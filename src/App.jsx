@@ -704,7 +704,7 @@ function FormulesChoixScreen({ onNav }) {
           <div style={{ fontSize: 52, marginBottom: 10 }}>🏊</div>
           <div style={{ color: "#fff", fontWeight: 900, fontSize: 20, marginBottom: 4 }}>Formules Natation</div>
           <div style={{ color: "rgba(255,255,255,0.8)", fontSize: 14 }}>1, 5, 6 ou 10 leçons</div>
-          <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 12 }}>
+          <div style={{ display: "flex", gap: 6, justifyContent: "center", marginTop: 12 }}>
             {["20 €", "95 €", "113 €", "170 €"].map(p => (
               <div key={p} style={{ background: "rgba(255,255,255,0.2)", borderRadius: 50, padding: "4px 12px", color: "#fff", fontSize: 12, fontWeight: 800 }}>{p}</div>
             ))}
@@ -723,7 +723,7 @@ function FormulesChoixScreen({ onNav }) {
           <div style={{ fontSize: 52, marginBottom: 10 }}>🏖️</div>
           <div style={{ color: "#fff", fontWeight: 900, fontSize: 20, marginBottom: 4 }}>Formules Club de Plage</div>
           <div style={{ color: "rgba(255,255,255,0.8)", fontSize: 14 }}>Matin · Après-midi · Journée</div>
-          <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 12 }}>
+          <div style={{ display: "flex", gap: 6, justifyContent: "center", marginTop: 12 }}>
             {["Formule Club", "Formule Liberté"].map(p => (
               <div key={p} style={{ background: "rgba(255,255,255,0.2)", borderRadius: 50, padding: "4px 12px", color: "#fff", fontSize: 12, fontWeight: 800 }}>{p}</div>
             ))}
@@ -741,7 +741,7 @@ function FormulesChoixScreen({ onNav }) {
           <div style={{ fontSize: 52, marginBottom: 10 }}>🌊</div>
           <div style={{ color: "#fff", fontWeight: 900, fontSize: 20, marginBottom: 4 }}>Éveil Aquatique</div>
           <div style={{ color: "rgba(255,255,255,0.8)", fontSize: 14 }}>Séances de 30 min · Chaque dimanche</div>
-          <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 12 }}>
+          <div style={{ display: "flex", gap: 6, justifyContent: "center", marginTop: 12 }}>
             <div style={{ background: "rgba(255,255,255,0.2)", borderRadius: 50, padding: "4px 16px", color: "#fff", fontSize: 13, fontWeight: 900 }}>20 € / séance</div>
           </div>
         </div>
@@ -1805,7 +1805,7 @@ function LoginScreen({ onNav, setUser }) {
           </div>
         ) : (
           /* Formulaire */
-          <div style={{ width: "100%", maxWidth: 420 }}>
+          <div style={{ width: "100%", maxWidth: 460 }}>
             <div style={{ textAlign: "center", marginBottom: 28 }}>
               <div style={{ fontSize: 56, marginBottom: 12 }}>🏖️</div>
               <h2 style={{ color: C.dark, fontWeight: 900, margin: "0 0 8px" }}>Connexion</h2>
@@ -4121,8 +4121,8 @@ function AdminCodeAccess({ onUnlock }) {
         <div style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 32px" }}>
           <div onClick={() => setOpen(false)} style={{ position: "absolute", inset: 0, background: "rgba(0,10,30,0.7)", backdropFilter: "blur(6px)" }} />
           <div style={{
-            position: "relative", background: "#fff", borderRadius: 28, padding: "36px 28px",
-            width: "100%", maxWidth: 420, textAlign: "center",
+            position: "relative", background: "#fff", borderRadius: 28, padding: "36px 20px",
+            width: "100%", maxWidth: 460, textAlign: "center",
             boxShadow: "0 24px 64px rgba(0,0,0,0.35)",
             animation: shake ? "shake .4s" : "none",
           }}>
