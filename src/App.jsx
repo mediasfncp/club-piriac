@@ -1886,7 +1886,7 @@ function InscriptionScreen({ onNav, setUser }) {
 
             <div style={{ display: "flex", gap: 10 }}>
               <SunBtn color="#bbb" onClick={() => setStep(3)} style={{ flex: 1 }}>← Retour</SunBtn>
-              <SunBtn color={form.cgvAccepted ? C.green : "#ccc"} disabled={!form.cgvAccepted} onClick={() => { if (form.cgvAccepted) { setUser({ ...form }); setDone(true); } }} style={{ flex: 2 }}>🎉 Confirmer !</SunBtn>
+              <SunBtn color={form.cgvAccepted ? C.green : "#ccc"} disabled={!form.cgvAccepted} onClick={async () => { if (!form.cgvAccepted) return; try { const membre = await creerMembre(form); await creerEnfants(membre.id, form.enfants || []); setUser({ ...form, supabaseId: membre.id }); } catch(e) { const ex = await getMembre(form.email); setUser({ ...form, supabaseId: ex?.id }); } setDone(true); }} style={{ flex: 2 }}>🎉 Confirmer !</SunBtn>
             </div>
           </Card>
         )}
