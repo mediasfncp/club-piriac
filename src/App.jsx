@@ -3947,10 +3947,10 @@ const ADMIN_CODE = "club2026";
 
 function AdminCodeAccess({ onUnlock }) {
   const [open, setOpen] = useState(false);
-  const [digits, setDigits] = useState(["", "", "", ""]);
+  const [digits, setDigits] = useState(["", "", "", "", "", "", "", ""]);
   const [error, setError] = useState(false);
   const [shake, setShake] = useState(false);
-  const inputRefs = [null, null, null, null].map(() => useState(null));
+  const inputRefs = [null, null, null, null, null, null, null, null].map(() => useState(null));
 
   const handleDigit = (idx, val) => {
     if (!/^\d?$/.test(val)) return;
