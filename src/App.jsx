@@ -4079,12 +4079,12 @@ function AdminCodeAccess({ onUnlock }) {
       const code = [...next.slice(0,7), val].join("");
       if (code === ADMIN_CODE) {
         setOpen(false);
-        setDigits(["","","",""]);
+        setDigits(["","","","","","","",""]);
         onUnlock();
       } else {
         setError(true);
         setShake(true);
-        setTimeout(() => { setShake(false); setDigits(["","","",""]); document.getElementById("admin-pin-0")?.focus(); }, 600);
+        setTimeout(() => { setShake(false); setDigits(["","","","","","","",""]); document.getElementById("admin-pin-0")?.focus(); }, 600);
       }
     }
   };
@@ -4097,7 +4097,7 @@ function AdminCodeAccess({ onUnlock }) {
 
   const handleOpen = () => {
     setOpen(true);
-    setDigits(["","","",""]);
+    setDigits(["","","","","","","",""]);
     setError(false);
     setTimeout(() => document.getElementById("admin-pin-0")?.focus(), 100);
   };
@@ -4337,9 +4337,9 @@ export default function App() {
               <div style={{ fontSize:60, marginBottom:8 }}>🌊</div>
               <h3 style={{ color:C.dark, margin:"0 0 6px" }}>Bienvenue !</h3>
               <p style={{ color:"#888", fontSize:13, margin:"0 0 16px" }}>Connectez-vous pour accéder à votre espace personnel</p>
-              <SunBtn color={C.ocean} onClick={() => onNav("login")} style={{ marginBottom: 10 }}>🔑 Se connecter</SunBtn>
+              <SunBtn color={C.ocean} onClick={() => setScreen("login")} style={{ marginBottom: 10 }}>🔑 Se connecter</SunBtn>
               <div style={{ marginTop: 10 }}>
-                <button onClick={() => onNav("inscription")} style={{ background:"none", border:"none", color:C.coral, fontSize:13, cursor:"pointer", fontFamily:"inherit", fontWeight:700 }}>
+                <button onClick={() => setScreen("inscription")} style={{ background:"none", border:"none", color:C.coral, fontSize:13, cursor:"pointer", fontFamily:"inherit", fontWeight:700 }}>
                   Pas encore de compte ? S'inscrire →
                 </button>
               </div>
