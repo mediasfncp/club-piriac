@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { creerMembre, creerEnfants, getMembre, creerReservationNatation, creerReservationClub, updateLiberte, enregistrerPaiement, getPaiements, getAllMembres, getAllReservations } from "./supabase";
+import { creerMembre, creerEnfants, getMembre, creerReservationNatation, creerReservationClub, updateLiberte, enregistrerPaiement, getPaiements, getAllMembres, getAllReservations } from "./supabase";
 
 /* ═══════════════════════════════════════════════════════
    🌊 FNCP – Club de Plage  |  Univers Joyeux Plage & Enfants
