@@ -4136,7 +4136,7 @@ function AdminCodeAccess({ onUnlock }) {
                 <input
                   key={i}
                   id={`admin-pin-${i}`}
-                  type="password"
+                  type="text"
                   inputMode="text"
                   maxLength={1}
                   value={d}
