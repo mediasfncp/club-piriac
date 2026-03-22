@@ -3581,6 +3581,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
   // Paiements réels Supabase
   const realTotal = dbPaiements.reduce((s, p) => s + Number(p.montant || 0), 0);
   const takenSpots = sessions.reduce((s,x) => s + (2 - x.spots), 0);
+  const totalSpots = sessions.reduce((s,x) => s + x.spots, 0);
   const fillRate = sessions.length > 0 ? Math.round((takenSpots / (sessions.length * 2)) * 100) : 0;
 
   const tabs = [
