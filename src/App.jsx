@@ -3943,7 +3943,7 @@ function BottomNav({ current, onNav }) {
 }
 
 // ── ADMIN CODE ACCESS ─────────────────────────────────────
-const ADMIN_CODE = "2026";
+const ADMIN_CODE = "club2026";
 
 function AdminCodeAccess({ onUnlock }) {
   const [open, setOpen] = useState(false);
