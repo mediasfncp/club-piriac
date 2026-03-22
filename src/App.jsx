@@ -3958,14 +3958,14 @@ function AdminCodeAccess({ onUnlock }) {
     next[idx] = val;
     setDigits(next);
     setError(false);
-    if (val && idx < 3) {
+    if (val && idx < 7) {
       // auto-focus next
       const nextInput = document.getElementById(`admin-pin-${idx+1}`);
       if (nextInput) nextInput.focus();
     }
     // Auto-check when all filled
-    if (idx === 3 && val) {
-      const code = [...next.slice(0,3), val].join("");
+    if (idx === 7 && val) {
+      const code = [...next.slice(0,7), val].join("");
       if (code === ADMIN_CODE) {
         setOpen(false);
         setDigits(["","","",""]);
@@ -4017,7 +4017,7 @@ function AdminCodeAccess({ onUnlock }) {
           }}>
             <div style={{ width: 64, height: 64, borderRadius: 20, background: "linear-gradient(135deg, #0F2027, #203A43)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 30, margin: "0 auto 16px" }}>⚙️</div>
             <h2 style={{ color: "#2C3E50", fontSize: 20, fontWeight: 900, margin: "0 0 6px" }}>Espace Admin</h2>
-            <p style={{ color: "#888", fontSize: 13, margin: "0 0 28px" }}>Saisissez le code à 4 chiffres</p>
+            <p style={{ color: "#888", fontSize: 13, margin: "0 0 28px" }}>Saisissez le code d'accès</p>
 
             {/* PIN inputs */}
             <div style={{ display: "flex", gap: 12, justifyContent: "center", marginBottom: 20 }}>
@@ -4026,7 +4026,7 @@ function AdminCodeAccess({ onUnlock }) {
                   key={i}
                   id={`admin-pin-${i}`}
                   type="password"
-                  inputMode="numeric"
+                  inputMode="text"
                   maxLength={1}
                   value={d}
                   onChange={e => handleDigit(i, e.target.value.slice(-1))}
