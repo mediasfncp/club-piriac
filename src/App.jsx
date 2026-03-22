@@ -2362,14 +2362,36 @@ function FicheModal({ membre, onClose }) {
   );
 }
 
-function MembresTab({ allResas }) {
+function MembresTab({ allResas, dbMembres }) {
   const [selectedMembre, setSelectedMembre] = useState(null);
+
+  // Fusionner données mock + Supabase
+  const membresSupabase = (dbMembres || []).map(m => ({
+    id: m.id,
+    name: `${m.prenom} ${m.nom}`,
+    email: m.email,
+    phone: m.tel,
+    adresse: m.adresse,
+    color: C.ocean,
+    av: "👤",
+    enfants: m.enfants || [],
+    resa: 0,
+    droitImage: m.droit_image,
+    droitDiffusion: m.droit_diffusion,
+    supabase: true,
+  }));
+
+  const tousLesMembres = membresSupabase.length > 0 ? membresSupabase : MEMBRES;
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       {selectedMembre && <FicheModal membre={selectedMembre} onClose={() => setSelectedMembre(null)} />}
-      <div style={{ fontWeight: 900, color: "#2C3E50", fontSize: 14, marginBottom: 4 }}>{MEMBRES.length} membres inscrits</div>
-      {MEMBRES.map(u => (
-        <div key={u.id} onClick={() => setSelectedMembre(u)} style={{ background: "#fff", borderRadius: 20, padding: "14px 16px", boxShadow: "0 4px 16px rgba(0,0,0,0.06)", display: "flex", alignItems: "center", gap: 14, cursor: "pointer", transition: "transform .15s" }}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+        <div style={{ fontWeight: 900, color: "#2C3E50", fontSize: 14 }}>{tousLesMembres.length} membre{tousLesMembres.length > 1 ? "s" : ""} inscrit{tousLesMembres.length > 1 ? "s" : ""}</div>
+        {membresSupabase.length > 0 && <Pill color={C.green}>✅ Supabase</Pill>}
+      </div>
+      {tousLesMembres.map((u, i) => (
+        <div key={u.id || i} onClick={() => setSelectedMembre(u)} style={{ background: "#fff", borderRadius: 20, padding: "14px 16px", boxShadow: "0 4px 16px rgba(0,0,0,0.06)", display: "flex", alignItems: "center", gap: 14, cursor: "pointer", transition: "transform .15s" }}
           onMouseEnter={e => e.currentTarget.style.transform = "translateY(-2px)"}
           onMouseLeave={e => e.currentTarget.style.transform = ""}
         >
@@ -2378,9 +2400,9 @@ function MembresTab({ allResas }) {
             <div style={{ fontWeight: 900, color: "#2C3E50", fontSize: 14 }}>{u.name}</div>
             <div style={{ fontSize: 11, color: "#aaa", marginBottom: 6 }}>{u.email}</div>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              <div style={{ background: `${u.color}18`, color: u.color, borderRadius: 50, padding: "3px 10px", fontSize: 11, fontWeight: 800 }}>👧 {u.enfants.length} enfant{u.enfants.length > 1 ? "s" : ""}</div>
-              <div style={{ background: `${C.ocean}15`, color: C.ocean, borderRadius: 50, padding: "3px 10px", fontSize: 11, fontWeight: 800 }}>📅 {u.resa} résas</div>
-              {u.enfants.some(e => e.allergies) && <div style={{ background: "#FFF0F0", color: C.sunset, borderRadius: 50, padding: "3px 10px", fontSize: 11, fontWeight: 800 }}>⚠️ Allergie</div>}
+              <div style={{ background: `${u.color}18`, color: u.color, borderRadius: 50, padding: "3px 10px", fontSize: 11, fontWeight: 800 }}>👧 {u.enfants?.length || 0} enfant{(u.enfants?.length || 0) > 1 ? "s" : ""}</div>
+              {u.enfants?.some(e => e.allergies) && <div style={{ background: "#FFF0F0", color: C.sunset, borderRadius: 50, padding: "3px 10px", fontSize: 11, fontWeight: 800 }}>⚠️ Allergie</div>}
+              {u.droitImage && <div style={{ background: `${C.green}18`, color: C.green, borderRadius: 50, padding: "3px 10px", fontSize: 11, fontWeight: 800 }}>📸 Photo OK</div>}
             </div>
           </div>
           <div style={{ fontSize: 20, color: "#ddd" }}>›</div>
@@ -3559,7 +3581,6 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
   // Paiements réels Supabase
   const realTotal = dbPaiements.reduce((s, p) => s + Number(p.montant || 0), 0);
   const takenSpots = sessions.reduce((s,x) => s + (2 - x.spots), 0);
-  const totalSpots = sessions.reduce((s,x) => s + x.spots, 0);
   const fillRate = sessions.length > 0 ? Math.round((takenSpots / (sessions.length * 2)) * 100) : 0;
 
   const tabs = [
@@ -3724,10 +3745,24 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
         {tab === "reservations" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-              <div style={{ fontWeight: 900, color: "#2C3E50", fontSize: 14 }}>{allResas.length} réservation(s)</div>
-              <Pill color={C.green}>{allResas.filter(r => r.status === "confirmed").length} confirmées</Pill>
+              <div style={{ fontWeight: 900, color: "#2C3E50", fontSize: 14 }}>
+                {dbResas.length > 0 ? dbResas.length : allResas.length} réservation(s)
+              </div>
+              <div style={{ display: "flex", gap: 6 }}>
+                <Pill color={C.green}>{dbResas.length > 0 ? dbResas.length : allResas.filter(r => r.status === "confirmed").length} confirmées</Pill>
+                {dbResas.length > 0 && <Pill color={C.ocean}>✅ Supabase</Pill>}
+              </div>
             </div>
-            {allResas.map(r => (
+            {(dbResas.length > 0 ? dbResas.map((r, i) => ({
+              id: r.id,
+              parent: r.membres ? `${r.membres.prenom} ${r.membres.nom}` : "—",
+              email: r.membres?.email || "—",
+              phone: r.membres?.tel || "—",
+              enfants: r.enfants || [],
+              session: `${r.heure} · ${r.jour}`,
+              date: r.date_seance ? new Date(r.date_seance).toLocaleDateString("fr-FR") : "—",
+              status: r.statut || "confirmed",
+            })) : allResas).map(r => (
               <div key={r.id} style={{ background: "#fff", borderRadius: 20, padding: "14px 16px", boxShadow: "0 4px 16px rgba(0,0,0,0.06)" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -3743,11 +3778,12 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                 </div>
                 <div style={{ background: "#F8FBFF", borderRadius: 12, padding: "8px 12px", marginBottom: 8 }}>
                   <div style={{ fontSize: 12, color: C.ocean, fontWeight: 800 }}>🏊 {r.session}</div>
+                  {r.date && <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>📅 {r.date}</div>}
                   {r.phone !== "—" && <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>📞 {r.phone}</div>}
                 </div>
                 {r.enfants?.length > 0 && (
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                    {r.enfants.map(c => <Pill key={c} color={C.sea}>{c}</Pill>)}
+                    {r.enfants.map((c, i) => <Pill key={i} color={C.sea}>{c}</Pill>)}
                   </div>
                 )}
               </div>
@@ -3756,11 +3792,11 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
         )}
 
         {tab === "membres" && (
-          <MembresTab allResas={allResas} />
+          <MembresTab allResas={allResas} dbMembres={dbMembres} />
         )}
 
         {tab === "paiements" && (
-          <PaiementsTab />
+          <PaiementsTab dbPaiements={dbPaiements} />
         )}
 
         {tab === "planning" && (
