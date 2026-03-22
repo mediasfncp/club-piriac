@@ -1,5 +1,11 @@
 import { useState, useEffect } from "react";
-import { creerMembre, creerEnfants, getMembre, creerReservationNatation, creerReservationClub, updateLiberte, enregistrerPaiement, getPaiements, getAllMembres, getAllReservations } from "./supabase";
+import {
+  creerMembre, creerEnfants, getMembre,
+  creerReservationNatation, getReservationsNatation,
+  creerReservationClub, updateLiberte,
+  enregistrerPaiement, getPaiements, getTotalPaiements,
+  getAllMembres, getAllReservations
+} from "./supabase";
 
 /* ═══════════════════════════════════════════════════════
    🌊 FNCP – Club de Plage  |  Univers Joyeux Plage & Enfants
@@ -358,108 +364,132 @@ const BackBtn = ({ onNav, to }) => (
 );
 
 // ── PAYPAL MODAL ──────────────────────────────────────────
-function PayPalModal({ amount, label, onSuccess, onCancel }) {
+// ── WERO MODAL ────────────────────────────────────────────
+// Couleurs officielles Wero
+const WERO = { main: "#6B2D8B", light: "#8B3DB0", accent: "#E8D5F5", dark: "#4A1D62" };
+
+function WeroModal({ amount, label, onSuccess, onCancel }) {
   const [step, setStep] = useState("form"); // form | processing | success
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [phone, setPhone] = useState("");
   const [error, setError] = useState("");
 
   const handlePay = () => {
-    if (!email || !password) { setError("Merci de remplir tous les champs."); return; }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setError("Adresse email invalide."); return; }
+    const clean = phone.replace(/\s/g, "");
+    if (!clean) { setError("Merci de saisir votre numéro de téléphone."); return; }
+    if (!/^(\+33|0)[67]\d{8}$/.test(clean)) { setError("Numéro invalide. Ex : 06 12 34 56 78"); return; }
     setError("");
     setStep("processing");
-    setTimeout(() => { setStep("success"); }, 2200);
+    setTimeout(() => setStep("success"), 2400);
   };
+
+  const WERO_LOGO = (
+    <svg width="72" height="28" viewBox="0 0 120 40" fill="none">
+      <rect width="120" height="40" rx="8" fill={WERO.main}/>
+      <text x="12" y="28" fontFamily="Arial, sans-serif" fontSize="22" fontWeight="900" fill="#fff" letterSpacing="1">wero</text>
+      <circle cx="100" cy="20" r="12" fill={WERO.accent} opacity="0.3"/>
+      <circle cx="100" cy="20" r="7" fill="#fff" opacity="0.9"/>
+    </svg>
+  );
 
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end" }}>
-      {/* Backdrop */}
-      <div onClick={step === "processing" ? undefined : onCancel} style={{ position: "absolute", inset: 0, background: "rgba(0,20,60,0.6)", backdropFilter: "blur(5px)" }} />
+      <div onClick={step === "processing" ? undefined : onCancel} style={{ position: "absolute", inset: 0, background: "rgba(30,10,50,0.65)", backdropFilter: "blur(6px)" }} />
 
-      {/* Sheet */}
-      <div style={{ position: "relative", width: "100%", maxWidth: 430, background: "#fff", borderRadius: "28px 28px 0 0", boxShadow: "0 -12px 48px rgba(0,0,0,0.25)", overflow: "hidden" }}>
+      <div style={{ position: "relative", width: "100%", maxWidth: 430, background: "#fff", borderRadius: "28px 28px 0 0", boxShadow: "0 -12px 48px rgba(0,0,0,0.3)", overflow: "hidden" }}>
 
+        {/* Processing */}
         {step === "processing" && (
-          <div style={{ padding: "40px 24px", textAlign: "center" }}>
-            <div style={{ fontSize: 52, marginBottom: 16 }}>⏳</div>
-            <div style={{ fontWeight: 900, color: "#003087", fontSize: 18, marginBottom: 8 }}>Paiement en cours...</div>
-            <div style={{ fontSize: 14, color: "#888" }}>Connexion sécurisée PayPal</div>
-            <div style={{ marginTop: 24, display: "flex", justifyContent: "center", gap: 8 }}>
-              {[0, 1, 2].map(i => (
-                <div key={i} style={{ width: 10, height: 10, borderRadius: "50%", background: "#009CDE", animation: `pulse 1s ${i * 0.3}s infinite` }} />
+          <div style={{ padding: "44px 24px", textAlign: "center" }}>
+            <div style={{ width: 80, height: 80, borderRadius: "50%", background: `linear-gradient(135deg, ${WERO.main}, ${WERO.light})`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", fontSize: 36 }}>💸</div>
+            <div style={{ fontWeight: 900, color: WERO.main, fontSize: 18, marginBottom: 8 }}>Envoi en cours…</div>
+            <div style={{ fontSize: 13, color: "#888", marginBottom: 24 }}>Connexion sécurisée Wero</div>
+            <div style={{ display: "flex", justifyContent: "center", gap: 8 }}>
+              {[0,1,2].map(i => (
+                <div key={i} style={{ width: 10, height: 10, borderRadius: "50%", background: WERO.main, animation: `pulse 1s ${i*0.3}s infinite` }} />
               ))}
             </div>
           </div>
         )}
 
+        {/* Success */}
         {step === "success" && (
-          <div style={{ padding: "40px 24px", textAlign: "center" }}>
-            <div style={{ width: 80, height: 80, borderRadius: "50%", background: "linear-gradient(135deg, #00B09B, #6BCB77)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 38, margin: "0 auto 16px" }}>✓</div>
-            <div style={{ fontWeight: 900, color: "#003087", fontSize: 20, marginBottom: 6 }}>Paiement confirmé !</div>
-            <div style={{ fontSize: 14, color: "#888", marginBottom: 4 }}>PayPal · {amount} €</div>
+          <div style={{ padding: "44px 24px", textAlign: "center" }}>
+            <div style={{ width: 84, height: 84, borderRadius: "50%", background: `linear-gradient(135deg, ${WERO.main}, ${WERO.light})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 40, margin: "0 auto 18px" }}>✓</div>
+            <div style={{ fontWeight: 900, color: WERO.main, fontSize: 22, marginBottom: 6 }}>Paiement reçu !</div>
+            <div style={{ fontSize: 15, color: "#555", marginBottom: 4 }}><strong>{amount} €</strong> via Wero</div>
             <div style={{ fontSize: 13, color: "#aaa", marginBottom: 28 }}>{label}</div>
-            <button onClick={onSuccess} style={{ background: "linear-gradient(135deg, #009CDE, #003087)", color: "#fff", border: "none", borderRadius: 50, padding: "14px 40px", fontWeight: 900, fontSize: 16, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 6px 20px #009CDE55" }}>
+            <button onClick={onSuccess} style={{ background: `linear-gradient(135deg, ${WERO.main}, ${WERO.light})`, color: "#fff", border: "none", borderRadius: 50, padding: "14px 40px", fontWeight: 900, fontSize: 16, cursor: "pointer", fontFamily: "inherit", boxShadow: `0 6px 20px ${WERO.main}55` }}>
               Accéder à ma réservation →
             </button>
           </div>
         )}
 
+        {/* Form */}
         {step === "form" && (
           <>
-            {/* PayPal header */}
-            <div style={{ background: "linear-gradient(135deg, #003087, #009CDE)", padding: "20px 24px 18px" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-                <div style={{ color: "#fff", fontWeight: 900, fontSize: 22, letterSpacing: -0.5 }}>Pay<span style={{ color: "#009CDE", background: "#fff", borderRadius: 4, padding: "0 3px", fontSize: 20 }}>Pal</span></div>
+            {/* Header Wero */}
+            <div style={{ background: `linear-gradient(135deg, ${WERO.dark}, ${WERO.main}, ${WERO.light})`, padding: "20px 24px 20px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                <div style={{ color: "#fff", fontWeight: 900, fontSize: 26, letterSpacing: 1 }}>wero</div>
                 <button onClick={onCancel} style={{ background: "rgba(255,255,255,0.2)", border: "none", color: "#fff", borderRadius: "50%", width: 30, height: 30, cursor: "pointer", fontWeight: 900, fontSize: 16, fontFamily: "inherit" }}>✕</button>
               </div>
-              <div style={{ background: "rgba(255,255,255,0.12)", borderRadius: 14, padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              {/* Montant */}
+              <div style={{ background: "rgba(255,255,255,0.15)", borderRadius: 16, padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
-                  <div style={{ color: "rgba(255,255,255,0.75)", fontSize: 12, marginBottom: 2 }}>Montant à payer</div>
-                  <div style={{ color: "#fff", fontWeight: 900, fontSize: 26 }}>{amount} €</div>
+                  <div style={{ color: "rgba(255,255,255,0.7)", fontSize: 12, marginBottom: 2 }}>Montant</div>
+                  <div style={{ color: "#fff", fontWeight: 900, fontSize: 28, lineHeight: 1 }}>{amount} €</div>
                 </div>
                 <div style={{ textAlign: "right" }}>
-                  <div style={{ color: "rgba(255,255,255,0.75)", fontSize: 11 }}>FNCP · Club de Plage</div>
+                  <div style={{ color: "rgba(255,255,255,0.7)", fontSize: 11 }}>FNCP · Club de Plage</div>
                   <div style={{ color: "rgba(255,255,255,0.9)", fontSize: 12, fontWeight: 700, marginTop: 2 }}>{label}</div>
                 </div>
               </div>
             </div>
 
-            <div style={{ padding: "20px 24px 28px" }}>
-              <div style={{ fontSize: 14, color: "#555", fontWeight: 700, marginBottom: 16 }}>Connecte-toi à ton compte PayPal</div>
-
-              {/* Email */}
-              <div style={{ marginBottom: 12 }}>
-                <label style={{ fontSize: 12, fontWeight: 900, color: "#003087", display: "block", marginBottom: 5, letterSpacing: 0.3, textTransform: "uppercase" }}>Email</label>
-                <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="prenom@exemple.fr"
-                  style={{ width: "100%", border: "2px solid #e0e8f0", borderRadius: 12, padding: "12px 14px", fontSize: 15, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
-                  onFocus={e => e.target.style.borderColor = "#009CDE"}
-                  onBlur={e => e.target.style.borderColor = "#e0e8f0"} />
+            <div style={{ padding: "22px 24px 28px" }}>
+              {/* Info Wero */}
+              <div style={{ background: WERO.accent, borderRadius: 14, padding: "12px 14px", marginBottom: 18, display: "flex", gap: 10, alignItems: "flex-start" }}>
+                <div style={{ fontSize: 20, flexShrink: 0 }}>💜</div>
+                <div style={{ fontSize: 12, color: WERO.dark, lineHeight: 1.6 }}>
+                  <strong>Paiement via Wero</strong> — disponible dans votre application bancaire (BNP, Société Générale, Crédit Agricole, LCL, La Banque Postale…)
+                </div>
               </div>
 
-              {/* Password */}
-              <div style={{ marginBottom: 16 }}>
-                <label style={{ fontSize: 12, fontWeight: 900, color: "#003087", display: "block", marginBottom: 5, letterSpacing: 0.3, textTransform: "uppercase" }}>Mot de passe</label>
-                <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••"
-                  style={{ width: "100%", border: "2px solid #e0e8f0", borderRadius: 12, padding: "12px 14px", fontSize: 15, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
-                  onFocus={e => e.target.style.borderColor = "#009CDE"}
-                  onBlur={e => e.target.style.borderColor = "#e0e8f0"} />
+              {/* Téléphone */}
+              <div style={{ marginBottom: 18 }}>
+                <label style={{ fontSize: 12, fontWeight: 900, color: WERO.main, display: "block", marginBottom: 6, letterSpacing: 0.5, textTransform: "uppercase" }}>
+                  📱 Votre numéro de téléphone
+                </label>
+                <input
+                  type="tel" value={phone}
+                  onChange={e => { setPhone(e.target.value); setError(""); }}
+                  placeholder="06 12 34 56 78"
+                  style={{ width: "100%", border: `2px solid ${error ? "#e74c3c" : "#e0d5f0"}`, borderRadius: 14, padding: "13px 16px", fontSize: 16, fontFamily: "inherit", outline: "none", boxSizing: "border-box", color: "#2C3E50", background: "#FDFBFF", letterSpacing: 1 }}
+                  onFocus={e => e.target.style.borderColor = WERO.main}
+                  onBlur={e => e.target.style.borderColor = error ? "#e74c3c" : "#e0d5f0"}
+                />
+                <div style={{ fontSize: 11, color: "#aaa", marginTop: 5 }}>Le numéro associé à votre compte Wero</div>
               </div>
 
               {error && (
-                <div style={{ background: "#fff0f0", border: "1.5px solid #ffaaaa", borderRadius: 10, padding: "9px 14px", fontSize: 13, color: "#cc0000", fontWeight: 700, marginBottom: 14 }}>⚠️ {error}</div>
+                <div style={{ background: "#fff0f0", border: "1.5px solid #fca5a5", borderRadius: 10, padding: "9px 14px", fontSize: 13, color: "#e74c3c", fontWeight: 700, marginBottom: 14 }}>⚠️ {error}</div>
               )}
 
               {/* Pay button */}
-              <button onClick={handlePay} style={{ width: "100%", background: "linear-gradient(135deg, #003087, #009CDE)", color: "#fff", border: "none", borderRadius: 50, padding: "16px", fontWeight: 900, fontSize: 16, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 6px 20px #009CDE44", marginBottom: 12 }}>
-                🔒 Payer {amount} € avec PayPal
+              <button onClick={handlePay} style={{
+                width: "100%", background: `linear-gradient(135deg, ${WERO.dark}, ${WERO.main})`,
+                color: "#fff", border: "none", borderRadius: 50, padding: "16px",
+                fontWeight: 900, fontSize: 16, cursor: "pointer", fontFamily: "inherit",
+                boxShadow: `0 6px 20px ${WERO.main}55`, marginBottom: 14,
+              }}>
+                💜 Payer {amount} € avec Wero
               </button>
 
-              <div style={{ textAlign: "center", fontSize: 12, color: "#aaa" }}>
-                🔒 Paiement 100% sécurisé · Données chiffrées SSL
+              <div style={{ textAlign: "center", fontSize: 12, color: "#aaa", marginBottom: 6 }}>
+                🔒 Paiement sécurisé · Données chiffrées
               </div>
-              <div style={{ textAlign: "center", fontSize: 11, color: "#bbb", marginTop: 6 }}>
-                En payant, vous acceptez nos <span style={{ color: C.ocean }}>Conditions Générales de Vente</span>.<br/>
+              <div style={{ textAlign: "center", fontSize: 11, color: "#bbb" }}>
+                En payant, vous acceptez nos <span style={{ color: WERO.main }}>CGV</span>.<br/>
                 <span style={{ color: C.sunset, fontWeight: 700 }}>Aucun remboursement sauf attestation médicale.</span>
               </div>
             </div>
@@ -752,7 +782,7 @@ function FormulesEveilScreen({ onNav, user }) {
   const [selectedSunday, setSelectedSunday] = useState(0);
   const [booking, setBooking] = useState(null);
   const [done, setDone] = useState(null);
-  const [showPayPal, setShowPayPal] = useState(false);
+  const [showWero, setShowWero] = useState(false);
 
   // 🔒 Gate inscription
   if (!user) return (
@@ -781,11 +811,11 @@ function FormulesEveilScreen({ onNav, user }) {
   };
 
   const confirmBook = () => {
-    setShowPayPal(true);
+    setShowWero(true);
   };
 
-  const onPayPalSuccess = () => {
-    setShowPayPal(false);
+  const onWeroSuccess = () => {
+    setShowWero(false);
     setEveilSundays(prev => prev.map((sun, si) =>
       si === booking.sundayIdx
         ? { ...sun, slots: sun.slots.map(sl => sl.id === booking.slotId ? { ...sl, spots: Math.max(0, sl.spots - 1) } : sl) }
@@ -854,12 +884,12 @@ function FormulesEveilScreen({ onNav, user }) {
             <div style={{ fontSize: 13, color: "#777" }}>1 séance d'éveil aquatique · 30 min</div>
           </div>
           <SunBtn color="#9B59B6" full onClick={confirmBook}>🌊 Payer et confirmer · 20 €</SunBtn>
-          {showPayPal && (
-            <PayPalModal
+          {showWero && (
+            <WeroModal
               amount={20}
               label="Éveil Aquatique · 1 séance"
-              onSuccess={onPayPalSuccess}
-              onCancel={() => setShowPayPal(false)}
+              onSuccess={onWeroSuccess}
+              onCancel={() => setShowWero(false)}
             />
           )}
         </div>
@@ -954,7 +984,7 @@ function FormulesEveilScreen({ onNav, user }) {
 function FormulesNatationScreen({ onNav }) {
   const [selected, setSelected] = useState(null);
   const [done, setDone] = useState(false);
-  const [showPayPal, setShowPayPal] = useState(false);
+  const [showWero, setShowWero] = useState(false);
   if (done) return (
     <div style={{ padding: 32, textAlign: "center", background: C.shell, minHeight: "100%" }}>
       <div style={{ fontSize: 90 }}>🎉</div>
@@ -1000,13 +1030,13 @@ function FormulesNatationScreen({ onNav }) {
             <div style={{ fontSize: 30, marginBottom: 6 }}>{selected.emoji}</div>
             <div style={{ fontWeight: 900, color: C.dark, marginBottom: 2 }}>Formule : {selected.label}</div>
             <div style={{ fontSize: 26, fontWeight: 900, color: selected.color, marginBottom: 16 }}>{selected.price} €</div>
-            <SunBtn color={selected.color} full onClick={() => setShowPayPal(true)}>🔒 Payer et commander · {selected?.price} €</SunBtn>
-            {showPayPal && (
-              <PayPalModal
+            <SunBtn color={selected.color} full onClick={() => setShowWero(true)}>🔒 Payer et commander · {selected?.price} €</SunBtn>
+            {showWero && (
+              <WeroModal
                 amount={selected?.price}
                 label={`Formule Natation · ${selected?.label}`}
-                onSuccess={() => { setShowPayPal(false); setDone(true); }}
-                onCancel={() => setShowPayPal(false)}
+                onSuccess={() => { setShowWero(false); setDone(true); }}
+                onCancel={() => setShowWero(false)}
               />
             )}
           </Card>
@@ -1109,7 +1139,7 @@ function ReservationClubScreen({ onNav, user, setUser, clubPlaces, setClubPlaces
     { id:"apmidi", label:"Demi-journée Après-midi", horaires:"14h30 – 18h00", color:C.ocean, emoji:"🌊", places: clubPlaces?.apmidi ?? 45 },
   ];
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (!selectedSession) return;
     setUser(prev => ({ ...prev, liberteBalance: Math.max(0, (prev.liberteBalance||0) - 1) }));
     if (setClubPlaces) setClubPlaces(prev => ({ ...prev, [selectedSession]: Math.max(0, (prev[selectedSession]||45) - 1) }));
@@ -1125,6 +1155,18 @@ function ReservationClubScreen({ onNav, user, setUser, clubPlaces, setClubPlaces
         corps: `${s?.label} demain (${s?.horaires}). À demain !`,
         dateStr: rappelDate,
       });
+      // Sauvegarder dans Supabase
+      try {
+        await creerReservationClub({
+          membreId:         user?.supabaseId || null,
+          dateReservation:  iso,
+          session:          selectedSession,
+          labelJour:        `${selectedDay?.label} ${selectedDay?.num} ${selectedDay?.month}`,
+          rappelDate:       rappelDate,
+        });
+        const newBalance = Math.max(0, (user?.liberteBalance||0) - 1);
+        if (user?.supabaseId) await updateLiberte(user.supabaseId, newBalance, user.liberteTotal || newBalance);
+      } catch(e) { console.warn("Supabase:", e.message); }
     }
     setDone({ day: `${selectedDay?.label} ${selectedDay?.num} ${selectedDay?.month} 2026`, session: s?.label, rappelDate });
     setSelectedSession(null);
@@ -1235,7 +1277,7 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser }) 
   const [nbEnfants, setNbEnfants] = useState(1);
   const [selectedRow, setSelectedRow] = useState(null);
   const [done, setDone] = useState(null); // null | "club" | "liberte"
-  const [showPayPal, setShowPayPal] = useState(false);
+  const [showWero, setShowWero] = useState(false);
   const [selectedLiberte, setSelectedLiberte] = useState(null);
 
   const tarifData = formulType === "matin" ? TARIFS_MATIN : formulType === "apmidi" ? TARIFS_APMIDI : TARIFS_JOURNEE;
@@ -1433,11 +1475,22 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser }) 
                   ⚠️ Valable uniquement saison 2026 · 6 juil – 22 août
                 </div>
                 <div style={{ fontSize: 28, fontWeight: 900, color: C.coral, marginBottom: 16 }}>{selectedLiberte.price} €</div>
-                <SunBtn color={C.coral} full onClick={() => {
+                <SunBtn color={C.coral} full onClick={async () => {
                   // Crédite les demi-journées sur le compte utilisateur
                   if (setUser && user) {
                     const djCount = getDjCount(selectedLiberte.label);
-                    setUser(prev => ({ ...prev, liberteBalance: (prev.liberteBalance || 0) + djCount, liberteTotal: (prev.liberteTotal || 0) + djCount }));
+                    const newBalance = (user.liberteBalance || 0) + djCount;
+                    const newTotal = (user.liberteTotal || 0) + djCount;
+                    setUser(prev => ({ ...prev, liberteBalance: newBalance, liberteTotal: newTotal }));
+                    try {
+                      if (user.supabaseId) await updateLiberte(user.supabaseId, newBalance, newTotal);
+                      await enregistrerPaiement({
+                        membreId: user.supabaseId || null,
+                        montant:  selectedLiberte.price,
+                        type:     'liberte',
+                        label:    `Carte Liberté · ${selectedLiberte.label}`,
+                      });
+                    } catch(e) { console.warn("Supabase:", e.message); }
                   }
                   setDone("liberte");
                 }}>Activer ma Carte Liberté 🎟️</SunBtn>
@@ -1456,15 +1509,15 @@ function ReservationScreen({ onNav, user, sessions, setSessions, reservations, s
   const [booking, setBooking] = useState(null);
   const [selectedEnfants, setSelectedEnfants] = useState([]);
   const [done, setDone] = useState(null);
-  const [showPayPal, setShowPayPal] = useState(false);
+  const [showWero, setShowWero] = useState(false);
 
   const allForDay = sessions.filter(s => s.day === selectedDay);
   const morning = allForDay.filter(s => { const [h] = s.time.split(":").map(Number); return h < 13; });
   const afternoon = allForDay.filter(s => { const [h] = s.time.split(":").map(Number); return h >= 13; });
 
-  const handleConfirm = () => setShowPayPal(true);
-  const onPayPalSuccess = () => {
-    setShowPayPal(false);
+  const handleConfirm = () => setShowWero(true);
+  const onWeroSuccess = async () => {
+    setShowWero(false);
     setSessions(prev => prev.map(s => s.id === booking.id ? { ...s, spots: Math.max(0, s.spots-1) } : s));
     const resa = { ...booking, parent: user?.prenom || "Invité", enfants: selectedEnfants, id: Date.now() };
     setReservations(prev => [...prev, resa]);
@@ -1479,6 +1532,25 @@ function ReservationScreen({ onNav, user, sessions, setSessions, reservations, s
     });
     resa.rappelDate = rappelDate;
     resa.resaDate = resaDateISO;
+    // Sauvegarder dans Supabase
+    try {
+      await creerReservationNatation({
+        membreId:   user?.supabaseId || null,
+        jour:       booking.day,
+        heure:      booking.time,
+        dateSeance: resaDateISO,
+        enfants:    selectedEnfants,
+        rappelDate: rappelDate,
+        montant:    20,
+      });
+      await enregistrerPaiement({
+        membreId:        user?.supabaseId || null,
+        montant:         20,
+        type:            'natation',
+        label:           `Natation ${booking.time}`,
+        transactionWero: null,
+      });
+    } catch(e) { console.warn("Supabase:", e.message); }
     setDone(resa); setBooking(null); setSelectedEnfants([]);
   };
 
@@ -1558,12 +1630,12 @@ function ReservationScreen({ onNav, user, sessions, setSessions, reservations, s
           </Card>
         )}
         <SunBtn color={C.green} full onClick={handleConfirm}>🏊 Payer et confirmer · 20 €</SunBtn>
-        {showPayPal && (
-          <PayPalModal
+        {showWero && (
+          <WeroModal
             amount={20}
             label={`Natation · ${booking?.time}`}
-            onSuccess={onPayPalSuccess}
-            onCancel={() => setShowPayPal(false)}
+            onSuccess={onWeroSuccess}
+            onCancel={() => setShowWero(false)}
           />
         )}
       </div>
@@ -1886,7 +1958,20 @@ function InscriptionScreen({ onNav, setUser }) {
 
             <div style={{ display: "flex", gap: 10 }}>
               <SunBtn color="#bbb" onClick={() => setStep(3)} style={{ flex: 1 }}>← Retour</SunBtn>
-              <SunBtn color={form.cgvAccepted ? C.green : "#ccc"} disabled={!form.cgvAccepted} onClick={async () => { if (!form.cgvAccepted) return; try { const membre = await creerMembre(form); await creerEnfants(membre.id, form.enfants || []); setUser({ ...form, supabaseId: membre.id }); } catch(e) { const ex = await getMembre(form.email); setUser({ ...form, supabaseId: ex?.id }); } setDone(true); }} style={{ flex: 2 }}>🎉 Confirmer !</SunBtn>
+              <SunBtn color={form.cgvAccepted ? C.green : "#ccc"} disabled={!form.cgvAccepted} onClick={async () => {
+                if (!form.cgvAccepted) return;
+                try {
+                  const membre = await creerMembre(form);
+                  await creerEnfants(membre.id, form.enfants || []);
+                  setUser({ ...form, supabaseId: membre.id });
+                } catch (e) {
+                  // Si email déjà existant, on récupère le membre
+                  const existing = await getMembre(form.email);
+                  if (existing) setUser({ ...form, supabaseId: existing.id });
+                  else setUser({ ...form });
+                }
+                setDone(true);
+              }} style={{ flex: 2 }}>🎉 Confirmer !</SunBtn>
             </div>
           </Card>
         )}
@@ -2616,7 +2701,7 @@ function PaiementsTab() {
                 <div style={{ flex:1, minWidth:0 }}>
                   <div style={{ fontWeight:800, fontSize:13, color:"#2C3E50", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{p.parent}</div>
                   <div style={{ fontSize:11, color:"#aaa", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{p.type}</div>
-                  {period !== "jour" && <div style={{ fontSize:10, color:"#ccc" }}>{formatDate(p.date)} · PayPal</div>}
+                  {period !== "jour" && <div style={{ fontSize:10, color:"#ccc" }}>{formatDate(p.date)} · Wero</div>}
                 </div>
                 <div style={{ textAlign:"right", flexShrink:0 }}>
                   <div style={{ fontWeight:900, fontSize:14, color:CAT_COLOR[p.categorie] }}>{p.montant} €</div>
@@ -3442,6 +3527,16 @@ th{background:#1A8FE3;color:#fff;padding:9px 12px;text-align:left}
 
 function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSessions, setAllSeasonSessions, clubPlaces }) {
   const [tab, setTab] = useState("dashboard");
+  const [dbResas, setDbResas]     = useState([]);
+  const [dbMembres, setDbMembres] = useState([]);
+  const [dbPaiements, setDbPaiements] = useState([]);
+
+  // Charger les données Supabase au montage
+  useEffect(() => {
+    getAllReservations().then(d => setDbResas(d)).catch(() => {});
+    getAllMembres().then(d => setDbMembres(d)).catch(() => {});
+    getPaiements().then(d => setDbPaiements(d)).catch(() => {});
+  }, []);
 
   const MOCK_RESAS = [
     { id: 1, parent: "Martin Dupont",  email: "martin@gmail.com",  phone: "06 00 00 00 00", enfants: ["Emma","Lucas"], session: "09:00 - Lun 7",  status: "confirmed" },
@@ -3449,12 +3544,20 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
     { id: 3, parent: "Pierre Martin",  email: "pierre@gmail.com",  phone: "06 55 44 33 22", enfants: ["Noah"],          session: "10:00 - Mar 8",  status: "pending"   },
     { id: 4, parent: "Julie Leroy",    email: "julie@gmail.com",   phone: "06 77 88 99 11", enfants: ["Manon","Tom"],   session: "11:30 - Mer 9",  status: "confirmed" },
   ];
-  const allResas = [...MOCK_RESAS, ...reservations.map((r,i) => ({
+
+  // Fusionner données mock + vraies données Supabase
+  const supabaseResas = dbResas.map((r, i) => ({
+    id: `sb-${i}`, parent: `${r.membres?.prenom || ''} ${r.membres?.nom || ''}`.trim() || '—',
+    email: r.membres?.email || '—', phone: r.membres?.tel || '—',
+    enfants: r.enfants || [], session: `${r.heure} - ${r.jour}`, status: r.statut || 'confirmed'
+  }));
+  const allResas = [...MOCK_RESAS, ...supabaseResas, ...reservations.map((r,i) => ({
     id: 1000+i, parent: r.parent, email: "—", phone: "—", enfants: r.enfants || [],
     session: `${r.time} - ${DAYS.find(d=>d.id===r.day)?.label} ${DAYS.find(d=>d.id===r.day)?.num}`, status: "confirmed"
   }))];
 
-  const totalSpots = sessions.reduce((s,x) => s + x.spots, 0);
+  // Paiements réels Supabase
+  const realTotal = dbPaiements.reduce((s, p) => s + Number(p.montant || 0), 0);
   const takenSpots = sessions.reduce((s,x) => s + (2 - x.spots), 0);
   const fillRate = sessions.length > 0 ? Math.round((takenSpots / (sessions.length * 2)) * 100) : 0;
 
@@ -3497,23 +3600,27 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
       <div style={{ padding: "16px 16px 24px" }}>
         {tab === "dashboard" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+
+            {/* KPI principaux — données réelles Supabase */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               {[
-                { label: "Séances actives", value: sessions.length, emoji: "🗓️", bg: `linear-gradient(135deg, ${C.ocean}, #0052A3)`, sh: C.ocean },
-                { label: "Réservations",    value: allResas.length, emoji: "👥",  bg: `linear-gradient(135deg, ${C.green}, #1E8449)`, sh: C.green },
-                { label: "Places libres",   value: totalSpots,      emoji: "🌊",  bg: `linear-gradient(135deg, ${C.sea}, #17A589)`,   sh: C.sea   },
-                { label: "Places prises",   value: takenSpots,      emoji: "✅",  bg: `linear-gradient(135deg, ${C.coral}, #C0392B)`, sh: C.coral },
+                { label: "Membres inscrits", value: dbMembres.length,  emoji: "👤", bg: `linear-gradient(135deg, ${C.ocean}, #0052A3)`, sh: C.ocean },
+                { label: "Réservations",     value: dbResas.length + reservations.length, emoji: "👥", bg: `linear-gradient(135deg, ${C.green}, #1E8449)`, sh: C.green },
+                { label: "Places libres",    value: totalSpots,         emoji: "🌊", bg: `linear-gradient(135deg, ${C.sea}, #17A589)`,   sh: C.sea   },
+                { label: "Total encaissé",   value: `${realTotal} €`,   emoji: "💳", bg: `linear-gradient(135deg, ${C.coral}, #C0392B)`, sh: C.coral },
               ].map(s => (
                 <div key={s.label} style={{ background: s.bg, borderRadius: 20, padding: "16px 14px", boxShadow: `0 6px 20px ${s.sh}44` }}>
                   <div style={{ fontSize: 28, marginBottom: 8 }}>{s.emoji}</div>
-                  <div style={{ fontSize: 30, fontWeight: 900, color: "#fff", lineHeight: 1 }}>{s.value}</div>
+                  <div style={{ fontSize: 28, fontWeight: 900, color: "#fff", lineHeight: 1 }}>{s.value}</div>
                   <div style={{ fontSize: 11, color: "rgba(255,255,255,0.75)", fontWeight: 700, marginTop: 4 }}>{s.label}</div>
                 </div>
               ))}
             </div>
+
+            {/* Taux de remplissage */}
             <div style={{ background: "#fff", borderRadius: 20, padding: 18, boxShadow: "0 4px 16px rgba(0,0,0,0.06)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
-                <span style={{ fontWeight: 800, color: "#2C3E50", fontSize: 14 }}>📈 Taux de remplissage</span>
+                <span style={{ fontWeight: 800, color: "#2C3E50", fontSize: 14 }}>📈 Taux de remplissage natation</span>
                 <span style={{ fontWeight: 900, color: C.ocean, fontSize: 14 }}>{fillRate}%</span>
               </div>
               <div style={{ background: "#EEF5FF", borderRadius: 50, height: 10, overflow: "hidden" }}>
@@ -3525,54 +3632,67 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
               </div>
             </div>
 
-            {/* 💳 Suivi des paiements */}
-            {(() => {
-              const MOCK_PAYMENTS = [
-                { id: 1, parent: "Martin Dupont",  montant: 20,  type: "Natation · 1 leçon",          date: "06/07/2026" },
-                { id: 2, parent: "Sophie Bernard", montant: 95,  type: "Natation · 5 leçons",         date: "06/07/2026" },
-                { id: 3, parent: "Pierre Martin",  montant: 39,  type: "Club · Matin · 3 enfants",    date: "07/07/2026" },
-                { id: 4, parent: "Julie Leroy",    montant: 264, type: "Club · Journée · 2 semaines", date: "07/07/2026" },
-                { id: 5, parent: "Emma Renard",    montant: 40,  type: "Eveil Aquatique · 2 séances", date: "08/07/2026" },
-                { id: 6, parent: "Lucie Morin",    montant: 113, type: "Natation · 6 leçons",         date: "08/07/2026" },
-              ];
-              const totalEncaissé = MOCK_PAYMENTS.reduce((s, p) => s + p.montant, 0);
-              return (
-                <div style={{ background: "#fff", borderRadius: 20, padding: 18, boxShadow: "0 4px 16px rgba(0,0,0,0.06)" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-                    <div style={{ fontWeight: 800, color: "#2C3E50", fontSize: 14 }}>💳 Paiements reçus</div>
-                    <div style={{ background: `${C.green}18`, color: C.green, borderRadius: 50, padding: "4px 14px", fontWeight: 900, fontSize: 13 }}>{totalEncaissé} € encaissés</div>
-                  </div>
-
-                  {/* KPI */}
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
-                    <div style={{ background: `${C.green}12`, borderRadius: 14, padding: "12px", textAlign: "center" }}>
-                      <div style={{ fontWeight: 900, color: C.green, fontSize: 22 }}>{totalEncaissé} €</div>
-                      <div style={{ fontSize: 11, color: "#aaa", marginTop: 2 }}>Total encaissé</div>
-                    </div>
-                    <div style={{ background: `${C.ocean}12`, borderRadius: 14, padding: "12px", textAlign: "center" }}>
-                      <div style={{ fontWeight: 900, color: C.ocean, fontSize: 22 }}>{MOCK_PAYMENTS.length}</div>
-                      <div style={{ fontSize: 11, color: "#aaa", marginTop: 2 }}>Transactions</div>
-                    </div>
-                  </div>
-
-                  {/* Liste */}
-                  <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-                    {MOCK_PAYMENTS.map((p, i) => (
-                      <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderBottom: i < MOCK_PAYMENTS.length - 1 ? "1px solid #F0F4F8" : "none" }}>
-                        <div style={{ width: 36, height: 36, borderRadius: 12, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, background: `${C.green}18`, color: C.green, fontWeight: 900 }}>✓</div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontWeight: 800, fontSize: 13, color: "#2C3E50", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.parent}</div>
-                          <div style={{ fontSize: 11, color: "#aaa", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.type}</div>
-                          <div style={{ fontSize: 10, color: "#bbb" }}>{p.date} · PayPal</div>
-                        </div>
-                        <div style={{ fontWeight: 900, fontSize: 15, color: C.green, flexShrink: 0 }}>{p.montant} €</div>
-                      </div>
-                    ))}
-                  </div>
+            {/* 💳 Paiements réels Supabase */}
+            <div style={{ background: "#fff", borderRadius: 20, padding: 18, boxShadow: "0 4px 16px rgba(0,0,0,0.06)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                <div style={{ fontWeight: 800, color: "#2C3E50", fontSize: 14 }}>💳 Paiements reçus</div>
+                <div style={{ background: `${C.green}18`, color: C.green, borderRadius: 50, padding: "4px 14px", fontWeight: 900, fontSize: 13 }}>
+                  {realTotal} € encaissés
                 </div>
-              );
-            })()}
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 14 }}>
+                {[
+                  { label: "Total", value: `${realTotal} €`, color: C.green },
+                  { label: "Transactions", value: dbPaiements.length, color: C.ocean },
+                  { label: "Moyenne", value: dbPaiements.length > 0 ? `${Math.round(realTotal/dbPaiements.length)} €` : "—", color: "#9B59B6" },
+                ].map(k => (
+                  <div key={k.label} style={{ background: `${k.color}12`, borderRadius: 14, padding: "10px 8px", textAlign: "center" }}>
+                    <div style={{ fontWeight: 900, color: k.color, fontSize: 16 }}>{k.value}</div>
+                    <div style={{ fontSize: 10, color: "#aaa", marginTop: 2 }}>{k.label}</div>
+                  </div>
+                ))}
+              </div>
+              {dbPaiements.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "12px 0", color: "#bbb", fontSize: 13 }}>Aucun paiement enregistré</div>
+              ) : dbPaiements.slice(0, 6).map((p, i) => {
+                const catColor = p.type === "natation" ? C.ocean : p.type === "club" ? C.coral : p.type === "liberte" ? "#FF9500" : "#9B59B6";
+                const dateStr = p.date_paiement ? new Date(p.date_paiement).toLocaleDateString("fr-FR") : "—";
+                return (
+                  <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: i < Math.min(dbPaiements.length,6)-1 ? "1px solid #F0F4F8" : "none" }}>
+                    <div style={{ width: 34, height: 34, borderRadius: 12, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, background: `${catColor}18`, color: catColor, fontWeight: 900 }}>✓</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 800, fontSize: 13, color: "#2C3E50", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {p.membres ? `${p.membres.prenom} ${p.membres.nom}` : "—"}
+                      </div>
+                      <div style={{ fontSize: 11, color: "#aaa" }}>{p.label} · {dateStr}</div>
+                    </div>
+                    <div style={{ fontWeight: 900, fontSize: 14, color: catColor, flexShrink: 0 }}>{p.montant} €</div>
+                  </div>
+                );
+              })}
+            </div>
 
+            {/* 👤 Derniers membres inscrits */}
+            <div style={{ background: "#fff", borderRadius: 20, padding: 18, boxShadow: "0 4px 16px rgba(0,0,0,0.06)" }}>
+              <div style={{ fontWeight: 800, color: "#2C3E50", fontSize: 14, marginBottom: 14 }}>👤 Derniers membres inscrits</div>
+              {dbMembres.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "12px 0", color: "#bbb", fontSize: 13 }}>Aucun membre inscrit</div>
+              ) : dbMembres.slice(0, 5).map((m, i) => (
+                <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: i < Math.min(dbMembres.length,5)-1 ? "1px solid #F0F4F8" : "none" }}>
+                  <div style={{ width: 38, height: 38, borderRadius: 12, background: `linear-gradient(135deg, ${C.ocean}, ${C.sea})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>👤</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 800, color: "#2C3E50", fontSize: 13 }}>{m.prenom} {m.nom}</div>
+                    <div style={{ fontSize: 11, color: "#aaa" }}>{m.email}</div>
+                    <div style={{ fontSize: 10, color: "#bbb" }}>
+                      {m.enfants?.length || 0} enfant{(m.enfants?.length||0)>1?"s":""} · {new Date(m.created_at).toLocaleDateString("fr-FR")}
+                    </div>
+                  </div>
+                  <Pill color={C.green}>✓</Pill>
+                </div>
+              ))}
+            </div>
+
+            {/* 🔔 Dernières réservations */}
             <div style={{ background: "#fff", borderRadius: 20, padding: 18, boxShadow: "0 4px 16px rgba(0,0,0,0.06)" }}>
               <div style={{ fontWeight: 800, color: "#2C3E50", fontSize: 14, marginBottom: 14 }}>🔔 Dernières réservations</div>
               {allResas.slice(0, 5).map((r, i) => (
