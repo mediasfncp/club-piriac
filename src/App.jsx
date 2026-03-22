@@ -3968,12 +3968,12 @@ function AdminCodeAccess({ onUnlock }) {
       const code = [...next.slice(0,7), val].join("");
       if (code === ADMIN_CODE) {
         setOpen(false);
-        setDigits(["","","",""]);
+        setDigits(["","","","","","","",""]);
         onUnlock();
       } else {
         setError(true);
         setShake(true);
-        setTimeout(() => { setShake(false); setDigits(["","","",""]); document.getElementById("admin-pin-0")?.focus(); }, 600);
+        setTimeout(() => { setShake(false); setDigits(["","","","","","","",""]); document.getElementById("admin-pin-0")?.focus(); }, 600);
       }
     }
   };
@@ -3986,7 +3986,7 @@ function AdminCodeAccess({ onUnlock }) {
 
   const handleOpen = () => {
     setOpen(true);
-    setDigits(["","","",""]);
+    setDigits(["","","","","","","",""]);
     setError(false);
     setTimeout(() => document.getElementById("admin-pin-0")?.focus(), 100);
   };
