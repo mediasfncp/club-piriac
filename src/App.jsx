@@ -1743,6 +1743,115 @@ function MesReservationsScreen({ onNav, reservations }) {
   );
 }
 
+// ── LOGIN SCREEN ──────────────────────────────────────────
+function LoginScreen({ onNav, setUser }) {
+  const [email, setEmail]       = useState("");
+  const [step, setStep]         = useState("form"); // form | sent | loading | error
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const handleSend = async () => {
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setErrorMsg("Merci de saisir un email valide."); return;
+    }
+    setStep("loading");
+    try {
+      const { createClient } = await import("@supabase/supabase-js");
+      const sb = createClient(
+        "https://rnaosrftcntomehaepjh.supabase.co",
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJuYW9zcmZ0Y250b21laGFlcGpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxNjgzOTQsImV4cCI6MjA4OTc0NDM5NH0.9y9XK2FG5-o03ICrLTzgan3cBIWrg2wPTuMfFLf_3dY"
+      );
+      const { error } = await sb.auth.signInWithOtp({
+        email,
+        options: { shouldCreateUser: true }
+      });
+      if (error) throw error;
+      setStep("sent");
+    } catch(e) {
+      setErrorMsg(e.message || "Erreur lors de l'envoi. Réessayez.");
+      setStep("error");
+    }
+  };
+
+  return (
+    <div style={{ background: C.shell, minHeight: "100%", display: "flex", flexDirection: "column" }}>
+      {/* Header */}
+      <div style={{ background: `linear-gradient(135deg, ${C.ocean}, ${C.sea})`, padding: "24px 20px 0" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+          <button onClick={() => onNav("home")} style={{ background: "rgba(255,255,255,0.2)", border: "none", color: "#fff", borderRadius: "50%", width: 36, height: 36, cursor: "pointer", fontSize: 18, fontFamily: "inherit" }}>←</button>
+          <h2 style={{ color: "#fff", margin: 0, fontWeight: 900, fontSize: 20 }}>Mon espace FNCP</h2>
+        </div>
+        <Wave fill={C.shell} />
+      </div>
+
+      <div style={{ flex: 1, padding: "24px 20px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+
+        {step === "sent" ? (
+          /* Succès */
+          <div style={{ textAlign: "center", maxWidth: 320 }}>
+            <div style={{ width: 90, height: 90, borderRadius: "50%", background: `linear-gradient(135deg, ${C.green}, #1E8449)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 44, margin: "0 auto 20px" }}>📧</div>
+            <h2 style={{ color: C.dark, fontWeight: 900, margin: "0 0 10px" }}>Email envoyé !</h2>
+            <p style={{ color: "#666", fontSize: 14, lineHeight: 1.6, margin: "0 0 8px" }}>
+              Un lien de connexion a été envoyé à <strong>{email}</strong>
+            </p>
+            <p style={{ color: "#888", fontSize: 13, margin: "0 0 28px" }}>
+              Cliquez sur le lien dans l'email pour accéder à votre compte. Valable 24h.
+            </p>
+            <div style={{ background: `${C.ocean}12`, borderRadius: 16, padding: "12px 16px", marginBottom: 24, fontSize: 13, color: C.ocean, fontWeight: 700 }}>
+              💡 Vérifiez aussi vos spams
+            </div>
+            <button onClick={() => { setStep("form"); setEmail(""); }} style={{ background: "none", border: "none", color: C.ocean, fontSize: 14, cursor: "pointer", fontFamily: "inherit", fontWeight: 700 }}>
+              ← Utiliser un autre email
+            </button>
+          </div>
+        ) : (
+          /* Formulaire */
+          <div style={{ width: "100%", maxWidth: 340 }}>
+            <div style={{ textAlign: "center", marginBottom: 28 }}>
+              <div style={{ fontSize: 56, marginBottom: 12 }}>🏖️</div>
+              <h2 style={{ color: C.dark, fontWeight: 900, margin: "0 0 8px" }}>Connexion</h2>
+              <p style={{ color: "#888", fontSize: 14, margin: 0 }}>
+                Entrez votre email — nous vous envoyons un lien de connexion instantané
+              </p>
+            </div>
+
+            <Card>
+              <label style={{ fontSize: 12, fontWeight: 900, color: C.ocean, display: "block", marginBottom: 6, letterSpacing: 0.5, textTransform: "uppercase" }}>
+                📧 Votre email
+              </label>
+              <input
+                type="email" value={email}
+                onChange={e => { setEmail(e.target.value); setErrorMsg(""); setStep("form"); }}
+                placeholder="prenom@exemple.fr"
+                style={{ width: "100%", border: `2px solid ${errorMsg ? C.sunset : "#e0e8f0"}`, borderRadius: 14, padding: "13px 16px", fontSize: 15, fontFamily: "inherit", outline: "none", boxSizing: "border-box", color: C.dark }}
+                onFocus={e => e.target.style.borderColor = C.ocean}
+                onBlur={e => e.target.style.borderColor = errorMsg ? C.sunset : "#e0e8f0"}
+                onKeyDown={e => e.key === "Enter" && handleSend()}
+              />
+
+              {errorMsg && (
+                <div style={{ background: "#fff0f0", border: `1.5px solid ${C.sunset}44`, borderRadius: 10, padding: "8px 12px", marginTop: 10, fontSize: 13, color: C.sunset, fontWeight: 700 }}>
+                  ⚠️ {errorMsg}
+                </div>
+              )}
+
+              <SunBtn color={C.ocean} full onClick={handleSend} style={{ marginTop: 16 }}>
+                {step === "loading" ? "⏳ Envoi en cours..." : "✉️ Recevoir mon lien de connexion"}
+              </SunBtn>
+            </Card>
+
+            <div style={{ textAlign: "center", marginTop: 20 }}>
+              <p style={{ color: "#aaa", fontSize: 13, margin: "0 0 10px" }}>Pas encore de compte ?</p>
+              <SunBtn color={C.coral} onClick={() => onNav("inscription")}>
+                📋 S'inscrire au Club
+              </SunBtn>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── INSCRIPTION ───────────────────────────────────────────
 function InscriptionScreen({ onNav, setUser }) {
   const [step, setStep] = useState(1);
@@ -3581,7 +3690,6 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
   // Paiements réels Supabase
   const realTotal = dbPaiements.reduce((s, p) => s + Number(p.montant || 0), 0);
   const takenSpots = sessions.reduce((s,x) => s + (2 - x.spots), 0);
-  const totalSpots = sessions.reduce((s,x) => s + x.spots, 0);
   const fillRate = sessions.length > 0 ? Math.round((takenSpots / (sessions.length * 2)) * 100) : 0;
 
   const tabs = [
@@ -3963,14 +4071,55 @@ export default function App() {
   const [sessions, setSessions] = useState(INIT_SESSIONS);
   const [allSeasonSessions, setAllSeasonSessions] = useState(ALL_SEASON_SLOTS_INIT);
   const [reservations, setReservations] = useState([]);
-  // Places Club : 45 max par demi-journée (matin / après-midi / journée × par date)
-  // On stocke { "matin": N, "apmidi": N, "journee": N } — valeur = places restantes
   const [clubPlaces, setClubPlaces] = useState({ matin: 45, apmidi: 45, journee: 45 });
+
+  // Écouter les changements d'authentification Supabase (magic link)
+  useEffect(() => {
+    import("@supabase/supabase-js").then(({ createClient }) => {
+      const sb = createClient(
+        "https://rnaosrftcntomehaepjh.supabase.co",
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJuYW9zcmZ0Y250b21laGFlcGpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxNjgzOTQsImV4cCI6MjA4OTc0NDM5NH0.9y9XK2FG5-o03ICrLTzgan3cBIWrg2wPTuMfFLf_3dY"
+      );
+      // Vérifier si déjà connecté
+      sb.auth.getSession().then(({ data: { session } }) => {
+        if (session?.user) {
+          // Chercher le profil dans la table membres
+          sb.from("membres").select("*, enfants(*)").eq("email", session.user.email).single()
+            .then(({ data }) => {
+              if (data) setUser({ ...data, prenom: data.prenom, nom: data.nom, email: data.email, tel: data.tel, supabaseId: data.id });
+              else setUser({ email: session.user.email, prenom: "", nom: "", supabaseId: session.user.id });
+            });
+        }
+      });
+      // Écouter les connexions (magic link cliqué)
+      const { data: { subscription } } = sb.auth.onAuthStateChange((event, session) => {
+        if (event === "SIGNED_IN" && session?.user) {
+          sb.from("membres").select("*, enfants(*)").eq("email", session.user.email).single()
+            .then(({ data }) => {
+              if (data) {
+                setUser({ ...data, prenom: data.prenom, nom: data.nom, email: data.email, tel: data.tel, supabaseId: data.id });
+                setScreen("profil");
+              } else {
+                // Nouveau compte — rediriger vers inscription
+                setUser({ email: session.user.email, prenom: "", nom: "", supabaseId: session.user.id });
+                setScreen("inscription");
+              }
+            });
+        }
+        if (event === "SIGNED_OUT") {
+          setUser(null);
+          setScreen("home");
+        }
+      });
+      return () => subscription.unsubscribe();
+    });
+  }, []);
   const props = { onNav: setScreen, user, setUser, sessions, setSessions, reservations, setReservations, allSeasonSessions, setAllSeasonSessions, clubPlaces, setClubPlaces };
 
   const renderScreen = () => {
     switch (screen) {
       case "home":             return <HomeScreen {...props} />;
+      case "login":            return <LoginScreen {...props} />;
       case "formules":          return <FormulesChoixScreen {...props} />;
       case "formules-natation": return <FormulesNatationScreen {...props} />;
       case "formules-eveil":    return <FormulesEveilScreen {...props} />;
@@ -3992,7 +4141,14 @@ export default function App() {
                 <p style={{ color:"#888", fontSize:14, margin:"0 0 2px" }}>{user.email}</p>
                 <p style={{ color:"#888", fontSize:14, margin:"0 0 16px" }}>{user.tel}</p>
                 {user.enfants?.length > 0 && <div style={{ marginBottom:16, display:"flex", gap:6, flexWrap:"wrap", justifyContent:"center" }}>{user.enfants.map(e => <Pill key={e.id} color={C.sea}>{e.prenom}</Pill>)}</div>}
-                <SunBtn color={C.sunset} onClick={() => { setUser(null); setScreen("home"); }}>Se déconnecter</SunBtn>
+                <SunBtn color={C.sunset} onClick={async () => {
+                  try {
+                    const { createClient } = await import("@supabase/supabase-js");
+                    const sb = createClient("https://rnaosrftcntomehaepjh.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJuYW9zcmZ0Y250b21laGFlcGpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxNjgzOTQsImV4cCI6MjA4OTc0NDM5NH0.9y9XK2FG5-o03ICrLTzgan3cBIWrg2wPTuMfFLf_3dY");
+                    await sb.auth.signOut();
+                  } catch(e) {}
+                  setUser(null); setScreen("home");
+                }}>Se déconnecter</SunBtn>
               </Card>
 
               {/* Mes accès */}
@@ -4066,9 +4222,15 @@ export default function App() {
             </>
           ) : (
             <Card style={{ textAlign:"center", marginTop:14 }}>
-              <div style={{ fontSize:60 }}>🌊</div>
-              <p style={{ color:"#888" }}>Pas encore inscrit ?</p>
-              <SunBtn color={C.coral} onClick={() => setScreen("inscription")}>S'inscrire 🎉</SunBtn>
+              <div style={{ fontSize:60, marginBottom:8 }}>🌊</div>
+              <h3 style={{ color:C.dark, margin:"0 0 6px" }}>Bienvenue !</h3>
+              <p style={{ color:"#888", fontSize:13, margin:"0 0 16px" }}>Connectez-vous pour accéder à votre espace personnel</p>
+              <SunBtn color={C.ocean} onClick={() => onNav("login")} style={{ marginBottom: 10 }}>🔑 Se connecter</SunBtn>
+              <div style={{ marginTop: 10 }}>
+                <button onClick={() => onNav("inscription")} style={{ background:"none", border:"none", color:C.coral, fontSize:13, cursor:"pointer", fontFamily:"inherit", fontWeight:700 }}>
+                  Pas encore de compte ? S'inscrire →
+                </button>
+              </div>
             </Card>
           )}
           {/* Accès Admin protégé par code */}
