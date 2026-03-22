@@ -1805,7 +1805,7 @@ function LoginScreen({ onNav, setUser }) {
           </div>
         ) : (
           /* Formulaire */
-          <div style={{ width: "100%", maxWidth: 340 }}>
+          <div style={{ width: "100%", maxWidth: 420 }}>
             <div style={{ textAlign: "center", marginBottom: 28 }}>
               <div style={{ fontSize: 56, marginBottom: 12 }}>🏖️</div>
               <h2 style={{ color: C.dark, fontWeight: 900, margin: "0 0 8px" }}>Connexion</h2>
@@ -4011,7 +4011,7 @@ function AdminCodeAccess({ onUnlock }) {
           <div onClick={() => setOpen(false)} style={{ position: "absolute", inset: 0, background: "rgba(0,10,30,0.7)", backdropFilter: "blur(6px)" }} />
           <div style={{
             position: "relative", background: "#fff", borderRadius: 28, padding: "36px 28px",
-            width: "100%", maxWidth: 340, textAlign: "center",
+            width: "100%", maxWidth: 420, textAlign: "center",
             boxShadow: "0 24px 64px rgba(0,0,0,0.35)",
             animation: shake ? "shake .4s" : "none",
           }}>
@@ -4020,7 +4020,7 @@ function AdminCodeAccess({ onUnlock }) {
             <p style={{ color: "#888", fontSize: 13, margin: "0 0 28px" }}>Saisissez le code d'accès</p>
 
             {/* PIN inputs */}
-            <div style={{ display: "flex", gap: 12, justifyContent: "center", marginBottom: 20 }}>
+            <div style={{ display: "flex", gap: 8, justifyContent: "center", marginBottom: 20 }}>
               {digits.map((d, i) => (
                 <input
                   key={i}
@@ -4032,7 +4032,7 @@ function AdminCodeAccess({ onUnlock }) {
                   onChange={e => handleDigit(i, e.target.value.slice(-1))}
                   onKeyDown={e => handleKeyDown(i, e)}
                   style={{
-                    width: 54, height: 62, textAlign: "center", fontSize: 26, fontWeight: 900,
+                    width: 42, height: 52, textAlign: "center", fontSize: 26, fontWeight: 900,
                     border: `3px solid ${error ? "#e74c3c" : d ? "#1A8FE3" : "#e0e0e0"}`,
                     borderRadius: 16, outline: "none", fontFamily: "inherit",
                     background: error ? "#fff5f5" : d ? "#EEF8FF" : "#fafafa",
