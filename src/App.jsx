@@ -4064,7 +4064,7 @@ function AdminCodeAccess({ onUnlock }) {
   const inputRefs = [null, null, null, null, null, null, null, null].map(() => useState(null));
 
   const handleDigit = (idx, val) => {
-    if (!/^\d?$/.test(val)) return;
+    if (!/^[a-zA-Z0-9]?$/.test(val)) return;
     const next = [...digits];
     next[idx] = val;
     setDigits(next);
