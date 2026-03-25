@@ -4,7 +4,7 @@ import {
   creerReservationNatation, getReservationsNatation,
   creerReservationClub, updateLiberte,
   enregistrerPaiement, getPaiements, getTotalPaiements,
-  getAllMembres, getAllReservations
+  getAllMembres, getAllReservations, getTotalPaiements
 } from "./supabase";
 
 /* ═══════════════════════════════════════════════════════
@@ -3768,52 +3768,117 @@ th{background:#1A8FE3;color:#fff;padding:9px 12px;text-align:left}
 }
 
 // ── NOUVELLE RÉSERVATION ADMIN ────────────────────────────
-function NouvelleResaModal({ onClose, onSaved, dbMembres }) {
-  const [type, setType]         = useState("natation"); // natation | club
-  const [membreId, setMembreId] = useState("");
-  const [jour, setJour]         = useState("");
-  const [heure, setHeure]       = useState("");
-  const [session, setSession]   = useState("matin");
-  const [dateResa, setDateResa] = useState("");
-  const [enfants, setEnfants]   = useState("");
-  const [saving, setSaving]     = useState(false);
-  const [error, setError]       = useState("");
+function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, setAllSeasonSessions, clubPlaces, setClubPlaces }) {
+  const [type, setType]                 = useState("natation");
+  const [membreId, setMembreId]         = useState("");
+  const [selectedEnfants, setSelectedEnfants] = useState([]);
+  const [saving, setSaving]             = useState(false);
+  const [error, setError]               = useState("");
+
+  // Natation
+  const [forfaitNat, setForfaitNat]     = useState("unite"); // unite | forfait5 | forfait10
+  const [seancesNat, setSeancesNat]     = useState([{ date:"", heure:"" }]);
+
+  // Club
+  const [forfaitClub, setForfaitClub]   = useState("unite"); // unite | semaines | liberte
+  const [sessionClub, setSessionClub]   = useState("matin");
+  const [seancesClub, setSeancesClub]   = useState([{ date:"", session:"matin" }]);
+  const [nbSemaines, setNbSemaines]     = useState(1);
 
   const heuresNatation = [
     "09:00","09:30","10:00","10:30","11:00","11:30","12:00",
     "13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00","18:30","19:00"
   ];
 
+  const membreSelectionne = dbMembres.find(m => m.id === membreId);
+  const enfantsDuMembre   = membreSelectionne?.enfants || [];
+  const liberteBalance    = membreSelectionne?.liberte_balance || 0;
+
+  const toggleEnfant = (prenom) => setSelectedEnfants(prev =>
+    prev.includes(prenom) ? prev.filter(e => e !== prenom) : [...prev, prenom]
+  );
+  const handleMembreChange = (id) => { setMembreId(id); setSelectedEnfants([]); };
+
+  // Natation : nombre de séances selon forfait
+  const nbSeancesNat = forfaitNat === "unite" ? 1 : forfaitNat === "forfait5" ? 5 : 10;
+
+  const updateSeanceNat = (idx, field, val) => {
+    const next = [...seancesNat];
+    next[idx] = { ...next[idx], [field]: val };
+    setSeancesNat(next);
+  };
+  const addSeanceNat = () => setSeancesNat(prev => [...prev, { date:"", heure:"" }]);
+  const removeSeanceNat = (idx) => setSeancesNat(prev => prev.filter((_, i) => i !== idx));
+
+  const updateSeanceClub = (idx, field, val) => {
+    const next = [...seancesClub];
+    next[idx] = { ...next[idx], [field]: val };
+    setSeancesClub(next);
+  };
+  const addSeanceClub = () => setSeancesClub(prev => [...prev, { date:"", session:"matin" }]);
+  const removeSeanceClub = (idx) => setSeancesClub(prev => prev.filter((_, i) => i !== idx));
+
   const handleSave = async () => {
-    if (!dateResa) { setError("La date est obligatoire."); return; }
-    if (type === "natation" && !heure) { setError("L'heure est obligatoire."); return; }
     setSaving(true);
     try {
-      const membre = dbMembres.find(m => m.id === membreId);
-      const enfantsList = enfants.split(",").map(e => e.trim()).filter(Boolean);
       if (type === "natation") {
-        await creerReservationNatation({
-          membreId: membreId || null,
-          jour: new Date(dateResa).toLocaleDateString("fr-FR", { weekday: "short" }),
-          heure,
-          dateSeance: dateResa,
-          enfants: enfantsList,
-          rappelDate: getRappelDate(dateResa),
-          montant: 20,
-        });
+        const seancesValides = seancesNat.filter(s => s.date && s.heure);
+        if (!seancesValides.length) { setError("Ajoutez au moins une séance avec date et heure."); setSaving(false); return; }
+        for (const s of seancesValides) {
+          await creerReservationNatation({
+            membreId: membreId || null,
+            jour: new Date(s.date).toLocaleDateString("fr-FR", { weekday: "short" }),
+            heure: s.heure,
+            dateSeance: s.date,
+            enfants: selectedEnfants,
+            rappelDate: getRappelDate(s.date),
+            montant: forfaitNat === "unite" ? 20 : forfaitNat === "forfait5" ? 95 : 170,
+          });
+          // Décrémenter 1 place dans allSeasonSessions
+          if (setAllSeasonSessions) {
+            setAllSeasonSessions(prev => {
+              let decremented = false;
+              return prev.map(slot => {
+                if (!decremented && slot.time === s.heure && slot.spots > 0) {
+                  // Trouver le slot du bon jour
+                  const dayObj = ALL_SEASON_DAYS.find(d => d.id === slot.day);
+                  if (dayObj) {
+                    const y = 2026;
+                    const m = String(dayObj.month === "Juillet" ? 7 : 8).padStart(2,"0");
+                    const d2 = String(dayObj.num).padStart(2,"0");
+                    const slotDate = `${y}-${m}-${d2}`;
+                    if (slotDate === s.date) { decremented = true; return { ...slot, spots: Math.max(0, slot.spots - 1) }; }
+                  }
+                }
+                return slot;
+              });
+            });
+          }
+        }
       } else {
-        await creerReservationClub({
-          membreId: membreId || null,
-          dateReservation: dateResa,
-          session,
-          labelJour: new Date(dateResa).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }),
-          rappelDate: getRappelDate(dateResa),
-        });
+        const seancesValides = seancesClub.filter(s => s.date);
+        if (!seancesValides.length) { setError("Ajoutez au moins une séance."); setSaving(false); return; }
+        if (forfaitClub === "liberte" && seancesValides.length > liberteBalance) {
+          setError(`Solde insuffisant : ${liberteBalance} demi-journée(s) restante(s).`); setSaving(false); return;
+        }
+        for (const s of seancesValides) {
+          await creerReservationClub({
+            membreId: membreId || null,
+            dateReservation: s.date,
+            session: s.session,
+            labelJour: new Date(s.date).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }),
+            rappelDate: getRappelDate(s.date),
+          });
+          // Décrémenter 1 place club
+          if (setClubPlaces) {
+            setClubPlaces(prev => ({ ...prev, [s.session]: Math.max(0, (prev[s.session] || 45) - 1) }));
+          }
+        }
       }
       onSaved();
       onClose();
     } catch(e) {
-      setError("Erreur lors de l'enregistrement : " + e.message);
+      setError("Erreur : " + e.message);
       setSaving(false);
     }
   };
@@ -3821,7 +3886,7 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres }) {
   return (
     <div style={{ position:"fixed", inset:0, zIndex:1100, display:"flex", flexDirection:"column" }}>
       <div onClick={onClose} style={{ position:"absolute", inset:0, background:"rgba(0,20,50,0.65)", backdropFilter:"blur(5px)" }} />
-      <div style={{ position:"relative", marginTop:"auto", background:"#F0F4F8", borderRadius:"28px 28px 0 0", maxHeight:"92vh", display:"flex", flexDirection:"column", boxShadow:"0 -12px 48px rgba(0,0,0,0.3)" }}>
+      <div style={{ position:"relative", marginTop:"auto", background:"#F0F4F8", borderRadius:"28px 28px 0 0", maxHeight:"94vh", display:"flex", flexDirection:"column", boxShadow:"0 -12px 48px rgba(0,0,0,0.3)" }}>
         <div style={{ display:"flex", justifyContent:"center", padding:"12px 0 4px" }}>
           <div style={{ width:40, height:5, borderRadius:10, background:"#ddd" }} />
         </div>
@@ -3830,63 +3895,148 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres }) {
           <div style={{ color:"#fff", fontWeight:900, fontSize:17 }}>📋 Nouvelle réservation</div>
           <div style={{ color:"rgba(255,255,255,0.85)", fontSize:13, marginTop:2 }}>Saisie manuelle depuis l'admin</div>
         </div>
-        <div style={{ overflowY:"auto", padding:"16px 16px 28px", display:"flex", flexDirection:"column", gap:12 }}>
+
+        <div style={{ overflowY:"auto", padding:"16px 16px 28px", display:"flex", flexDirection:"column", gap:14 }}>
 
           {/* Type */}
           <div>
-            <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, textTransform:"uppercase" }}>Type d'activité</label>
+            <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, textTransform:"uppercase" }}>Activité</label>
             <div style={{ display:"flex", gap:8 }}>
-              {[["natation","🏊 Natation"],["club","🏖️ Club de Plage"]].map(([k,l]) => (
+              {[["natation","🏊 Natation"],["club","🏖️ Club"]].map(([k,l]) => (
                 <button key={k} onClick={() => setType(k)} style={{ flex:1, background: type===k ? C.ocean : "#f0f0f0", color: type===k ? "#fff" : "#888", border:"none", borderRadius:14, padding:"10px", cursor:"pointer", fontWeight:900, fontSize:13, fontFamily:"inherit" }}>{l}</button>
               ))}
             </div>
           </div>
 
-          {/* Membre */}
+          {/* Famille */}
           <div>
-            <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, textTransform:"uppercase" }}>Famille / Parent</label>
-            <select value={membreId} onChange={e => setMembreId(e.target.value)}
+            <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, textTransform:"uppercase" }}>Famille</label>
+            <select value={membreId} onChange={e => handleMembreChange(e.target.value)}
               style={{ width:"100%", border:"2px solid #e0e8f0", borderRadius:12, padding:"10px 12px", fontSize:14, fontFamily:"inherit", outline:"none", background:"#fff" }}>
-              <option value="">— Sélectionner (optionnel) —</option>
-              {dbMembres.map(m => <option key={m.id} value={m.id}>{m.prenom} {m.nom} · {m.email}</option>)}
+              <option value="">— Sélectionner —</option>
+              {dbMembres.map(m => <option key={m.id} value={m.id}>{m.prenom} {m.nom}</option>)}
             </select>
           </div>
 
-          {/* Date */}
-          <div>
-            <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, textTransform:"uppercase" }}>Date *</label>
-            <input type="date" value={dateResa} onChange={e => setDateResa(e.target.value)}
-              min="2026-07-06" max="2026-08-22"
-              style={{ width:"100%", border:"2px solid #e0e8f0", borderRadius:12, padding:"10px 12px", fontSize:14, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
-          </div>
-
-          {/* Heure (natation) ou Session (club) */}
-          {type === "natation" ? (
+          {/* Enfants */}
+          {enfantsDuMembre.length > 0 && (
             <div>
-              <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, textTransform:"uppercase" }}>Heure du créneau *</label>
-              <select value={heure} onChange={e => setHeure(e.target.value)}
-                style={{ width:"100%", border:"2px solid #e0e8f0", borderRadius:12, padding:"10px 12px", fontSize:14, fontFamily:"inherit", outline:"none", background:"#fff" }}>
-                <option value="">— Choisir l'heure —</option>
-                {heuresNatation.map(h => <option key={h} value={h}>{h}</option>)}
-              </select>
-            </div>
-          ) : (
-            <div>
-              <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, textTransform:"uppercase" }}>Session</label>
-              <div style={{ display:"flex", gap:8 }}>
-                {[["matin","☀️ Matin (9h30–12h30)"],["apmidi","🌊 Après-midi (14h30–18h00)"]].map(([k,l]) => (
-                  <button key={k} onClick={() => setSession(k)} style={{ flex:1, background: session===k ? C.coral : "#f0f0f0", color: session===k ? "#fff" : "#888", border:"none", borderRadius:14, padding:"10px 6px", cursor:"pointer", fontWeight:800, fontSize:11, fontFamily:"inherit" }}>{l}</button>
-                ))}
+              <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, textTransform:"uppercase" }}>
+                Enfants {selectedEnfants.length > 0 && `· ${selectedEnfants.length} sélectionné${selectedEnfants.length>1?"s":""}`}
+              </label>
+              <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+                {enfantsDuMembre.map((e, i) => {
+                  const sel = selectedEnfants.includes(e.prenom);
+                  return (
+                    <div key={i} onClick={() => toggleEnfant(e.prenom)} style={{
+                      display:"flex", alignItems:"center", gap:10,
+                      background: sel ? `${C.ocean}15` : "#fff",
+                      border: `2px solid ${sel ? C.ocean : "#e0e8f0"}`,
+                      borderRadius:12, padding:"10px 14px", cursor:"pointer",
+                    }}>
+                      <div style={{ width:28, height:28, borderRadius:8, background: sel ? C.ocean : "#f0f0f0", display:"flex", alignItems:"center", justifyContent:"center", color: sel?"#fff":"#bbb", fontWeight:900, fontSize:13 }}>{sel?"✓":""}</div>
+                      <div style={{ flex:1 }}>
+                        <div style={{ fontWeight:900, color:"#2C3E50", fontSize:13 }}>{e.prenom} {e.nom}</div>
+                        <div style={{ fontSize:11, color:"#aaa" }}>{calcAge(e.naissance)} ans</div>
+                      </div>
+                      {e.allergies && <div style={{ background:"#FFF0F0", color:C.sunset, borderRadius:50, padding:"2px 8px", fontSize:10, fontWeight:800 }}>⚠️</div>}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
 
-          {/* Enfants */}
-          <div>
-            <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, textTransform:"uppercase" }}>Prénom(s) des enfants</label>
-            <input value={enfants} onChange={e => setEnfants(e.target.value)} placeholder="Emma, Lucas (séparer par des virgules)"
-              style={{ width:"100%", border:"2px solid #e0e8f0", borderRadius:12, padding:"10px 12px", fontSize:14, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
-          </div>
+          {/* ── NATATION ── */}
+          {type === "natation" && (
+            <>
+              <div>
+                <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, textTransform:"uppercase" }}>Formule</label>
+                <div style={{ display:"flex", gap:6 }}>
+                  {[["unite","1 séance · 20€"],["forfait5","5 séances · 95€"],["forfait10","10 séances · 170€"]].map(([k,l]) => (
+                    <button key={k} onClick={() => { setForfaitNat(k); const n = k==="unite"?1:k==="forfait5"?5:10; setSeancesNat(Array.from({length:n},()=>({date:"",heure:""})));  }} style={{ flex:1, background: forfaitNat===k ? C.ocean : "#f0f0f0", color: forfaitNat===k ? "#fff" : "#888", border:"none", borderRadius:12, padding:"8px 4px", cursor:"pointer", fontWeight:800, fontSize:10, fontFamily:"inherit" }}>{l}</button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, textTransform:"uppercase" }}>
+                  Séances ({seancesNat.length}/{nbSeancesNat})
+                </label>
+                <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                  {seancesNat.map((s, i) => (
+                    <div key={i} style={{ background:"#fff", borderRadius:12, padding:"10px 12px", display:"flex", gap:8, alignItems:"center" }}>
+                      <div style={{ width:24, height:24, borderRadius:8, background:`${C.ocean}20`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:900, color:C.ocean, flexShrink:0 }}>{i+1}</div>
+                      <input type="date" value={s.date} onChange={e => updateSeanceNat(i,"date",e.target.value)} min="2026-07-06" max="2026-08-22"
+                        style={{ flex:1, border:"1.5px solid #e0e8f0", borderRadius:10, padding:"8px", fontSize:12, fontFamily:"inherit", outline:"none" }} />
+                      <select value={s.heure} onChange={e => updateSeanceNat(i,"heure",e.target.value)}
+                        style={{ flex:1, border:"1.5px solid #e0e8f0", borderRadius:10, padding:"8px", fontSize:12, fontFamily:"inherit", outline:"none", background:"#fff" }}>
+                        <option value="">Heure</option>
+                        {heuresNatation.map(h => <option key={h} value={h}>{h}</option>)}
+                      </select>
+                      {seancesNat.length > 1 && <button onClick={() => removeSeanceNat(i)} style={{ background:"#FFF0F0", border:"none", color:C.sunset, borderRadius:8, width:28, height:28, cursor:"pointer", fontWeight:900, fontFamily:"inherit" }}>✕</button>}
+                    </div>
+                  ))}
+                  {seancesNat.length < nbSeancesNat && (
+                    <button onClick={addSeanceNat} style={{ background:`${C.ocean}10`, border:`1.5px dashed ${C.ocean}40`, color:C.ocean, borderRadius:12, padding:"8px", cursor:"pointer", fontWeight:800, fontSize:12, fontFamily:"inherit" }}>
+                      ➕ Ajouter une séance
+                    </button>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* ── CLUB ── */}
+          {type === "club" && (
+            <>
+              <div>
+                <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, textTransform:"uppercase" }}>Formule</label>
+                <div style={{ display:"flex", gap:6 }}>
+                  {[["unite","📅 Unité"],["semaines","🗓️ Semaine(s)"],["liberte","🎟️ Carte Liberté"]].map(([k,l]) => (
+                    <button key={k} onClick={() => setForfaitClub(k)} style={{ flex:1, background: forfaitClub===k ? C.coral : "#f0f0f0", color: forfaitClub===k ? "#fff" : "#888", border:"none", borderRadius:12, padding:"8px 4px", cursor:"pointer", fontWeight:800, fontSize:10, fontFamily:"inherit" }}>{l}</button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Carte Liberté — solde */}
+              {forfaitClub === "liberte" && (
+                <div style={{ background: liberteBalance > 0 ? `${C.coral}12` : "#fff0f0", border:`1.5px solid ${liberteBalance>0?C.coral:"#fca5a5"}`, borderRadius:12, padding:"10px 14px" }}>
+                  <div style={{ fontWeight:900, color: liberteBalance>0?C.coral:"#e74c3c", fontSize:13 }}>
+                    🎟️ Solde Carte Liberté : <strong>{liberteBalance}</strong> demi-journée{liberteBalance>1?"s":""}
+                  </div>
+                  {liberteBalance === 0 && <div style={{ fontSize:11, color:"#e74c3c", marginTop:4 }}>Solde insuffisant — rechargez la carte</div>}
+                </div>
+              )}
+
+              {/* Séances club */}
+              <div>
+                <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, textTransform:"uppercase" }}>
+                  Séances {forfaitClub==="liberte" ? `(${seancesClub.length}/${liberteBalance} demi-j. utilisée${seancesClub.length>1?"s":""})` : ""}
+                </label>
+                <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                  {seancesClub.map((s, i) => (
+                    <div key={i} style={{ background:"#fff", borderRadius:12, padding:"10px 12px", display:"flex", gap:8, alignItems:"center" }}>
+                      <div style={{ width:24, height:24, borderRadius:8, background:`${C.coral}20`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:900, color:C.coral, flexShrink:0 }}>{i+1}</div>
+                      <input type="date" value={s.date} onChange={e => updateSeanceClub(i,"date",e.target.value)} min="2026-07-06" max="2026-08-22"
+                        style={{ flex:1, border:"1.5px solid #e0e8f0", borderRadius:10, padding:"8px", fontSize:12, fontFamily:"inherit", outline:"none" }} />
+                      <select value={s.session} onChange={e => updateSeanceClub(i,"session",e.target.value)}
+                        style={{ flex:1, border:"1.5px solid #e0e8f0", borderRadius:10, padding:"8px", fontSize:12, fontFamily:"inherit", outline:"none", background:"#fff" }}>
+                        <option value="matin">☀️ Matin</option>
+                        <option value="apmidi">🌊 Après-midi</option>
+                      </select>
+                      {seancesClub.length > 1 && <button onClick={() => removeSeanceClub(i)} style={{ background:"#FFF0F0", border:"none", color:C.sunset, borderRadius:8, width:28, height:28, cursor:"pointer", fontWeight:900, fontFamily:"inherit" }}>✕</button>}
+                    </div>
+                  ))}
+                  {(forfaitClub !== "liberte" || seancesClub.length < liberteBalance) && (
+                    <button onClick={addSeanceClub} style={{ background:`${C.coral}10`, border:`1.5px dashed ${C.coral}40`, color:C.coral, borderRadius:12, padding:"8px", cursor:"pointer", fontWeight:800, fontSize:12, fontFamily:"inherit" }}>
+                      ➕ Ajouter une séance
+                    </button>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
 
           {error && <div style={{ background:"#fff0f0", border:"1.5px solid #fca5a5", borderRadius:10, padding:"9px 14px", fontSize:13, color:"#e74c3c", fontWeight:700 }}>⚠️ {error}</div>}
 
@@ -3899,16 +4049,70 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres }) {
   );
 }
 
-function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSessions, setAllSeasonSessions, clubPlaces }) {
+function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSessions, setAllSeasonSessions, clubPlaces, setClubPlaces }) {
   const [tab, setTab] = useState("dashboard");
-  const [dbResas, setDbResas]     = useState([]);
-  const [dbMembres, setDbMembres] = useState([]);
+  const [dbResas, setDbResas]         = useState([]);
+  const [dbResasClub, setDbResasClub] = useState([]);
+  const [dbMembres, setDbMembres]     = useState([]);
   const [dbPaiements, setDbPaiements] = useState([]);
   const [showNouvelleResa, setShowNouvelleResa] = useState(false);
 
+  const refreshResas = () => {
+    getAllReservations().then(d => {
+      setDbResas(d);
+      // Synchroniser allSeasonSessions avec les vraies réservations Supabase
+      if (d && d.length > 0 && setAllSeasonSessions) {
+        setAllSeasonSessions(prev => {
+          const next = [...prev.map(s => ({ ...s, spots: 2 }))]; // Reset à 2
+          d.forEach(r => {
+            if (!r.date_seance || !r.heure) return;
+            const dateResa = r.date_seance.slice(0, 10);
+            let found = false;
+            for (let i = 0; i < next.length; i++) {
+              if (found) break;
+              if (next[i].time === r.heure && next[i].spots > 0) {
+                const dayObj = ALL_SEASON_DAYS.find(d2 => d2.id === next[i].day);
+                if (dayObj) {
+                  const m = String(dayObj.month === "Juillet" ? 7 : 8).padStart(2,"0");
+                  const d2 = String(dayObj.num).padStart(2,"0");
+                  if (`2026-${m}-${d2}` === dateResa) {
+                    next[i] = { ...next[i], spots: Math.max(0, next[i].spots - 1) };
+                    found = true;
+                  }
+                }
+              }
+            }
+          });
+          return next;
+        });
+      }
+    }).catch(() => {});
+    // Charger résas club
+    import("@supabase/supabase-js").then(({ createClient }) => {
+      const sb = createClient(
+        "https://rnaosrftcntomehaepjh.supabase.co",
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJuYW9zcmZ0Y250b21laGFlcGpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxNjgzOTQsImV4cCI6MjA4OTc0NDM5NH0.9y9XK2FG5-o03ICrLTzgan3cBIWrg2wPTuMfFLf_3dY"
+      );
+      sb.from("reservations_club").select("*, membres(prenom, nom, email, tel)").order("created_at", { ascending: false })
+        .then(({ data }) => {
+          setDbResasClub(data || []);
+          // Synchroniser clubPlaces
+          if (data && data.length > 0 && setClubPlaces) {
+            const counts = { matin: 0, apmidi: 0 };
+            data.forEach(r => { if (r.session === "matin") counts.matin++; else counts.apmidi++; });
+            setClubPlaces(prev => ({
+              ...prev,
+              matin: Math.max(0, 45 - counts.matin),
+              apmidi: Math.max(0, 45 - counts.apmidi),
+            }));
+          }
+        });
+    });
+  };
+
   // Charger les données Supabase au montage
   useEffect(() => {
-    getAllReservations().then(d => setDbResas(d)).catch(() => {});
+    refreshResas();
     getAllMembres().then(d => setDbMembres(d)).catch(() => {});
     getPaiements().then(d => setDbPaiements(d)).catch(() => {});
   }, []);
@@ -4101,58 +4305,78 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
             {showNouvelleResa && (
               <NouvelleResaModal
                 dbMembres={dbMembres}
+                allSeasonSessions={allSeasonSessions}
+                setAllSeasonSessions={setAllSeasonSessions}
+                clubPlaces={clubPlaces}
+                setClubPlaces={setClubPlaces}
                 onClose={() => setShowNouvelleResa(false)}
-                onSaved={() => {
-                  setShowNouvelleResa(false);
-                  getAllReservations().then(d => setDbResas(d)).catch(() => {});
-                }}
+                onSaved={() => { setShowNouvelleResa(false); refreshResas(); }}
               />
             )}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-              <div style={{ fontWeight: 900, color: "#2C3E50", fontSize: 14 }}>
-                {dbResas.length > 0 ? dbResas.length : allResas.length} réservation(s)
+
+            {/* Totaux */}
+            <div style={{ display:"flex", gap:8 }}>
+              <div style={{ flex:1, background:"#fff", borderRadius:16, padding:"12px", textAlign:"center", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
+                <div style={{ fontWeight:900, color:C.ocean, fontSize:20 }}>{dbResas.length}</div>
+                <div style={{ fontSize:11, color:"#aaa" }}>🏊 Natation</div>
               </div>
-              <div style={{ display: "flex", gap: 6 }}>
-                <button onClick={() => setShowNouvelleResa(true)} style={{ background:`linear-gradient(135deg,${C.green},#1E8449)`, color:"#fff", border:"none", borderRadius:50, padding:"6px 14px", cursor:"pointer", fontWeight:900, fontSize:12, fontFamily:"inherit" }}>
-                  ➕ Nouvelle
-                </button>
-                <Pill color={C.green}>{dbResas.length > 0 ? dbResas.length : allResas.filter(r => r.status === "confirmed").length} confirmées</Pill>
-                {dbResas.length > 0 && <Pill color={C.ocean}>✅ Supabase</Pill>}
+              <div style={{ flex:1, background:"#fff", borderRadius:16, padding:"12px", textAlign:"center", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
+                <div style={{ fontWeight:900, color:C.coral, fontSize:20 }}>{dbResasClub.length}</div>
+                <div style={{ fontSize:11, color:"#aaa" }}>🏖️ Club</div>
+              </div>
+              <div style={{ flex:1, background:"#fff", borderRadius:16, padding:"12px", textAlign:"center", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
+                <div style={{ fontWeight:900, color:C.green, fontSize:20 }}>{dbResas.length + dbResasClub.length}</div>
+                <div style={{ fontSize:11, color:"#aaa" }}>Total</div>
               </div>
             </div>
-            {(dbResas.length > 0 ? dbResas.map((r, i) => ({
-              id: r.id,
-              parent: r.membres ? `${r.membres.prenom} ${r.membres.nom}` : "—",
-              email: r.membres?.email || "—",
-              phone: r.membres?.tel || "—",
-              enfants: r.enfants || [],
-              session: `${r.heure} · ${r.jour}`,
-              date: r.date_seance ? new Date(r.date_seance).toLocaleDateString("fr-FR") : "—",
-              status: r.statut || "confirmed",
-            })) : allResas).map(r => (
-              <div key={r.id} style={{ background: "#fff", borderRadius: 20, padding: "14px 16px", boxShadow: "0 4px 16px rgba(0,0,0,0.06)" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <div style={{ width: 40, height: 40, borderRadius: 14, background: `linear-gradient(135deg, ${C.ocean}, ${C.sea})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>👤</div>
-                    <div>
-                      <div style={{ fontWeight: 900, color: "#2C3E50", fontSize: 14 }}>{r.parent}</div>
-                      <div style={{ fontSize: 11, color: "#aaa" }}>{r.email}</div>
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ fontWeight:900, color:"#2C3E50", fontSize:13 }}>{dbResas.length + dbResasClub.length} réservation(s) Supabase</div>
+              <button onClick={() => setShowNouvelleResa(true)} style={{ background:`linear-gradient(135deg,${C.green},#1E8449)`, color:"#fff", border:"none", borderRadius:50, padding:"6px 14px", cursor:"pointer", fontWeight:900, fontSize:12, fontFamily:"inherit" }}>
+                ➕ Nouvelle
+              </button>
+            </div>
+
+            {/* Natation */}
+            {dbResas.length > 0 && (
+              <>
+                <div style={{ fontWeight:800, color:C.ocean, fontSize:12, marginBottom:-4 }}>🏊 NATATION ({dbResas.length})</div>
+                {dbResas.map(r => (
+                  <div key={r.id} style={{ background:"#fff", borderRadius:18, padding:"12px 14px", boxShadow:"0 2px 10px rgba(0,0,0,0.05)", borderLeft:`4px solid ${C.ocean}` }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
+                      <div style={{ fontWeight:900, color:"#2C3E50", fontSize:13 }}>{r.membres ? `${r.membres.prenom} ${r.membres.nom}` : "—"}</div>
+                      <Pill color={C.green}>✓ Confirmé</Pill>
+                    </div>
+                    <div style={{ fontSize:12, color:C.ocean, fontWeight:700 }}>🕐 {r.heure} · {r.date_seance ? new Date(r.date_seance).toLocaleDateString("fr-FR") : "—"}</div>
+                    {r.enfants?.length > 0 && <div style={{ display:"flex", gap:5, marginTop:6, flexWrap:"wrap" }}>{r.enfants.map((e,i) => <Pill key={i} color={C.sea}>{e}</Pill>)}</div>}
+                  </div>
+                ))}
+              </>
+            )}
+
+            {/* Club */}
+            {dbResasClub.length > 0 && (
+              <>
+                <div style={{ fontWeight:800, color:C.coral, fontSize:12, marginBottom:-4 }}>🏖️ CLUB DE PLAGE ({dbResasClub.length})</div>
+                {dbResasClub.map(r => (
+                  <div key={r.id} style={{ background:"#fff", borderRadius:18, padding:"12px 14px", boxShadow:"0 2px 10px rgba(0,0,0,0.05)", borderLeft:`4px solid ${C.coral}` }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
+                      <div style={{ fontWeight:900, color:"#2C3E50", fontSize:13 }}>{r.membres ? `${r.membres.prenom} ${r.membres.nom}` : "—"}</div>
+                      <Pill color={C.green}>✓ Confirmé</Pill>
+                    </div>
+                    <div style={{ fontSize:12, color:C.coral, fontWeight:700 }}>
+                      {r.session === "matin" ? "☀️ Matin" : "🌊 Après-midi"} · {r.date_reservation ? new Date(r.date_reservation).toLocaleDateString("fr-FR") : "—"}
                     </div>
                   </div>
-                  <div style={{ background: r.status === "confirmed" ? `${C.green}20` : `${C.coral}20`, color: r.status === "confirmed" ? C.green : C.coral, borderRadius: 10, padding: "3px 10px", fontSize: 11, fontWeight: 900 }}>
-                    {r.status === "confirmed" ? "✓ Confirmé" : "⏳ Attente"}
-                  </div>
-                </div>
-                <div style={{ background: "#F8FBFF", borderRadius: 12, padding: "8px 12px", marginBottom: 8 }}>
-                  <div style={{ fontSize: 12, color: C.ocean, fontWeight: 800 }}>🏊 {r.session}</div>
-                  {r.date && <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>📅 {r.date}</div>}
-                  {r.phone !== "—" && <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>📞 {r.phone}</div>}
-                </div>
-                {r.enfants?.length > 0 && (
-                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                    {r.enfants.map((c, i) => <Pill key={i} color={C.sea}>{c}</Pill>)}
-                  </div>
-                )}
+                ))}
+              </>
+            )}
+
+            {/* Si aucune donnée Supabase, afficher mock */}
+            {dbResas.length === 0 && dbResasClub.length === 0 && allResas.map(r => (
+              <div key={r.id} style={{ background:"#fff", borderRadius:18, padding:"12px 14px", boxShadow:"0 2px 10px rgba(0,0,0,0.05)" }}>
+                <div style={{ fontWeight:900, color:"#2C3E50", fontSize:13 }}>{r.parent}</div>
+                <div style={{ fontSize:11, color:"#aaa" }}>🏊 {r.session}</div>
               </div>
             ))}
           </div>
