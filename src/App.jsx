@@ -704,7 +704,7 @@ function FormulesChoixScreen({ onNav }) {
           <div style={{ fontSize: 52, marginBottom: 10 }}>🏊</div>
           <div style={{ color: "#fff", fontWeight: 900, fontSize: 20, marginBottom: 4 }}>Formules Natation</div>
           <div style={{ color: "rgba(255,255,255,0.8)", fontSize: 14 }}>1, 5, 6 ou 10 leçons</div>
-          <div style={{ display: "flex", gap: 6, justifyContent: "center", marginTop: 12 }}>
+          <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 12 }}>
             {["20 €", "95 €", "113 €", "170 €"].map(p => (
               <div key={p} style={{ background: "rgba(255,255,255,0.2)", borderRadius: 50, padding: "4px 12px", color: "#fff", fontSize: 12, fontWeight: 800 }}>{p}</div>
             ))}
@@ -723,7 +723,7 @@ function FormulesChoixScreen({ onNav }) {
           <div style={{ fontSize: 52, marginBottom: 10 }}>🏖️</div>
           <div style={{ color: "#fff", fontWeight: 900, fontSize: 20, marginBottom: 4 }}>Formules Club de Plage</div>
           <div style={{ color: "rgba(255,255,255,0.8)", fontSize: 14 }}>Matin · Après-midi · Journée</div>
-          <div style={{ display: "flex", gap: 6, justifyContent: "center", marginTop: 12 }}>
+          <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 12 }}>
             {["Formule Club", "Formule Liberté"].map(p => (
               <div key={p} style={{ background: "rgba(255,255,255,0.2)", borderRadius: 50, padding: "4px 12px", color: "#fff", fontSize: 12, fontWeight: 800 }}>{p}</div>
             ))}
@@ -741,7 +741,7 @@ function FormulesChoixScreen({ onNav }) {
           <div style={{ fontSize: 52, marginBottom: 10 }}>🌊</div>
           <div style={{ color: "#fff", fontWeight: 900, fontSize: 20, marginBottom: 4 }}>Éveil Aquatique</div>
           <div style={{ color: "rgba(255,255,255,0.8)", fontSize: 14 }}>Séances de 30 min · Chaque dimanche</div>
-          <div style={{ display: "flex", gap: 6, justifyContent: "center", marginTop: 12 }}>
+          <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 12 }}>
             <div style={{ background: "rgba(255,255,255,0.2)", borderRadius: 50, padding: "4px 16px", color: "#fff", fontSize: 13, fontWeight: 900 }}>20 € / séance</div>
           </div>
         </div>
@@ -1805,7 +1805,7 @@ function LoginScreen({ onNav, setUser }) {
           </div>
         ) : (
           /* Formulaire */
-          <div style={{ width: "100%", maxWidth: 460 }}>
+          <div style={{ width: "100%", maxWidth: 340 }}>
             <div style={{ textAlign: "center", marginBottom: 28 }}>
               <div style={{ fontSize: 56, marginBottom: 12 }}>🏖️</div>
               <h2 style={{ color: C.dark, fontWeight: 900, margin: "0 0 8px" }}>Connexion</h2>
@@ -3767,11 +3767,144 @@ th{background:#1A8FE3;color:#fff;padding:9px 12px;text-align:left}
   );
 }
 
+// ── NOUVELLE RÉSERVATION ADMIN ────────────────────────────
+function NouvelleResaModal({ onClose, onSaved, dbMembres }) {
+  const [type, setType]         = useState("natation"); // natation | club
+  const [membreId, setMembreId] = useState("");
+  const [jour, setJour]         = useState("");
+  const [heure, setHeure]       = useState("");
+  const [session, setSession]   = useState("matin");
+  const [dateResa, setDateResa] = useState("");
+  const [enfants, setEnfants]   = useState("");
+  const [saving, setSaving]     = useState(false);
+  const [error, setError]       = useState("");
+
+  const heuresNatation = [
+    "09:00","09:30","10:00","10:30","11:00","11:30","12:00",
+    "13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00","18:30","19:00"
+  ];
+
+  const handleSave = async () => {
+    if (!dateResa) { setError("La date est obligatoire."); return; }
+    if (type === "natation" && !heure) { setError("L'heure est obligatoire."); return; }
+    setSaving(true);
+    try {
+      const membre = dbMembres.find(m => m.id === membreId);
+      const enfantsList = enfants.split(",").map(e => e.trim()).filter(Boolean);
+      if (type === "natation") {
+        await creerReservationNatation({
+          membreId: membreId || null,
+          jour: new Date(dateResa).toLocaleDateString("fr-FR", { weekday: "short" }),
+          heure,
+          dateSeance: dateResa,
+          enfants: enfantsList,
+          rappelDate: getRappelDate(dateResa),
+          montant: 20,
+        });
+      } else {
+        await creerReservationClub({
+          membreId: membreId || null,
+          dateReservation: dateResa,
+          session,
+          labelJour: new Date(dateResa).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }),
+          rappelDate: getRappelDate(dateResa),
+        });
+      }
+      onSaved();
+      onClose();
+    } catch(e) {
+      setError("Erreur lors de l'enregistrement : " + e.message);
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={{ position:"fixed", inset:0, zIndex:1100, display:"flex", flexDirection:"column" }}>
+      <div onClick={onClose} style={{ position:"absolute", inset:0, background:"rgba(0,20,50,0.65)", backdropFilter:"blur(5px)" }} />
+      <div style={{ position:"relative", marginTop:"auto", background:"#F0F4F8", borderRadius:"28px 28px 0 0", maxHeight:"92vh", display:"flex", flexDirection:"column", boxShadow:"0 -12px 48px rgba(0,0,0,0.3)" }}>
+        <div style={{ display:"flex", justifyContent:"center", padding:"12px 0 4px" }}>
+          <div style={{ width:40, height:5, borderRadius:10, background:"#ddd" }} />
+        </div>
+        <div style={{ background:`linear-gradient(135deg,${C.ocean},${C.sea})`, margin:"0 16px", borderRadius:20, padding:"14px 18px", position:"relative" }}>
+          <button onClick={onClose} style={{ position:"absolute", top:10, right:12, background:"rgba(255,255,255,0.25)", border:"none", color:"#fff", borderRadius:"50%", width:30, height:30, cursor:"pointer", fontWeight:900, fontSize:16, fontFamily:"inherit" }}>✕</button>
+          <div style={{ color:"#fff", fontWeight:900, fontSize:17 }}>📋 Nouvelle réservation</div>
+          <div style={{ color:"rgba(255,255,255,0.85)", fontSize:13, marginTop:2 }}>Saisie manuelle depuis l'admin</div>
+        </div>
+        <div style={{ overflowY:"auto", padding:"16px 16px 28px", display:"flex", flexDirection:"column", gap:12 }}>
+
+          {/* Type */}
+          <div>
+            <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, textTransform:"uppercase" }}>Type d'activité</label>
+            <div style={{ display:"flex", gap:8 }}>
+              {[["natation","🏊 Natation"],["club","🏖️ Club de Plage"]].map(([k,l]) => (
+                <button key={k} onClick={() => setType(k)} style={{ flex:1, background: type===k ? C.ocean : "#f0f0f0", color: type===k ? "#fff" : "#888", border:"none", borderRadius:14, padding:"10px", cursor:"pointer", fontWeight:900, fontSize:13, fontFamily:"inherit" }}>{l}</button>
+              ))}
+            </div>
+          </div>
+
+          {/* Membre */}
+          <div>
+            <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, textTransform:"uppercase" }}>Famille / Parent</label>
+            <select value={membreId} onChange={e => setMembreId(e.target.value)}
+              style={{ width:"100%", border:"2px solid #e0e8f0", borderRadius:12, padding:"10px 12px", fontSize:14, fontFamily:"inherit", outline:"none", background:"#fff" }}>
+              <option value="">— Sélectionner (optionnel) —</option>
+              {dbMembres.map(m => <option key={m.id} value={m.id}>{m.prenom} {m.nom} · {m.email}</option>)}
+            </select>
+          </div>
+
+          {/* Date */}
+          <div>
+            <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, textTransform:"uppercase" }}>Date *</label>
+            <input type="date" value={dateResa} onChange={e => setDateResa(e.target.value)}
+              min="2026-07-06" max="2026-08-22"
+              style={{ width:"100%", border:"2px solid #e0e8f0", borderRadius:12, padding:"10px 12px", fontSize:14, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+          </div>
+
+          {/* Heure (natation) ou Session (club) */}
+          {type === "natation" ? (
+            <div>
+              <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, textTransform:"uppercase" }}>Heure du créneau *</label>
+              <select value={heure} onChange={e => setHeure(e.target.value)}
+                style={{ width:"100%", border:"2px solid #e0e8f0", borderRadius:12, padding:"10px 12px", fontSize:14, fontFamily:"inherit", outline:"none", background:"#fff" }}>
+                <option value="">— Choisir l'heure —</option>
+                {heuresNatation.map(h => <option key={h} value={h}>{h}</option>)}
+              </select>
+            </div>
+          ) : (
+            <div>
+              <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, textTransform:"uppercase" }}>Session</label>
+              <div style={{ display:"flex", gap:8 }}>
+                {[["matin","☀️ Matin (9h30–12h30)"],["apmidi","🌊 Après-midi (14h30–18h00)"]].map(([k,l]) => (
+                  <button key={k} onClick={() => setSession(k)} style={{ flex:1, background: session===k ? C.coral : "#f0f0f0", color: session===k ? "#fff" : "#888", border:"none", borderRadius:14, padding:"10px 6px", cursor:"pointer", fontWeight:800, fontSize:11, fontFamily:"inherit" }}>{l}</button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Enfants */}
+          <div>
+            <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, textTransform:"uppercase" }}>Prénom(s) des enfants</label>
+            <input value={enfants} onChange={e => setEnfants(e.target.value)} placeholder="Emma, Lucas (séparer par des virgules)"
+              style={{ width:"100%", border:"2px solid #e0e8f0", borderRadius:12, padding:"10px 12px", fontSize:14, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+          </div>
+
+          {error && <div style={{ background:"#fff0f0", border:"1.5px solid #fca5a5", borderRadius:10, padding:"9px 14px", fontSize:13, color:"#e74c3c", fontWeight:700 }}>⚠️ {error}</div>}
+
+          <SunBtn color={saving ? "#aaa" : C.green} full onClick={handleSave} disabled={saving}>
+            {saving ? "⏳ Enregistrement..." : "✅ Créer la réservation"}
+          </SunBtn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSessions, setAllSeasonSessions, clubPlaces }) {
   const [tab, setTab] = useState("dashboard");
   const [dbResas, setDbResas]     = useState([]);
   const [dbMembres, setDbMembres] = useState([]);
   const [dbPaiements, setDbPaiements] = useState([]);
+  const [showNouvelleResa, setShowNouvelleResa] = useState(false);
 
   // Charger les données Supabase au montage
   useEffect(() => {
@@ -3965,11 +4098,24 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
 
         {tab === "reservations" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {showNouvelleResa && (
+              <NouvelleResaModal
+                dbMembres={dbMembres}
+                onClose={() => setShowNouvelleResa(false)}
+                onSaved={() => {
+                  setShowNouvelleResa(false);
+                  getAllReservations().then(d => setDbResas(d)).catch(() => {});
+                }}
+              />
+            )}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
               <div style={{ fontWeight: 900, color: "#2C3E50", fontSize: 14 }}>
                 {dbResas.length > 0 ? dbResas.length : allResas.length} réservation(s)
               </div>
               <div style={{ display: "flex", gap: 6 }}>
+                <button onClick={() => setShowNouvelleResa(true)} style={{ background:`linear-gradient(135deg,${C.green},#1E8449)`, color:"#fff", border:"none", borderRadius:50, padding:"6px 14px", cursor:"pointer", fontWeight:900, fontSize:12, fontFamily:"inherit" }}>
+                  ➕ Nouvelle
+                </button>
                 <Pill color={C.green}>{dbResas.length > 0 ? dbResas.length : allResas.filter(r => r.status === "confirmed").length} confirmées</Pill>
                 {dbResas.length > 0 && <Pill color={C.ocean}>✅ Supabase</Pill>}
               </div>
@@ -4054,37 +4200,37 @@ function BottomNav({ current, onNav }) {
 }
 
 // ── ADMIN CODE ACCESS ─────────────────────────────────────
-const ADMIN_CODE = "club2026";
+const ADMIN_CODE = "2026";
 
 function AdminCodeAccess({ onUnlock }) {
   const [open, setOpen] = useState(false);
-  const [digits, setDigits] = useState(["", "", "", "", "", "", "", ""]);
+  const [digits, setDigits] = useState(["", "", "", ""]);
   const [error, setError] = useState(false);
   const [shake, setShake] = useState(false);
-  const inputRefs = [null, null, null, null, null, null, null, null].map(() => useState(null));
+  const inputRefs = [null, null, null, null].map(() => useState(null));
 
   const handleDigit = (idx, val) => {
-    if (!/^[a-zA-Z0-9]?$/.test(val)) return;
+    if (!/^\d?$/.test(val)) return;
     const next = [...digits];
     next[idx] = val;
     setDigits(next);
     setError(false);
-    if (val && idx < 7) {
+    if (val && idx < 3) {
       // auto-focus next
       const nextInput = document.getElementById(`admin-pin-${idx+1}`);
       if (nextInput) nextInput.focus();
     }
     // Auto-check when all filled
-    if (idx === 7 && val) {
-      const code = [...next.slice(0,7), val].join("");
-      if (code.toLowerCase() === ADMIN_CODE.toLowerCase()) {
+    if (idx === 3 && val) {
+      const code = [...next.slice(0,3), val].join("");
+      if (code === ADMIN_CODE) {
         setOpen(false);
-        setDigits(["","","","","","","",""]);
+        setDigits(["","","",""]);
         onUnlock();
       } else {
         setError(true);
         setShake(true);
-        setTimeout(() => { setShake(false); setDigits(["","","","","","","",""]); document.getElementById("admin-pin-0")?.focus(); }, 600);
+        setTimeout(() => { setShake(false); setDigits(["","","",""]); document.getElementById("admin-pin-0")?.focus(); }, 600);
       }
     }
   };
@@ -4097,7 +4243,7 @@ function AdminCodeAccess({ onUnlock }) {
 
   const handleOpen = () => {
     setOpen(true);
-    setDigits(["","","","","","","",""]);
+    setDigits(["","","",""]);
     setError(false);
     setTimeout(() => document.getElementById("admin-pin-0")?.focus(), 100);
   };
@@ -4121,14 +4267,14 @@ function AdminCodeAccess({ onUnlock }) {
         <div style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 32px" }}>
           <div onClick={() => setOpen(false)} style={{ position: "absolute", inset: 0, background: "rgba(0,10,30,0.7)", backdropFilter: "blur(6px)" }} />
           <div style={{
-            position: "relative", background: "#fff", borderRadius: 28, padding: "36px 20px",
-            width: "100%", maxWidth: 460, textAlign: "center",
+            position: "relative", background: "#fff", borderRadius: 28, padding: "36px 28px",
+            width: "100%", maxWidth: 340, textAlign: "center",
             boxShadow: "0 24px 64px rgba(0,0,0,0.35)",
             animation: shake ? "shake .4s" : "none",
           }}>
             <div style={{ width: 64, height: 64, borderRadius: 20, background: "linear-gradient(135deg, #0F2027, #203A43)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 30, margin: "0 auto 16px" }}>⚙️</div>
             <h2 style={{ color: "#2C3E50", fontSize: 20, fontWeight: 900, margin: "0 0 6px" }}>Espace Admin</h2>
-            <p style={{ color: "#888", fontSize: 13, margin: "0 0 28px" }}>Saisissez le code d'accès</p>
+            <p style={{ color: "#888", fontSize: 13, margin: "0 0 28px" }}>Saisissez le code à 4 chiffres</p>
 
             {/* PIN inputs */}
             <div style={{ display: "flex", gap: 12, justifyContent: "center", marginBottom: 20 }}>
@@ -4136,14 +4282,14 @@ function AdminCodeAccess({ onUnlock }) {
                 <input
                   key={i}
                   id={`admin-pin-${i}`}
-                  type="text"
-                  inputMode="text"
+                  type="password"
+                  inputMode="numeric"
                   maxLength={1}
                   value={d}
                   onChange={e => handleDigit(i, e.target.value.slice(-1))}
                   onKeyDown={e => handleKeyDown(i, e)}
                   style={{
-                    width: 42, height: 52, textAlign: "center", fontSize: 26, fontWeight: 900,
+                    width: 54, height: 62, textAlign: "center", fontSize: 26, fontWeight: 900,
                     border: `3px solid ${error ? "#e74c3c" : d ? "#1A8FE3" : "#e0e0e0"}`,
                     borderRadius: 16, outline: "none", fontFamily: "inherit",
                     background: error ? "#fff5f5" : d ? "#EEF8FF" : "#fafafa",
@@ -4337,9 +4483,9 @@ export default function App() {
               <div style={{ fontSize:60, marginBottom:8 }}>🌊</div>
               <h3 style={{ color:C.dark, margin:"0 0 6px" }}>Bienvenue !</h3>
               <p style={{ color:"#888", fontSize:13, margin:"0 0 16px" }}>Connectez-vous pour accéder à votre espace personnel</p>
-              <SunBtn color={C.ocean} onClick={() => setScreen("login")} style={{ marginBottom: 10 }}>🔑 Se connecter</SunBtn>
+              <SunBtn color={C.ocean} onClick={() => onNav("login")} style={{ marginBottom: 10 }}>🔑 Se connecter</SunBtn>
               <div style={{ marginTop: 10 }}>
-                <button onClick={() => setScreen("inscription")} style={{ background:"none", border:"none", color:C.coral, fontSize:13, cursor:"pointer", fontFamily:"inherit", fontWeight:700 }}>
+                <button onClick={() => onNav("inscription")} style={{ background:"none", border:"none", color:C.coral, fontSize:13, cursor:"pointer", fontFamily:"inherit", fontWeight:700 }}>
                   Pas encore de compte ? S'inscrire →
                 </button>
               </div>
