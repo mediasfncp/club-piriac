@@ -4059,32 +4059,27 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
 
   const refreshResas = () => {
     getAllReservations().then(d => {
-      setDbResas(d);
-      if (d && d.length > 0 && setAllSeasonSessions) {
-        setAllSeasonSessions(() => {
-          const next = ALL_SEASON_SLOTS_INIT.map(s => ({ ...s, spots: 2 }));
-          d.forEach(r => {
-            if (!r.date_seance || !r.heure) return;
-            const dateResa = r.date_seance.slice(0, 10);
-            for (let i = 0; i < next.length; i++) {
-              if (next[i].time === r.heure && next[i].spots > 0) {
-                const dayObj = ALL_SEASON_DAYS.find(d2 => d2.id === next[i].day);
-                if (dayObj && dayObj.date) {
-                  const y = dayObj.date.getFullYear();
-                  const m = String(dayObj.date.getMonth() + 1).padStart(2, "0");
-                  const d2 = String(dayObj.date.getDate()).padStart(2, "0");
-                  if (`${y}-${m}-${d2}` === dateResa) {
-                    next[i] = { ...next[i], spots: Math.max(0, next[i].spots - 1) };
-                    break;
-                  }
-                }
-              }
-            }
-          });
-          return next;
-        });
-      }
+      setDbResas(d || []);
+      // Reconstruire allSeasonSessions depuis zéro + décrémenter selon résas réelles
+      const next = ALL_SEASON_SLOTS_INIT.map(s => ({ ...s, spots: 2 }));
+      (d || []).forEach(r => {
+        if (!r.date_seance || !r.heure) return;
+        const dateResa = r.date_seance.slice(0, 10);
+        // Trouver tous les slots qui matchent heure + date
+        for (let i = 0; i < next.length; i++) {
+          if (next[i].time !== r.heure || next[i].spots <= 0) continue;
+          const dayObj = ALL_SEASON_DAYS.find(d2 => d2.id === next[i].day);
+          if (!dayObj?.date) continue;
+          const slotISO = `${dayObj.date.getFullYear()}-${String(dayObj.date.getMonth()+1).padStart(2,"0")}-${String(dayObj.date.getDate()).padStart(2,"0")}`;
+          if (slotISO === dateResa) {
+            next[i] = { ...next[i], spots: next[i].spots - 1 };
+            break;
+          }
+        }
+      });
+      if (setAllSeasonSessions) setAllSeasonSessions(next);
     }).catch(() => {});
+
     import("@supabase/supabase-js").then(({ createClient }) => {
       const sb = createClient(
         "https://rnaosrftcntomehaepjh.supabase.co",
@@ -4093,17 +4088,37 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
       sb.from("reservations_club").select("*, membres(prenom, nom, email, tel)").order("created_at", { ascending: false })
         .then(({ data }) => {
           setDbResasClub(data || []);
-          if (data && data.length > 0 && setClubPlaces) {
+          if (data && setClubPlaces) {
             const counts = { matin: 0, apmidi: 0 };
             data.forEach(r => { if (r.session === "matin") counts.matin++; else counts.apmidi++; });
-            setClubPlaces(prev => ({
-              ...prev,
-              matin: Math.max(0, 45 - counts.matin),
-              apmidi: Math.max(0, 45 - counts.apmidi),
-            }));
+            setClubPlaces(prev => ({ ...prev, matin: Math.max(0, 45 - counts.matin), apmidi: Math.max(0, 45 - counts.apmidi) }));
           }
         });
     });
+  };
+
+  const supprimerResaNatation = async (id) => {
+    try {
+      const { createClient } = await import("@supabase/supabase-js");
+      const sb = createClient(
+        "https://rnaosrftcntomehaepjh.supabase.co",
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJuYW9zcmZ0Y250b21laGFlcGpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxNjgzOTQsImV4cCI6MjA4OTc0NDM5NH0.9y9XK2FG5-o03ICrLTzgan3cBIWrg2wPTuMfFLf_3dY"
+      );
+      await sb.from("reservations_natation").delete().eq("id", id);
+      refreshResas();
+    } catch(e) { alert("Erreur suppression : " + e.message); }
+  };
+
+  const supprimerResaClub = async (id) => {
+    try {
+      const { createClient } = await import("@supabase/supabase-js");
+      const sb = createClient(
+        "https://rnaosrftcntomehaepjh.supabase.co",
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJuYW9zcmZ0Y250b21laGFlcGpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxNjgzOTQsImV4cCI6MjA4OTc0NDM5NH0.9y9XK2FG5-o03ICrLTzgan3cBIWrg2wPTuMfFLf_3dY"
+      );
+      await sb.from("reservations_club").delete().eq("id", id);
+      refreshResas();
+    } catch(e) { alert("Erreur suppression : " + e.message); }
   };
 
   // Charger les données Supabase au montage
@@ -4341,7 +4356,11 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                   <div key={r.id} style={{ background:"#fff", borderRadius:18, padding:"12px 14px", boxShadow:"0 2px 10px rgba(0,0,0,0.05)", borderLeft:`4px solid ${C.ocean}` }}>
                     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
                       <div style={{ fontWeight:900, color:"#2C3E50", fontSize:13 }}>{r.membres ? `${r.membres.prenom} ${r.membres.nom}` : "—"}</div>
-                      <Pill color={C.green}>✓ Confirmé</Pill>
+                      <div style={{ display:"flex", gap:6, alignItems:"center" }}>
+                        <Pill color={C.green}>✓ Confirmé</Pill>
+                        <button onClick={() => { if(window.confirm("Supprimer cette réservation ?")) supprimerResaNatation(r.id); }}
+                          style={{ background:"#FFF0F0", border:"none", color:C.sunset, borderRadius:8, width:28, height:28, cursor:"pointer", fontWeight:900, fontSize:13, fontFamily:"inherit" }}>🗑</button>
+                      </div>
                     </div>
                     <div style={{ fontSize:12, color:C.ocean, fontWeight:700 }}>🕐 {r.heure} · {r.date_seance ? new Date(r.date_seance).toLocaleDateString("fr-FR") : "—"}</div>
                     {r.enfants?.length > 0 && <div style={{ display:"flex", gap:5, marginTop:6, flexWrap:"wrap" }}>{r.enfants.map((e,i) => <Pill key={i} color={C.sea}>{e}</Pill>)}</div>}
@@ -4358,7 +4377,11 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                   <div key={r.id} style={{ background:"#fff", borderRadius:18, padding:"12px 14px", boxShadow:"0 2px 10px rgba(0,0,0,0.05)", borderLeft:`4px solid ${C.coral}` }}>
                     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
                       <div style={{ fontWeight:900, color:"#2C3E50", fontSize:13 }}>{r.membres ? `${r.membres.prenom} ${r.membres.nom}` : "—"}</div>
-                      <Pill color={C.green}>✓ Confirmé</Pill>
+                      <div style={{ display:"flex", gap:6, alignItems:"center" }}>
+                        <Pill color={C.green}>✓ Confirmé</Pill>
+                        <button onClick={() => { if(window.confirm("Supprimer cette réservation ?")) supprimerResaClub(r.id); }}
+                          style={{ background:"#FFF0F0", border:"none", color:C.sunset, borderRadius:8, width:28, height:28, cursor:"pointer", fontWeight:900, fontSize:13, fontFamily:"inherit" }}>🗑</button>
+                      </div>
                     </div>
                     <div style={{ fontSize:12, color:C.coral, fontWeight:700 }}>
                       {r.session === "matin" ? "☀️ Matin" : "🌊 Après-midi"} · {r.date_reservation ? new Date(r.date_reservation).toLocaleDateString("fr-FR") : "—"}
