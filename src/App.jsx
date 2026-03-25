@@ -5,6 +5,7 @@ import {
   creerReservationClub, updateLiberte,
   enregistrerPaiement, getPaiements, getTotalPaiements,
   getAllMembres, getAllReservations, getTotalPaiements
+  supabase as sb,
 } from "./supabase";
 
 /* ═══════════════════════════════════════════════════════
@@ -1755,11 +1756,6 @@ function LoginScreen({ onNav, setUser }) {
     }
     setStep("loading");
     try {
-      const { createClient } = await import("@supabase/supabase-js");
-      const sb = createClient(
-        "https://rnaosrftcntomehaepjh.supabase.co",
-        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJuYW9zcmZ0Y250b21laGFlcGpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxNjgzOTQsImV4cCI6MjA4OTc0NDM5NH0.9y9XK2FG5-o03ICrLTzgan3cBIWrg2wPTuMfFLf_3dY"
-      );
       const { error } = await sb.auth.signInWithOtp({
         email,
         options: { shouldCreateUser: true }
@@ -4080,30 +4076,19 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
       if (setAllSeasonSessions) setAllSeasonSessions(next);
     }).catch(() => {});
 
-    import("@supabase/supabase-js").then(({ createClient }) => {
-      const sb = createClient(
-        "https://rnaosrftcntomehaepjh.supabase.co",
-        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJuYW9zcmZ0Y250b21laGFlcGpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxNjgzOTQsImV4cCI6MjA4OTc0NDM5NH0.9y9XK2FG5-o03ICrLTzgan3cBIWrg2wPTuMfFLf_3dY"
-      );
-      sb.from("reservations_club").select("*, membres(prenom, nom, email, tel)").order("created_at", { ascending: false })
-        .then(({ data }) => {
-          setDbResasClub(data || []);
-          if (data && setClubPlaces) {
-            const counts = { matin: 0, apmidi: 0 };
-            data.forEach(r => { if (r.session === "matin") counts.matin++; else counts.apmidi++; });
-            setClubPlaces(prev => ({ ...prev, matin: Math.max(0, 45 - counts.matin), apmidi: Math.max(0, 45 - counts.apmidi) }));
-          }
-        });
-    });
+    sb.from("reservations_club").select("*, membres(prenom, nom, email, tel)").order("created_at", { ascending: false })
+      .then(({ data }) => {
+        setDbResasClub(data || []);
+        if (data && setClubPlaces) {
+          const counts = { matin: 0, apmidi: 0 };
+          data.forEach(r => { if (r.session === "matin") counts.matin++; else counts.apmidi++; });
+          setClubPlaces(prev => ({ ...prev, matin: Math.max(0, 45 - counts.matin), apmidi: Math.max(0, 45 - counts.apmidi) }));
+        }
+      });
   };
 
   const supprimerResaNatation = async (id) => {
     try {
-      const { createClient } = await import("@supabase/supabase-js");
-      const sb = createClient(
-        "https://rnaosrftcntomehaepjh.supabase.co",
-        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJuYW9zcmZ0Y250b21laGFlcGpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxNjgzOTQsImV4cCI6MjA4OTc0NDM5NH0.9y9XK2FG5-o03ICrLTzgan3cBIWrg2wPTuMfFLf_3dY"
-      );
       await sb.from("reservations_natation").delete().eq("id", id);
       refreshResas();
     } catch(e) { alert("Erreur suppression : " + e.message); }
@@ -4111,11 +4096,6 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
 
   const supprimerResaClub = async (id) => {
     try {
-      const { createClient } = await import("@supabase/supabase-js");
-      const sb = createClient(
-        "https://rnaosrftcntomehaepjh.supabase.co",
-        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJuYW9zcmZ0Y250b21laGFlcGpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxNjgzOTQsImV4cCI6MjA4OTc0NDM5NH0.9y9XK2FG5-o03ICrLTzgan3cBIWrg2wPTuMfFLf_3dY"
-      );
       await sb.from("reservations_club").delete().eq("id", id);
       refreshResas();
     } catch(e) { alert("Erreur suppression : " + e.message); }
@@ -4565,15 +4545,9 @@ export default function App() {
 
   // Écouter les changements d'authentification Supabase (magic link)
   useEffect(() => {
-    import("@supabase/supabase-js").then(({ createClient }) => {
-      const sb = createClient(
-        "https://rnaosrftcntomehaepjh.supabase.co",
-        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJuYW9zcmZ0Y250b21laGFlcGpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxNjgzOTQsImV4cCI6MjA4OTc0NDM5NH0.9y9XK2FG5-o03ICrLTzgan3cBIWrg2wPTuMfFLf_3dY"
-      );
       // Vérifier si déjà connecté
       sb.auth.getSession().then(({ data: { session } }) => {
         if (session?.user) {
-          // Chercher le profil dans la table membres
           sb.from("membres").select("*, enfants(*)").eq("email", session.user.email).single()
             .then(({ data }) => {
               if (data) setUser({ ...data, prenom: data.prenom, nom: data.nom, email: data.email, tel: data.tel, supabaseId: data.id });
@@ -4590,7 +4564,6 @@ export default function App() {
                 setUser({ ...data, prenom: data.prenom, nom: data.nom, email: data.email, tel: data.tel, supabaseId: data.id });
                 setScreen("profil");
               } else {
-                // Nouveau compte — rediriger vers inscription
                 setUser({ email: session.user.email, prenom: "", nom: "", supabaseId: session.user.id });
                 setScreen("inscription");
               }
@@ -4602,7 +4575,6 @@ export default function App() {
         }
       });
       return () => subscription.unsubscribe();
-    });
   }, []);
   const props = { onNav: setScreen, user, setUser, sessions, setSessions, reservations, setReservations, allSeasonSessions, setAllSeasonSessions, clubPlaces, setClubPlaces };
 
@@ -4632,11 +4604,7 @@ export default function App() {
                 <p style={{ color:"#888", fontSize:14, margin:"0 0 16px" }}>{user.tel}</p>
                 {user.enfants?.length > 0 && <div style={{ marginBottom:16, display:"flex", gap:6, flexWrap:"wrap", justifyContent:"center" }}>{user.enfants.map(e => <Pill key={e.id} color={C.sea}>{e.prenom}</Pill>)}</div>}
                 <SunBtn color={C.sunset} onClick={async () => {
-                  try {
-                    const { createClient } = await import("@supabase/supabase-js");
-                    const sb = createClient("https://rnaosrftcntomehaepjh.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJuYW9zcmZ0Y250b21laGFlcGpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxNjgzOTQsImV4cCI6MjA4OTc0NDM5NH0.9y9XK2FG5-o03ICrLTzgan3cBIWrg2wPTuMfFLf_3dY");
-                    await sb.auth.signOut();
-                  } catch(e) {}
+                  try { await sb.auth.signOut(); } catch(e) {}
                   setUser(null); setScreen("home");
                 }}>Se déconnecter</SunBtn>
               </Card>
