@@ -4060,24 +4060,22 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
   const refreshResas = () => {
     getAllReservations().then(d => {
       setDbResas(d);
-      // Synchroniser allSeasonSessions avec les vraies réservations Supabase
       if (d && d.length > 0 && setAllSeasonSessions) {
-        setAllSeasonSessions(prev => {
-          const next = [...prev.map(s => ({ ...s, spots: 2 }))]; // Reset à 2
+        setAllSeasonSessions(() => {
+          const next = ALL_SEASON_SLOTS_INIT.map(s => ({ ...s, spots: 2 }));
           d.forEach(r => {
             if (!r.date_seance || !r.heure) return;
             const dateResa = r.date_seance.slice(0, 10);
-            let found = false;
             for (let i = 0; i < next.length; i++) {
-              if (found) break;
               if (next[i].time === r.heure && next[i].spots > 0) {
                 const dayObj = ALL_SEASON_DAYS.find(d2 => d2.id === next[i].day);
-                if (dayObj) {
-                  const m = String(dayObj.month === "Juillet" ? 7 : 8).padStart(2,"0");
-                  const d2 = String(dayObj.num).padStart(2,"0");
-                  if (`2026-${m}-${d2}` === dateResa) {
+                if (dayObj && dayObj.date) {
+                  const y = dayObj.date.getFullYear();
+                  const m = String(dayObj.date.getMonth() + 1).padStart(2, "0");
+                  const d2 = String(dayObj.date.getDate()).padStart(2, "0");
+                  if (`${y}-${m}-${d2}` === dateResa) {
                     next[i] = { ...next[i], spots: Math.max(0, next[i].spots - 1) };
-                    found = true;
+                    break;
                   }
                 }
               }
@@ -4087,7 +4085,6 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
         });
       }
     }).catch(() => {});
-    // Charger résas club
     import("@supabase/supabase-js").then(({ createClient }) => {
       const sb = createClient(
         "https://rnaosrftcntomehaepjh.supabase.co",
@@ -4096,7 +4093,6 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
       sb.from("reservations_club").select("*, membres(prenom, nom, email, tel)").order("created_at", { ascending: false })
         .then(({ data }) => {
           setDbResasClub(data || []);
-          // Synchroniser clubPlaces
           if (data && data.length > 0 && setClubPlaces) {
             const counts = { matin: 0, apmidi: 0 };
             data.forEach(r => { if (r.session === "matin") counts.matin++; else counts.apmidi++; });
