@@ -1805,7 +1805,7 @@ function LoginScreen({ onNav, setUser }) {
           </div>
         ) : (
           /* Formulaire */
-          <div style={{ width: "100%", maxWidth: 460 }}>
+          <div style={{ width: "100%", maxWidth: 340 }}>
             <div style={{ textAlign: "center", marginBottom: 28 }}>
               <div style={{ fontSize: 56, marginBottom: 12 }}>🏖️</div>
               <h2 style={{ color: C.dark, fontWeight: 900, margin: "0 0 8px" }}>Connexion</h2>
@@ -4203,54 +4203,37 @@ function BottomNav({ current, onNav }) {
 const ADMIN_CODE = "club2026";
 
 function AdminCodeAccess({ onUnlock }) {
-  const [open, setOpen] = useState(false);
-  const [digits, setDigits] = useState(["", "", "", "", "", "", "", ""]);
+  const [open, setOpen]   = useState(false);
+  const [code, setCode]   = useState("");
   const [error, setError] = useState(false);
   const [shake, setShake] = useState(false);
-  const inputRefs = [null, null, null, null, null, null, null, null].map(() => useState(null));
 
-  const handleDigit = (idx, val) => {
-    if (!/^\d?$/.test(val)) return;
-    const next = [...digits];
-    next[idx] = val;
-    setDigits(next);
+  const handleChange = (val) => {
+    const clean = val.slice(0, 8);
+    setCode(clean);
     setError(false);
-    if (val && idx < 7) {
-      // auto-focus next
-      const nextInput = document.getElementById(`admin-pin-${idx+1}`);
-      if (nextInput) nextInput.focus();
-    }
-    // Auto-check when all filled
-    if (idx === 7 && val) {
-      const code = [...next.slice(0,7), val].join("");
-      if (code.toLowerCase() === ADMIN_CODE.toLowerCase()) {
+    if (clean.length === 8) {
+      if (clean.toLowerCase() === ADMIN_CODE.toLowerCase()) {
         setOpen(false);
-        setDigits(["","","","","","","",""]);
+        setCode("");
         onUnlock();
       } else {
         setError(true);
         setShake(true);
-        setTimeout(() => { setShake(false); setDigits(["","","","","","","",""]); document.getElementById("admin-pin-0")?.focus(); }, 600);
+        setTimeout(() => { setShake(false); setCode(""); setError(false); }, 800);
       }
-    }
-  };
-
-  const handleKeyDown = (idx, e) => {
-    if (e.key === "Backspace" && !digits[idx] && idx > 0) {
-      document.getElementById(`admin-pin-${idx-1}`)?.focus();
     }
   };
 
   const handleOpen = () => {
     setOpen(true);
-    setDigits(["","","","","","","",""]);
+    setCode("");
     setError(false);
-    setTimeout(() => document.getElementById("admin-pin-0")?.focus(), 100);
+    setTimeout(() => document.getElementById("admin-hidden-input")?.focus(), 100);
   };
 
   return (
     <div style={{ marginTop: 24 }}>
-      {/* Admin button */}
       <div onClick={handleOpen} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "linear-gradient(135deg, #0F2027, #203A43)", borderRadius: 20, padding: "14px 18px", cursor: "pointer", boxShadow: "0 4px 16px rgba(0,0,0,0.15)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div style={{ width: 40, height: 40, borderRadius: 14, background: "rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>⚙️</div>
@@ -4262,41 +4245,47 @@ function AdminCodeAccess({ onUnlock }) {
         <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 20 }}>›</div>
       </div>
 
-      {/* Code modal */}
       {open && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 32px" }}>
+        <div style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 24px" }}>
           <div onClick={() => setOpen(false)} style={{ position: "absolute", inset: 0, background: "rgba(0,10,30,0.7)", backdropFilter: "blur(6px)" }} />
           <div style={{
-            position: "relative", background: "#fff", borderRadius: 28, padding: "36px 28px",
-            width: "100%", maxWidth: 460, textAlign: "center",
+            position: "relative", background: "#fff", borderRadius: 28, padding: "36px 20px",
+            width: "100%", maxWidth: 380, textAlign: "center",
             boxShadow: "0 24px 64px rgba(0,0,0,0.35)",
             animation: shake ? "shake .4s" : "none",
           }}>
             <div style={{ width: 64, height: 64, borderRadius: 20, background: "linear-gradient(135deg, #0F2027, #203A43)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 30, margin: "0 auto 16px" }}>⚙️</div>
             <h2 style={{ color: "#2C3E50", fontSize: 20, fontWeight: 900, margin: "0 0 6px" }}>Espace Admin</h2>
-            <p style={{ color: "#888", fontSize: 13, margin: "0 0 28px" }}>Saisissez le code à 4 chiffres</p>
+            <p style={{ color: "#888", fontSize: 13, margin: "0 0 24px" }}>Saisissez le code d'accès</p>
 
-            {/* PIN inputs */}
-            <div style={{ display: "flex", gap: 6, justifyContent: "center", marginBottom: 20 }}>
-              {digits.map((d, i) => (
-                <input
-                  key={i}
-                  id={`admin-pin-${i}`}
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={1}
-                  value={d}
-                  onChange={e => handleDigit(i, e.target.value.slice(-1))}
-                  onKeyDown={e => handleKeyDown(i, e)}
-                  style={{
-                    width: 42, height: 52, textAlign: "center", fontSize: 26, fontWeight: 900,
-                    border: `3px solid ${error ? "#e74c3c" : d ? "#1A8FE3" : "#e0e0e0"}`,
-                    borderRadius: 16, outline: "none", fontFamily: "inherit",
-                    background: error ? "#fff5f5" : d ? "#EEF8FF" : "#fafafa",
-                    color: "#2C3E50", transition: "all .15s",
-                    boxShadow: d ? "0 4px 12px rgba(26,143,227,0.2)" : "none",
-                  }}
-                />
+            {/* Input caché qui reçoit la vraie saisie */}
+            <input
+              id="admin-hidden-input"
+              type="text"
+              value={code}
+              onChange={e => handleChange(e.target.value)}
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="none"
+              spellCheck="false"
+              style={{ position: "absolute", opacity: 0, width: 1, height: 1, top: 0, left: 0 }}
+            />
+
+            {/* Cases visuelles */}
+            <div onClick={() => document.getElementById("admin-hidden-input")?.focus()}
+              style={{ display: "flex", gap: 8, justifyContent: "center", marginBottom: 20, cursor: "text" }}>
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} style={{
+                  width: 36, height: 48, borderRadius: 12,
+                  border: `3px solid ${error ? "#e74c3c" : i < code.length ? "#1A8FE3" : i === code.length ? "#1A8FE3" : "#e0e0e0"}`,
+                  background: error ? "#fff5f5" : i < code.length ? "#EEF8FF" : "#fafafa",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 20, fontWeight: 900, color: "#2C3E50",
+                  boxShadow: i === code.length ? `0 0 0 3px #1A8FE322` : "none",
+                  transition: "all .15s",
+                }}>
+                  {i < code.length ? "•" : ""}
+                </div>
               ))}
             </div>
 
@@ -4483,9 +4472,9 @@ export default function App() {
               <div style={{ fontSize:60, marginBottom:8 }}>🌊</div>
               <h3 style={{ color:C.dark, margin:"0 0 6px" }}>Bienvenue !</h3>
               <p style={{ color:"#888", fontSize:13, margin:"0 0 16px" }}>Connectez-vous pour accéder à votre espace personnel</p>
-              <SunBtn color={C.ocean} onClick={() => onNav("login")} style={{ marginBottom: 10 }}>🔑 Se connecter</SunBtn>
+              <SunBtn color={C.ocean} onClick={() => setScreen("login")} style={{ marginBottom: 10 }}>🔑 Se connecter</SunBtn>
               <div style={{ marginTop: 10 }}>
-                <button onClick={() => onNav("inscription")} style={{ background:"none", border:"none", color:C.coral, fontSize:13, cursor:"pointer", fontFamily:"inherit", fontWeight:700 }}>
+                <button onClick={() => setScreen("inscription")} style={{ background:"none", border:"none", color:C.coral, fontSize:13, cursor:"pointer", fontFamily:"inherit", fontWeight:700 }}>
                   Pas encore de compte ? S'inscrire →
                 </button>
               </div>
