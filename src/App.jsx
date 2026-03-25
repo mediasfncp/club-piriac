@@ -4077,7 +4077,7 @@ function AdminCodeAccess({ onUnlock }) {
     // Auto-check when all filled
     if (idx === 7 && val) {
       const code = [...next.slice(0,7), val].join("");
-      if (code === ADMIN_CODE) {
+      if (code.toLowerCase() === ADMIN_CODE.toLowerCase()) {
         setOpen(false);
         setDigits(["","","","","","","",""]);
         onUnlock();
