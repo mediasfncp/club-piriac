@@ -1575,116 +1575,113 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser }) 
 }
 
 // ── RESERVATION ───────────────────────────────────────────
-function ReservationScreen({ onNav, user, sessions, setSessions, reservations, setReservations }) {
-  const [selectedDay, setSelectedDay] = useState("lun7");
-  const [booking, setBooking] = useState(null);
+function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSessions, reservations, setReservations }) {
+  const [weekIdx, setWeekIdx]           = useState(0);
+  const [selectedDayId, setSelectedDayId] = useState(null);
+  const [booking, setBooking]           = useState(null);
   const [selectedEnfants, setSelectedEnfants] = useState([]);
-  const [done, setDone] = useState(null);
-  const [showWero, setShowWero] = useState(false);
+  const [done, setDone]                 = useState(null);
+  const [showWero, setShowWero]         = useState(false);
+
+  // Construire les semaines depuis ALL_SEASON_DAYS
+  const weeks = (() => {
+    const ws = []; let wk = [];
+    ALL_SEASON_DAYS.forEach((d, i) => {
+      wk.push(d);
+      if (d.label === "Sam" || i === ALL_SEASON_DAYS.length - 1) { ws.push([...wk]); wk = []; }
+    });
+    return ws;
+  })();
+  const currentWeek = weeks[Math.min(weekIdx, weeks.length-1)] || [];
+  const selectedDay = selectedDayId ? ALL_SEASON_DAYS.find(d => d.id === selectedDayId) : currentWeek[0];
+  const effectiveDayId = selectedDay?.id || currentWeek[0]?.id;
+
+  // Init selectedDayId quand semaine change
+  useEffect(() => {
+    if (currentWeek[0]) setSelectedDayId(currentWeek[0].id);
+  }, [weekIdx]);
 
   // Synchroniser les places depuis Supabase au chargement
   useEffect(() => {
     sb.from("reservations_natation").select("date_seance, heure")
       .then(({ data }) => {
         if (!data?.length) return;
-        setSessions(prev => {
-          const next = prev.map(s => ({ ...s, spots: 2 }));
-          data.forEach(r => {
-            if (!r.date_seance || !r.heure) return;
-            const dateResa = r.date_seance.slice(0, 10);
-            for (let i = 0; i < next.length; i++) {
-              if (next[i].time !== r.heure || next[i].spots <= 0) continue;
-              const dayObj = DAYS.find(d => d.id === next[i].day);
-              if (dayObj) {
-                const iso = `2026-07-${String(dayObj.num).padStart(2,"0")}`;
-                if (iso === dateResa) { next[i] = { ...next[i], spots: next[i].spots - 1 }; break; }
+        if (setAllSeasonSessions) {
+          setAllSeasonSessions(() => {
+            const next = ALL_SEASON_SLOTS_INIT.map(s => ({ ...s, spots: 2 }));
+            data.forEach(r => {
+              if (!r.date_seance || !r.heure) return;
+              const dateResa = r.date_seance.slice(0, 10);
+              for (let i = 0; i < next.length; i++) {
+                if (next[i].time !== r.heure || next[i].spots <= 0) continue;
+                const dayObj = ALL_SEASON_DAYS.find(d => d.id === next[i].day);
+                if (dayObj?.date) {
+                  const iso = `${dayObj.date.getFullYear()}-${String(dayObj.date.getMonth()+1).padStart(2,"0")}-${String(dayObj.date.getDate()).padStart(2,"0")}`;
+                  if (iso === dateResa) { next[i] = { ...next[i], spots: next[i].spots - 1 }; break; }
+                }
               }
-            }
+            });
+            return next;
           });
-          return next;
-        });
+        }
       }).catch(() => {});
   }, []);
 
-  const allForDay = sessions.filter(s => s.day === selectedDay);
-  const morning = allForDay.filter(s => { const [h] = s.time.split(":").map(Number); return h < 13; });
+  const allForDay = (allSeasonSessions || []).filter(s => s.day === effectiveDayId);
+  const morning   = allForDay.filter(s => { const [h] = s.time.split(":").map(Number); return h < 13; });
   const afternoon = allForDay.filter(s => { const [h] = s.time.split(":").map(Number); return h >= 13; });
+
+  // Date ISO du jour sélectionné
+  const getDateISO = (day) => {
+    if (!day?.date) return "";
+    return `${day.date.getFullYear()}-${String(day.date.getMonth()+1).padStart(2,"0")}-${String(day.date.getDate()).padStart(2,"0")}`;
+  };
 
   const handleConfirm = () => setShowWero(true);
   const onWeroSuccess = async () => {
     setShowWero(false);
-    setSessions(prev => prev.map(s => s.id === booking.id ? { ...s, spots: Math.max(0, s.spots-1) } : s));
+    if (setAllSeasonSessions) setAllSeasonSessions(prev => prev.map(s => s.id === booking.id ? { ...s, spots: Math.max(0, s.spots-1) } : s));
     const resa = { ...booking, parent: user?.prenom || "Invité", enfants: selectedEnfants, id: Date.now() };
     setReservations(prev => [...prev, resa]);
-    // Programmer rappel veille à 20h
-    const dayNum = DAYS.find(d => d.id === booking.day)?.num;
-    const resaDateISO = `2026-07-${String(dayNum).padStart(2,"0")}`;
+    const resaDateISO = getDateISO(selectedDay);
     const rappelDate = getRappelDate(resaDateISO);
-    scheduleRappel({
-      titre: "🏊 Rappel séance natation demain !",
-      corps: `Ta séance de natation à ${booking.time} est demain. N'oublie pas !`,
-      dateStr: rappelDate,
-    });
+    scheduleRappel({ titre:"🏊 Rappel séance natation demain !", corps:`Ta séance à ${booking.time} est demain !`, dateStr:rappelDate });
     resa.rappelDate = rappelDate;
-    resa.resaDate = resaDateISO;
-    // Sauvegarder dans Supabase
     try {
-      await creerReservationNatation({
-        membreId:   user?.supabaseId || null,
-        jour:       booking.day,
-        heure:      booking.time,
-        dateSeance: resaDateISO,
-        enfants:    selectedEnfants,
-        rappelDate: rappelDate,
-        montant:    20,
-      });
-      await enregistrerPaiement({
-        membreId:        user?.supabaseId || null,
-        montant:         20,
-        type:            'natation',
-        label:           `Natation ${booking.time}`,
-        transactionWero: null,
-      });
+      await creerReservationNatation({ membreId:user?.supabaseId||null, jour:booking.day, heure:booking.time, dateSeance:resaDateISO, enfants:selectedEnfants, rappelDate, montant:20 });
+      await enregistrerPaiement({ membreId:user?.supabaseId||null, montant:20, type:'natation', label:`Natation ${booking.time}`, transactionWero:null });
     } catch(e) { console.warn("Supabase:", e.message); }
     setDone(resa); setBooking(null); setSelectedEnfants([]);
   };
 
-  // 🔒 Gate : inscription obligatoire
   if (!user) return (
-    <div style={{ background: C.shell, minHeight: "100%", display: "flex", flexDirection: "column" }}>
-      <div style={{ background: `linear-gradient(135deg, #00C9FF, ${C.sea})`, padding: "20px 20px 0" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
-          <BackBtn onNav={onNav} />
-          <h2 style={{ color: "#fff", margin: 0, fontWeight: 900, fontSize: 20 }}>🏊 Réservations Natation</h2>
+    <div style={{ background:C.shell, minHeight:"100%", display:"flex", flexDirection:"column" }}>
+      <div style={{ background:`linear-gradient(135deg, #00C9FF, ${C.sea})`, padding:"20px 20px 0" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:8 }}>
+          <BackBtn onNav={onNav} /><h2 style={{ color:"#fff", margin:0, fontWeight:900, fontSize:20 }}>🏊 Réservations Natation</h2>
         </div>
         <Wave fill={C.shell} />
       </div>
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px 24px", textAlign: "center" }}>
-        <div style={{ fontSize: 72, marginBottom: 16 }}>🔒</div>
-        <h2 style={{ color: C.dark, fontSize: 22, margin: "0 0 10px" }}>Inscription requise</h2>
-        <p style={{ color: "#777", fontSize: 15, margin: "0 0 28px", lineHeight: 1.6 }}>
-          Pour réserver un créneau de natation, tu dois d'abord t'inscrire au Club de Plage FNCP.
-        </p>
-        <SunBtn color={C.coral} onClick={() => onNav("inscription")} style={{ marginBottom: 14 }}>
-          📋 S'inscrire maintenant
-        </SunBtn>
-        <button onClick={() => onNav("home")} style={{ background: "none", border: "none", color: "#aaa", fontSize: 14, cursor: "pointer", fontFamily: "inherit", fontWeight: 700 }}>
-          ← Retour à l'accueil
-        </button>
+      <div style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:"32px 24px", textAlign:"center" }}>
+        <div style={{ fontSize:72, marginBottom:16 }}>🔒</div>
+        <h2 style={{ color:C.dark, fontSize:22, margin:"0 0 10px" }}>Inscription requise</h2>
+        <SunBtn color={C.coral} onClick={() => onNav("inscription")}>📋 S'inscrire maintenant</SunBtn>
+        <button onClick={() => onNav("home")} style={{ background:"none", border:"none", color:"#aaa", fontSize:14, cursor:"pointer", fontFamily:"inherit", fontWeight:700, marginTop:12 }}>← Retour</button>
       </div>
     </div>
   );
+
   if (done) return (
-    <div style={{ padding: 32, textAlign: "center", background: C.shell, minHeight: "100%" }}>
-      <div style={{ fontSize: 90 }}>🎊</div>
-      <h2 style={{ color: C.green, fontSize: 24 }}>C'est réservé !</h2>
-      <Card style={{ margin: "16px 0", textAlign: "left" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ fontSize: 44 }}>🏊</div>
+    <div style={{ padding:32, textAlign:"center", background:C.shell, minHeight:"100%" }}>
+      <div style={{ fontSize:90 }}>🎊</div>
+      <h2 style={{ color:C.green, fontSize:24 }}>C'est réservé !</h2>
+      <Card style={{ margin:"16px 0", textAlign:"left" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+          <div style={{ fontSize:44 }}>🏊</div>
           <div>
-            <div style={{ fontWeight: 900, fontSize: 24, color: C.ocean }}>{done.time}</div>
-            <div style={{ color: "#666" }}>{DAYS.find(d => d.id === done.day)?.label} {DAYS.find(d => d.id === done.day)?.num} Juillet</div>
-            {done.enfants?.length > 0 && <div style={{ marginTop: 6, display: "flex", gap: 4, flexWrap: "wrap" }}>{done.enfants.map(e => <Pill key={e} color={C.sea}>{e}</Pill>)}</div>}
+            <div style={{ fontWeight:900, fontSize:24, color:C.ocean }}>{done.time}</div>
+            <div style={{ color:"#666" }}>{selectedDay?.label} {selectedDay?.num} {selectedDay?.month} 2026</div>
+            {done.enfants?.length > 0 && <div style={{ marginTop:6, display:"flex", gap:4, flexWrap:"wrap" }}>{done.enfants.map(e => <Pill key={e} color={C.sea}>{e}</Pill>)}</div>}
           </div>
         </div>
         {done.rappelDate && <RappelBanner rappels={[done]} />}
@@ -1692,32 +1689,34 @@ function ReservationScreen({ onNav, user, sessions, setSessions, reservations, s
       <SunBtn color={C.ocean} onClick={() => { setDone(null); onNav("home"); }}>🏠 Retour à l'accueil</SunBtn>
     </div>
   );
+
   if (booking) return (
-    <div style={{ background: C.shell, minHeight: "100%" }}>
-      <div style={{ background: `linear-gradient(135deg, #00C9FF, ${C.sea})`, padding: "20px 20px 0", textAlign: "center" }}>
-        <div style={{ display: "flex", alignItems: "center", marginBottom: 6 }}><BackBtn onNav={() => setBooking(null)} /><div style={{ flex: 1, color: "rgba(255,255,255,0.9)", fontSize: 13, fontWeight: 700 }}>🏊 Réserver la séance</div></div>
-        <div style={{ fontSize: 56, fontWeight: 900, color: "#fff", letterSpacing: -2 }}>{booking.time}</div>
-        <div style={{ color: C.sun, fontWeight: 800, fontSize: 15, marginBottom: 4 }}>{DAYS.find(d => d.id === booking.day)?.label} {DAYS.find(d => d.id === booking.day)?.num} Juillet 2026 ☀️</div>
+    <div style={{ background:C.shell, minHeight:"100%" }}>
+      <div style={{ background:`linear-gradient(135deg, #00C9FF, ${C.sea})`, padding:"20px 20px 0", textAlign:"center" }}>
+        <div style={{ display:"flex", alignItems:"center", marginBottom:6 }}><BackBtn onNav={() => setBooking(null)} /><div style={{ flex:1, color:"rgba(255,255,255,0.9)", fontSize:13, fontWeight:700 }}>🏊 Réserver la séance</div></div>
+        <div style={{ fontSize:56, fontWeight:900, color:"#fff", letterSpacing:-2 }}>{booking.time}</div>
+        <div style={{ color:C.sun, fontWeight:800, fontSize:15, marginBottom:4 }}>{selectedDay?.label} {selectedDay?.num} {selectedDay?.month} 2026 ☀️</div>
         <Wave fill={C.shell} />
       </div>
-      <div style={{ padding: "10px 18px 24px", display: "flex", flexDirection: "column", gap: 14 }}>
+      <div style={{ padding:"10px 18px 24px", display:"flex", flexDirection:"column", gap:14 }}>
         <Card>
-          <h3 style={{ color: C.dark, margin: "0 0 10px", fontSize: 15 }}>👤 Parent / Responsable</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "6px 12px", fontSize: 14 }}>
-            <span style={{ color: "#aaa" }}>Nom</span><strong>{user?.prenom} {user?.nom || "—"}</strong>
-            <span style={{ color: "#aaa" }}>Email</span><span>{user?.email || "—"}</span>
-            <span style={{ color: "#aaa" }}>Tél.</span><span>{user?.tel || "—"}</span>
+          <h3 style={{ color:C.dark, margin:"0 0 10px", fontSize:15 }}>👤 Parent / Responsable</h3>
+          <div style={{ display:"grid", gridTemplateColumns:"auto 1fr", gap:"6px 12px", fontSize:14 }}>
+            <span style={{ color:"#aaa" }}>Nom</span><strong>{user?.prenom} {user?.nom||"—"}</strong>
+            <span style={{ color:"#aaa" }}>Email</span><span>{user?.email||"—"}</span>
+            <span style={{ color:"#aaa" }}>Tél.</span><span>{user?.tel||"—"}</span>
           </div>
         </Card>
         {user?.enfants?.length > 0 && (
           <Card>
-            <h3 style={{ color: C.dark, margin: "0 0 12px", fontSize: 15 }}>🧒 Enfants participants</h3>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+            <h3 style={{ color:C.dark, margin:"0 0 12px", fontSize:15 }}>🧒 Enfants participants</h3>
+            <div style={{ display:"flex", flexWrap:"wrap", gap:10 }}>
               {user.enfants.map(e => {
                 const sel = selectedEnfants.includes(e.prenom);
                 return (
-                  <div key={e.id} onClick={() => setSelectedEnfants(s => sel ? s.filter(x => x !== e.prenom) : [...s, e.prenom])} style={{ display: "flex", alignItems: "center", gap: 8, background: sel ? `${C.sea}30` : "#f5f5f5", border: `2.5px solid ${sel ? C.sea : "#e0e0e0"}`, borderRadius: 50, padding: "8px 16px", cursor: "pointer", fontWeight: 700, color: sel ? C.deep : "#888" }}>
-                    <span>{sel ? "✓" : "○"}</span><span>{e.prenom}</span>
+                  <div key={e.id} onClick={() => setSelectedEnfants(s => sel ? s.filter(x=>x!==e.prenom) : [...s,e.prenom])}
+                    style={{ display:"flex", alignItems:"center", gap:8, background:sel?`${C.sea}30`:"#f5f5f5", border:`2.5px solid ${sel?C.sea:"#e0e0e0"}`, borderRadius:50, padding:"8px 16px", cursor:"pointer", fontWeight:700, color:sel?C.deep:"#888" }}>
+                    <span>{sel?"✓":"○"}</span><span>{e.prenom}</span>
                   </div>
                 );
               })}
@@ -1725,76 +1724,84 @@ function ReservationScreen({ onNav, user, sessions, setSessions, reservations, s
           </Card>
         )}
         <SunBtn color={C.green} full onClick={handleConfirm}>🏊 Payer et confirmer · 20 €</SunBtn>
-        {showWero && (
-          <WeroModal
-            amount={20}
-            label={`Natation · ${booking?.time}`}
-            onSuccess={onWeroSuccess}
-            onCancel={() => setShowWero(false)}
-          />
-        )}
+        {showWero && <WeroModal amount={20} label={`Natation · ${booking?.time}`} onSuccess={onWeroSuccess} onCancel={() => setShowWero(false)} />}
       </div>
     </div>
   );
+
   const SlotRow = ({ s }) => (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#fff", borderRadius: 18, padding: "12px 16px", boxShadow: "0 3px 12px rgba(0,102,204,0.08)", border: `2px solid ${s.spots === 1 ? C.coral+"60" : C.sea+"40"}` }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <div style={{ width: 44, height: 44, borderRadius: 14, background: `linear-gradient(135deg, ${C.ocean}, ${C.sea})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>🏊</div>
+    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", background:"#fff", borderRadius:18, padding:"12px 16px", boxShadow:"0 3px 12px rgba(0,102,204,0.08)", border:`2px solid ${s.spots===1?C.coral+"60":C.sea+"40"}` }}>
+      <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+        <div style={{ width:44, height:44, borderRadius:14, background:`linear-gradient(135deg,${C.ocean},${C.sea})`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20 }}>🏊</div>
         <div>
-          <div style={{ fontWeight: 900, fontSize: 18, color: C.dark }}>{s.time}</div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: s.spots === 1 ? C.coral : C.green }}>{s.spots === 1 ? "🟡 1 place restante" : "🟢 2 places dispo"}</div>
+          <div style={{ fontWeight:900, fontSize:18, color:C.dark }}>{s.time}</div>
+          <div style={{ fontSize:12, fontWeight:700, color:s.spots===1?C.coral:C.green }}>{s.spots===1?"🟡 1 place restante":"🟢 2 places dispo"}</div>
         </div>
       </div>
-      <SunBtn small color={s.spots === 1 ? C.coral : C.ocean} onClick={() => setBooking(s)}>Réserver</SunBtn>
+      <SunBtn small color={s.spots===1?C.coral:C.ocean} onClick={() => setBooking(s)}>Réserver</SunBtn>
     </div>
   );
+
+  const weekLabel = currentWeek.length > 0 ? `${currentWeek[0].num} ${currentWeek[0].month} – ${currentWeek[currentWeek.length-1].num} ${currentWeek[currentWeek.length-1].month}` : "";
+
   return (
-    <div style={{ background: C.shell, minHeight: "100%" }}>
-      <div style={{ background: `linear-gradient(135deg, #00C9FF, ${C.sea})`, padding: "20px 20px 0" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+    <div style={{ background:C.shell, minHeight:"100%" }}>
+      <div style={{ background:`linear-gradient(135deg, #00C9FF, ${C.sea})`, padding:"20px 20px 0" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:10 }}>
           <BackBtn onNav={onNav} />
-          <div><h2 style={{ color: "#fff", margin: 0, fontWeight: 900, fontSize: 20 }}>🏊 Réservations Natation</h2><p style={{ color: "rgba(255,255,255,0.8)", margin: 0, fontSize: 12 }}>Créneaux 30 min · 2 places max · Juillet 2026</p></div>
+          <div><h2 style={{ color:"#fff", margin:0, fontWeight:900, fontSize:20 }}>🏊 Natation</h2><p style={{ color:"rgba(255,255,255,0.8)", margin:0, fontSize:12 }}>Créneaux 30 min · 2 places max</p></div>
         </div>
-        <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 4 }}>
-          {DAYS.map(d => {
-            const avail = sessions.filter(s => s.day === d.id && s.spots > 0).length;
+        {/* Navigation semaine */}
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", background:"rgba(255,255,255,0.2)", borderRadius:16, padding:"8px 12px", marginBottom:10 }}>
+          <button onClick={() => setWeekIdx(Math.max(0, weekIdx-1))} disabled={weekIdx===0}
+            style={{ background:"rgba(255,255,255,0.3)", border:"none", color:"#fff", borderRadius:10, width:32, height:32, cursor:weekIdx===0?"default":"pointer", fontWeight:900, fontSize:16, fontFamily:"inherit", opacity:weekIdx===0?0.4:1 }}>‹</button>
+          <span style={{ color:"#fff", fontWeight:800, fontSize:13 }}>📅 {weekLabel}</span>
+          <button onClick={() => setWeekIdx(Math.min(weeks.length-1, weekIdx+1))} disabled={weekIdx===weeks.length-1}
+            style={{ background:"rgba(255,255,255,0.3)", border:"none", color:"#fff", borderRadius:10, width:32, height:32, cursor:weekIdx===weeks.length-1?"default":"pointer", fontWeight:900, fontSize:16, fontFamily:"inherit", opacity:weekIdx===weeks.length-1?0.4:1 }}>›</button>
+        </div>
+        {/* Sélecteur jours */}
+        <div style={{ display:"flex", gap:6, overflowX:"auto", paddingBottom:4 }}>
+          {currentWeek.map(d => {
+            const sel = effectiveDayId === d.id;
+            const avail = (allSeasonSessions||[]).filter(s => s.day===d.id && s.spots>0).length;
             return (
-              <button key={d.id} onClick={() => setSelectedDay(d.id)} style={{ background: selectedDay === d.id ? "#fff" : "rgba(255,255,255,0.25)", color: selectedDay === d.id ? C.ocean : "#fff", border: "none", borderRadius: 16, padding: "10px 12px", cursor: "pointer", fontWeight: 800, fontFamily: "inherit", minWidth: 52, textAlign: "center", transition: "all .15s" }}>
-                <div style={{ fontSize: 10 }}>{d.label}</div>
-                <div style={{ fontSize: 18, fontWeight: 900 }}>{d.num}</div>
-                <div style={{ fontSize: 9, color: selectedDay === d.id ? C.green : "rgba(255,255,255,0.7)" }}>{avail}</div>
+              <button key={d.id} onClick={() => setSelectedDayId(d.id)}
+                style={{ background:sel?"#fff":"rgba(255,255,255,0.25)", color:sel?C.ocean:"#fff", border:"none", borderRadius:16, padding:"10px 12px", cursor:"pointer", fontWeight:800, fontFamily:"inherit", minWidth:52, textAlign:"center", transition:"all .15s" }}>
+                <div style={{ fontSize:10 }}>{d.label}</div>
+                <div style={{ fontSize:18, fontWeight:900 }}>{d.num}</div>
+                <div style={{ fontSize:9, color:sel?(avail===0?C.sunset:C.green):"rgba(255,255,255,0.7)" }}>{avail===0?"🔴":avail}</div>
               </button>
             );
           })}
         </div>
         <Wave fill={C.shell} />
       </div>
-      <div style={{ padding: "10px 18px 24px" }}>
-        {morning.filter(s => s.spots > 0).length > 0 && (
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-              <div style={{ height: 2, flex: 1, background: `linear-gradient(90deg, ${C.sun}, transparent)` }} />
-              <span style={{ fontWeight: 900, color: C.coral, fontSize: 13, whiteSpace: "nowrap" }}>☀️ Matin · 9h00 – 12h30</span>
-              <div style={{ height: 2, flex: 1, background: `linear-gradient(270deg, ${C.sun}, transparent)` }} />
+      <div style={{ padding:"10px 18px 24px" }}>
+        {morning.filter(s=>s.spots>0).length > 0 && (
+          <div style={{ marginBottom:20 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
+              <div style={{ height:2, flex:1, background:`linear-gradient(90deg,${C.sun},transparent)` }} />
+              <span style={{ fontWeight:900, color:C.coral, fontSize:13, whiteSpace:"nowrap" }}>☀️ Matin · 9h00 – 12h30</span>
+              <div style={{ height:2, flex:1, background:`linear-gradient(270deg,${C.sun},transparent)` }} />
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>{morning.filter(s => s.spots > 0).map(s => <SlotRow key={s.id} s={s} />)}</div>
+            <div style={{ display:"flex", flexDirection:"column", gap:8 }}>{morning.filter(s=>s.spots>0).map(s=><SlotRow key={s.id} s={s} />)}</div>
           </div>
         )}
-        {afternoon.filter(s => s.spots > 0).length > 0 && (
+        {afternoon.filter(s=>s.spots>0).length > 0 && (
           <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-              <div style={{ height: 2, flex: 1, background: `linear-gradient(90deg, ${C.ocean}, transparent)` }} />
-              <span style={{ fontWeight: 900, color: C.ocean, fontSize: 13, whiteSpace: "nowrap" }}>🌊 Après-midi · 13h30 – 19h00</span>
-              <div style={{ height: 2, flex: 1, background: `linear-gradient(270deg, ${C.ocean}, transparent)` }} />
+            <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
+              <div style={{ height:2, flex:1, background:`linear-gradient(90deg,${C.ocean},transparent)` }} />
+              <span style={{ fontWeight:900, color:C.ocean, fontSize:13, whiteSpace:"nowrap" }}>🌊 Après-midi · 13h30 – 19h00</span>
+              <div style={{ height:2, flex:1, background:`linear-gradient(270deg,${C.ocean},transparent)` }} />
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>{afternoon.filter(s => s.spots > 0).map(s => <SlotRow key={s.id} s={s} />)}</div>
+            <div style={{ display:"flex", flexDirection:"column", gap:8 }}>{afternoon.filter(s=>s.spots>0).map(s=><SlotRow key={s.id} s={s} />)}</div>
           </div>
         )}
-        {allForDay.filter(s => s.spots > 0).length === 0 && (
-          <Card style={{ textAlign: "center", padding: 32 }}>
-            <div style={{ fontSize: 50, marginBottom: 8 }}>🔴</div>
-            <p style={{ color: C.sunset, fontWeight: 800 }}>Tous les créneaux sont complets</p>
-            <p style={{ color: "#aaa", fontSize: 13 }}>Essayez un autre jour</p>
+        {allForDay.filter(s=>s.spots>0).length === 0 && (
+          <Card style={{ textAlign:"center", padding:32 }}>
+            <div style={{ fontSize:50, marginBottom:8 }}>🔴</div>
+            <p style={{ color:C.sunset, fontWeight:800 }}>Tous les créneaux sont complets</p>
+            <p style={{ color:"#aaa", fontSize:13 }}>Essayez un autre jour</p>
           </Card>
         )}
       </div>
