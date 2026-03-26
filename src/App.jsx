@@ -4,7 +4,7 @@ import {
   creerReservationNatation, getReservationsNatation,
   creerReservationClub, updateLiberte,
   enregistrerPaiement, getPaiements, getTotalPaiements,
-  getAllMembres, getAllReservations, getTotalPaiements
+  getAllMembres, getAllReservations, getTotalPaiements,
   supabase as sb,
 } from "./supabase";
 
