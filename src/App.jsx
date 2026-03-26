@@ -4,7 +4,7 @@ import {
   creerReservationNatation, getReservationsNatation,
   creerReservationClub, updateLiberte,
   enregistrerPaiement, getPaiements, getTotalPaiements,
-  getAllMembres, getAllReservations,
+  getAllMembres, getAllReservations, getTotalPaiements
   supabase as sb,
 } from "./supabase";
 
@@ -1071,6 +1071,51 @@ const CLUB_SEASON_DAYS = (() => {
   return days;
 })();
 
+// Semaines saison 2026 — 6 jours consécutifs sans dimanche
+// Toutes les combinaisons possibles (Lun→Sam, Mar→Lun, Mer→Mar, Jeu→Mer, Ven→Jeu, Sam→Ven)
+const SEASON_WEEKS = (() => {
+  const dowOrder = ["Lun","Mar","Mer","Jeu","Ven","Sam"]; // sans dim
+  const allDays = CLUB_SEASON_DAYS; // déjà sans dim
+  const weeks = [];
+
+  dowOrder.forEach((startLabel, si) => {
+    // Pour chaque jour qui correspond au jour de départ
+    allDays.forEach((startDay, startIdx) => {
+      if (startDay.label !== startLabel) return;
+      // Prendre les 6 prochains jours consécutifs sans dimanche
+      let collected = [];
+      let idx = startIdx;
+      while (collected.length < 6 && idx < allDays.length) {
+        collected.push(allDays[idx]);
+        idx++;
+      }
+      if (collected.length === 6) {
+        const first = collected[0];
+        const last  = collected[5];
+        // Vérifier que c'est bien 6 jours consécutifs (pas de saut de semaine)
+        const daysDiff = Math.round((last.date - first.date) / (1000*60*60*24));
+        if (daysDiff <= 7) { // max 7 jours civils pour 6 jours ouvrés
+          weeks.push({
+            label: `${first.num} ${first.month} (${first.label}) → ${last.num} ${last.month} (${last.label})`,
+            days: [...collected],
+          });
+        }
+      }
+    });
+  });
+
+  // Dédoublonner et trier par date de début
+  const seen = new Set();
+  return weeks
+    .filter(w => {
+      const key = w.days[0].id;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .sort((a, b) => a.days[0].date - b.days[0].date);
+})();
+
 function ReservationClubScreen({ onNav, user, setUser, clubPlaces, setClubPlaces }) {
   const [selectedDayId, setSelectedDayId] = useState(CLUB_SEASON_DAYS[0]?.id);
   const [selectedSession, setSelectedSession] = useState(null); // "matin" | "apmidi"
@@ -1912,15 +1957,15 @@ function InscriptionScreen({ onNav, setUser }) {
             {form.email && !emailValid && <div style={{ fontSize: 12, color: C.sunset, fontWeight: 700, marginTop: -10, marginBottom: 12 }}>⚠️ Format invalide — ex : prenom@exemple.fr</div>}
             <FInput label="Téléphone" type="tel" value={form.tel} onChange={f("tel")} required />
             <FInput label="Téléphone 2" type="tel" value={form.tel2} onChange={f("tel2")} placeholder="Autre numéro (optionnel)" />
-            <FInput label="Adresse" value={form.adresse} onChange={f("adresse")} required placeholder="Ex : 4 allée des Roitelets" />
+            <FInput label="Adresse" value={form.adresse} onChange={f("adresse")} required />
             {step1Error && !form.adresse && <div style={{ fontSize: 12, color: C.sunset, fontWeight: 700, marginTop: -10, marginBottom: 12 }}>⚠️ L'adresse est obligatoire</div>}
             <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "0 12px" }}>
               <div>
-                <FInput label="Ville" value={form.ville} onChange={f("ville")} required placeholder="Ex : La Baule" />
+                <FInput label="Ville" value={form.ville} onChange={f("ville")} required />
                 {step1Error && !form.ville && <div style={{ fontSize: 12, color: C.sunset, fontWeight: 700, marginTop: -10, marginBottom: 12 }}>⚠️ Obligatoire</div>}
               </div>
               <div>
-                <FInput label="Code postal" value={form.cp} onChange={f("cp")} required placeholder="44500" />
+                <FInput label="Code postal" value={form.cp} onChange={f("cp")} required />
                 {form.cp && !cpValid && <div style={{ fontSize: 12, color: C.sunset, fontWeight: 700, marginTop: -10, marginBottom: 12 }}>⚠️ 5 chiffres</div>}
               </div>
             </div>
@@ -2025,7 +2070,6 @@ function InscriptionScreen({ onNav, setUser }) {
             <div style={{ background: `${C.sea}15`, border: `2px solid ${C.sea}40`, borderRadius: 14, padding: 14, marginBottom: 14 }}>
               <div style={{ fontWeight: 900, fontSize: 17, color: C.dark }}>{form.prenom} {form.nom}</div>
               <div style={{ color: "#666", fontSize: 14 }}>{form.email} · {form.tel}{form.tel2 ? ` · ${form.tel2}` : ""}</div>
-              {form.adresse && <div style={{ color: "#888", fontSize: 13, marginTop: 4 }}>{form.adresse}, {form.cp} {form.ville}</div>}
             </div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
               <div style={{ fontWeight: 800, color: C.dark }}>Enfants inscrits :</div>
@@ -3776,10 +3820,10 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
   const [seancesNat, setSeancesNat]     = useState([{ date:"", heure:"" }]);
 
   // Club
-  const [forfaitClub, setForfaitClub]   = useState("unite"); // unite | semaines | liberte
-  const [sessionClub, setSessionClub]   = useState("matin");
-  const [seancesClub, setSeancesClub]   = useState([{ date:"", session:"matin" }]);
-  const [nbSemaines, setNbSemaines]     = useState(1);
+  const [forfaitClub, setForfaitClub]     = useState("unite"); // unite | semaines | liberte
+  const [sessionClub, setSessionClub]     = useState("matin");
+  const [seancesClub, setSeancesClub]     = useState([{ date:"", session:"matin" }]);
+  const [selectedWeeks, setSelectedWeeks] = useState([]); // indices des semaines sélectionnées
 
   const heuresNatation = [
     "09:00","09:30","10:00","10:30","11:00","11:30","12:00",
@@ -3852,22 +3896,41 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
           }
         }
       } else {
-        const seancesValides = seancesClub.filter(s => s.date);
-        if (!seancesValides.length) { setError("Ajoutez au moins une séance."); setSaving(false); return; }
-        if (forfaitClub === "liberte" && seancesValides.length > liberteBalance) {
-          setError(`Solde insuffisant : ${liberteBalance} demi-journée(s) restante(s).`); setSaving(false); return;
-        }
-        for (const s of seancesValides) {
-          await creerReservationClub({
-            membreId: membreId || null,
-            dateReservation: s.date,
-            session: s.session,
-            labelJour: new Date(s.date).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }),
-            rappelDate: getRappelDate(s.date),
-          });
-          // Décrémenter 1 place club
-          if (setClubPlaces) {
-            setClubPlaces(prev => ({ ...prev, [s.session]: Math.max(0, (prev[s.session] || 45) - 1) }));
+        // SEMAINES — générer toutes les séances des semaines sélectionnées
+        if (forfaitClub === "semaines") {
+          if (!selectedWeeks.length) { setError("Sélectionnez au moins une semaine."); setSaving(false); return; }
+          const sessions = sessionClub === "journee" ? ["matin","apmidi"] : [sessionClub];
+          for (const wIdx of selectedWeeks) {
+            const week = SEASON_WEEKS[wIdx];
+            for (const day of week.days) {
+              const dateStr = `${day.date.getFullYear()}-${String(day.date.getMonth()+1).padStart(2,"0")}-${String(day.date.getDate()).padStart(2,"0")}`;
+              for (const sess of sessions) {
+                await creerReservationClub({
+                  membreId: membreId || null,
+                  dateReservation: dateStr,
+                  session: sess,
+                  labelJour: day.date.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }),
+                  rappelDate: getRappelDate(dateStr),
+                });
+                if (setClubPlaces) setClubPlaces(prev => ({ ...prev, [sess]: Math.max(0, (prev[sess]||45) - 1) }));
+              }
+            }
+          }
+        } else {
+          const seancesValides = seancesClub.filter(s => s.date);
+          if (!seancesValides.length) { setError("Ajoutez au moins une séance."); setSaving(false); return; }
+          if (forfaitClub === "liberte" && seancesValides.length > liberteBalance) {
+            setError(`Solde insuffisant : ${liberteBalance} demi-journée(s) restante(s).`); setSaving(false); return;
+          }
+          for (const s of seancesValides) {
+            await creerReservationClub({
+              membreId: membreId || null,
+              dateReservation: s.date,
+              session: s.session,
+              labelJour: new Date(s.date).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }),
+              rappelDate: getRappelDate(s.date),
+            });
+            if (setClubPlaces) setClubPlaces(prev => ({ ...prev, [s.session]: Math.max(0, (prev[s.session]||45) - 1) }));
           }
         }
       }
@@ -3990,10 +4053,44 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
                 <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, textTransform:"uppercase" }}>Formule</label>
                 <div style={{ display:"flex", gap:6 }}>
                   {[["unite","📅 Unité"],["semaines","🗓️ Semaine(s)"],["liberte","🎟️ Carte Liberté"]].map(([k,l]) => (
-                    <button key={k} onClick={() => setForfaitClub(k)} style={{ flex:1, background: forfaitClub===k ? C.coral : "#f0f0f0", color: forfaitClub===k ? "#fff" : "#888", border:"none", borderRadius:12, padding:"8px 4px", cursor:"pointer", fontWeight:800, fontSize:10, fontFamily:"inherit" }}>{l}</button>
+                    <button key={k} onClick={() => { setForfaitClub(k); setSelectedWeeks([]); setSeancesClub([{date:"",session:"matin"}]); }} style={{ flex:1, background: forfaitClub===k ? C.coral : "#f0f0f0", color: forfaitClub===k ? "#fff" : "#888", border:"none", borderRadius:12, padding:"8px 4px", cursor:"pointer", fontWeight:800, fontSize:10, fontFamily:"inherit" }}>{l}</button>
                   ))}
                 </div>
               </div>
+
+              {/* Semaines — sélection */}
+              {forfaitClub === "semaines" && (
+                <div>
+                  <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:8, textTransform:"uppercase" }}>
+                    Semaine(s) sélectionnée(s) {selectedWeeks.length > 0 && `· ${selectedWeeks.length}`}
+                  </label>
+                  <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+                    {SEASON_WEEKS.map((w, i) => {
+                      const sel = selectedWeeks.includes(i);
+                      return (
+                        <div key={i} onClick={() => setSelectedWeeks(prev => sel ? prev.filter(x=>x!==i) : [...prev, i])}
+                          style={{ display:"flex", alignItems:"center", gap:10, background: sel ? `${C.coral}15` : "#fff", border:`2px solid ${sel?C.coral:"#e0e8f0"}`, borderRadius:14, padding:"10px 14px", cursor:"pointer" }}>
+                          <div style={{ width:28, height:28, borderRadius:8, background: sel?C.coral:"#f0f0f0", display:"flex", alignItems:"center", justifyContent:"center", color:sel?"#fff":"#bbb", fontWeight:900, fontSize:13 }}>{sel?"✓":""}</div>
+                          <div style={{ flex:1 }}>
+                            <div style={{ fontWeight:800, color:"#2C3E50", fontSize:13 }}>{w.label}</div>
+                            <div style={{ fontSize:11, color:"#aaa" }}>6 jours · Lun → Sam</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {selectedWeeks.length > 0 && (
+                    <div>
+                      <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginTop:12, marginBottom:6, textTransform:"uppercase" }}>Session</label>
+                      <div style={{ display:"flex", gap:8 }}>
+                        {[["matin","☀️ Matin"],["apmidi","🌊 Après-midi"],["journee","🌅 Journée complète"]].map(([k,l]) => (
+                          <button key={k} onClick={() => setSessionClub(k)} style={{ flex:1, background: sessionClub===k ? C.coral : "#f0f0f0", color: sessionClub===k ? "#fff" : "#888", border:"none", borderRadius:12, padding:"8px 4px", cursor:"pointer", fontWeight:800, fontSize:10, fontFamily:"inherit" }}>{l}</button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Carte Liberté — solde */}
               {forfaitClub === "liberte" && (
@@ -4005,32 +4102,34 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
                 </div>
               )}
 
-              {/* Séances club */}
-              <div>
-                <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, textTransform:"uppercase" }}>
-                  Séances {forfaitClub==="liberte" ? `(${seancesClub.length}/${liberteBalance} demi-j. utilisée${seancesClub.length>1?"s":""})` : ""}
-                </label>
-                <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-                  {seancesClub.map((s, i) => (
-                    <div key={i} style={{ background:"#fff", borderRadius:12, padding:"10px 12px", display:"flex", gap:8, alignItems:"center" }}>
-                      <div style={{ width:24, height:24, borderRadius:8, background:`${C.coral}20`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:900, color:C.coral, flexShrink:0 }}>{i+1}</div>
-                      <input type="date" value={s.date} onChange={e => updateSeanceClub(i,"date",e.target.value)} min="2026-07-06" max="2026-08-22"
-                        style={{ flex:1, border:"1.5px solid #e0e8f0", borderRadius:10, padding:"8px", fontSize:12, fontFamily:"inherit", outline:"none" }} />
-                      <select value={s.session} onChange={e => updateSeanceClub(i,"session",e.target.value)}
-                        style={{ flex:1, border:"1.5px solid #e0e8f0", borderRadius:10, padding:"8px", fontSize:12, fontFamily:"inherit", outline:"none", background:"#fff" }}>
-                        <option value="matin">☀️ Matin</option>
-                        <option value="apmidi">🌊 Après-midi</option>
-                      </select>
-                      {seancesClub.length > 1 && <button onClick={() => removeSeanceClub(i)} style={{ background:"#FFF0F0", border:"none", color:C.sunset, borderRadius:8, width:28, height:28, cursor:"pointer", fontWeight:900, fontFamily:"inherit" }}>✕</button>}
-                    </div>
-                  ))}
-                  {(forfaitClub !== "liberte" || seancesClub.length < liberteBalance) && (
-                    <button onClick={addSeanceClub} style={{ background:`${C.coral}10`, border:`1.5px dashed ${C.coral}40`, color:C.coral, borderRadius:12, padding:"8px", cursor:"pointer", fontWeight:800, fontSize:12, fontFamily:"inherit" }}>
-                      ➕ Ajouter une séance
-                    </button>
-                  )}
+              {/* Séances unitaires ou liberté */}
+              {(forfaitClub === "unite" || forfaitClub === "liberte") && (
+                <div>
+                  <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, textTransform:"uppercase" }}>
+                    Séances {forfaitClub==="liberte" ? `(${seancesClub.length}/${liberteBalance} demi-j.)` : ""}
+                  </label>
+                  <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                    {seancesClub.map((s, i) => (
+                      <div key={i} style={{ background:"#fff", borderRadius:12, padding:"10px 12px", display:"flex", gap:8, alignItems:"center" }}>
+                        <div style={{ width:24, height:24, borderRadius:8, background:`${C.coral}20`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:900, color:C.coral, flexShrink:0 }}>{i+1}</div>
+                        <input type="date" value={s.date} onChange={e => updateSeanceClub(i,"date",e.target.value)} min="2026-07-06" max="2026-08-22"
+                          style={{ flex:1, border:"1.5px solid #e0e8f0", borderRadius:10, padding:"8px", fontSize:12, fontFamily:"inherit", outline:"none" }} />
+                        <select value={s.session} onChange={e => updateSeanceClub(i,"session",e.target.value)}
+                          style={{ flex:1, border:"1.5px solid #e0e8f0", borderRadius:10, padding:"8px", fontSize:12, fontFamily:"inherit", outline:"none", background:"#fff" }}>
+                          <option value="matin">☀️ Matin</option>
+                          <option value="apmidi">🌊 Après-midi</option>
+                        </select>
+                        {seancesClub.length > 1 && <button onClick={() => removeSeanceClub(i)} style={{ background:"#FFF0F0", border:"none", color:C.sunset, borderRadius:8, width:28, height:28, cursor:"pointer", fontWeight:900, fontFamily:"inherit" }}>✕</button>}
+                      </div>
+                    ))}
+                    {(forfaitClub !== "liberte" || seancesClub.length < liberteBalance) && (
+                      <button onClick={addSeanceClub} style={{ background:`${C.coral}10`, border:`1.5px dashed ${C.coral}40`, color:C.coral, borderRadius:12, padding:"8px", cursor:"pointer", fontWeight:800, fontSize:12, fontFamily:"inherit" }}>
+                        ➕ Ajouter une séance
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
             </>
           )}
 
