@@ -3824,6 +3824,7 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
   const [sessionClub, setSessionClub]     = useState("matin");
   const [seancesClub, setSeancesClub]     = useState([{ date:"", session:"matin" }]);
   const [selectedWeeks, setSelectedWeeks] = useState([]); // indices des semaines sélectionnées
+  const [moisFilter, setMoisFilter]       = useState("juil"); // juil | aout
 
   const heuresNatation = [
     "09:00","09:30","10:00","10:30","11:00","11:30","12:00",
@@ -4064,13 +4065,28 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
                   <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:8, textTransform:"uppercase" }}>
                     Semaine(s) {selectedWeeks.length > 0 && <span style={{ color:C.coral }}>· {selectedWeeks.length} sélectionnée{selectedWeeks.length>1?"s":""}</span>}
                   </label>
+
+                  {/* Toggle Juillet / Août */}
+                  <div style={{ display:"flex", gap:8, marginBottom:10 }}>
+                    {[["juil","🌊 Juillet"],["aout","☀️ Août"]].map(([k,l]) => (
+                      <button key={k} onClick={() => setMoisFilter(k)}
+                        style={{ flex:1, background: moisFilter===k ? `linear-gradient(135deg,${C.ocean},${C.sea})` : "#f0f0f0", color: moisFilter===k ? "#fff" : "#888", border:"none", borderRadius:14, padding:"10px", cursor:"pointer", fontWeight:900, fontSize:13, fontFamily:"inherit", boxShadow: moisFilter===k ? `0 4px 12px ${C.ocean}44` : "none" }}>
+                        {l}
+                      </button>
+                    ))}
+                  </div>
+
                   <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
-                    {SEASON_WEEKS.map((w, i) => {
-                      const sel = selectedWeeks.includes(i);
+                    {SEASON_WEEKS.filter(w => {
+                      const m = w.days[0].date.getMonth();
+                      return moisFilter === "juil" ? m === 6 : m === 7;
+                    }).map((w, i) => {
+                      const realIdx = SEASON_WEEKS.indexOf(w);
+                      const sel = selectedWeeks.includes(realIdx);
                       const first = w.days[0];
                       const last  = w.days[w.days.length-1];
                       return (
-                        <div key={i} onClick={() => setSelectedWeeks(prev => sel ? prev.filter(x=>x!==i) : [...prev, i])}
+                        <div key={realIdx} onClick={() => setSelectedWeeks(prev => sel ? prev.filter(x=>x!==realIdx) : [...prev, realIdx])}
                           style={{
                             background: sel ? `linear-gradient(135deg,${C.coral},${C.sun})` : "#fff",
                             border: `2px solid ${sel ? C.coral : "#e0e8f0"}`,
