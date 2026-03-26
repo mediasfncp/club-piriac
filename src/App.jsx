@@ -4058,39 +4058,49 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
                 </div>
               </div>
 
-              {/* Semaines — sélection */}
+              {/* Semaines — grille 2 colonnes */}
               {forfaitClub === "semaines" && (
                 <div>
                   <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:8, textTransform:"uppercase" }}>
-                    Semaine(s) {selectedWeeks.length > 0 && `· ${selectedWeeks.length} sélectionnée${selectedWeeks.length>1?"s":""}`}
+                    Semaine(s) {selectedWeeks.length > 0 && <span style={{ color:C.coral }}>· {selectedWeeks.length} sélectionnée{selectedWeeks.length>1?"s":""}</span>}
                   </label>
-                  <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
                     {SEASON_WEEKS.map((w, i) => {
                       const sel = selectedWeeks.includes(i);
                       const first = w.days[0];
                       const last  = w.days[w.days.length-1];
                       return (
                         <div key={i} onClick={() => setSelectedWeeks(prev => sel ? prev.filter(x=>x!==i) : [...prev, i])}
-                          style={{ display:"flex", alignItems:"center", gap:10, background: sel ? `${C.coral}15` : "#fff", border:`2px solid ${sel?C.coral:"#e0e8f0"}`, borderRadius:14, padding:"10px 12px", cursor:"pointer" }}>
-                          <div style={{ width:26, height:26, borderRadius:8, background: sel?C.coral:"#f0f0f0", display:"flex", alignItems:"center", justifyContent:"center", color:sel?"#fff":"#bbb", fontWeight:900, fontSize:12, flexShrink:0 }}>{sel?"✓":""}</div>
-                          <div style={{ flex:1 }}>
-                            {/* Dates */}
-                            <div style={{ fontWeight:800, color:"#2C3E50", fontSize:13 }}>
-                              {first.num} {first.month} → {last.num} {last.month}
+                          style={{
+                            background: sel ? `linear-gradient(135deg,${C.coral},${C.sun})` : "#fff",
+                            border: `2px solid ${sel ? C.coral : "#e0e8f0"}`,
+                            borderRadius: 16, padding: "10px 10px 8px",
+                            cursor: "pointer",
+                            boxShadow: sel ? `0 4px 14px ${C.coral}44` : "0 2px 6px rgba(0,0,0,0.04)",
+                          }}>
+                          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
+                            <div style={{ fontSize:9, fontWeight:900, color: sel?"rgba(255,255,255,0.8)":"#aaa", textTransform:"uppercase" }}>
+                              {first.label} → {last.label}
                             </div>
-                            {/* Pills des jours */}
-                            <div style={{ display:"flex", gap:3, marginTop:5, flexWrap:"wrap" }}>
-                              {w.days.map((d, di) => (
-                                <div key={di} style={{
-                                  background: sel ? `${C.coral}25` : "#F0F4F8",
-                                  color: sel ? C.coral : "#888",
-                                  borderRadius:6, padding:"2px 6px",
-                                  fontSize:10, fontWeight:800,
-                                }}>
-                                  {d.label} {d.num}
-                                </div>
-                              ))}
+                            <div style={{ width:16, height:16, borderRadius:5, background: sel?"rgba(255,255,255,0.35)":"#f0f0f0", display:"flex", alignItems:"center", justifyContent:"center", fontSize:9, color: sel?"#fff":"#bbb", fontWeight:900 }}>
+                              {sel ? "✓" : ""}
                             </div>
+                          </div>
+                          <div style={{ fontWeight:900, color: sel?"#fff":"#2C3E50", fontSize:13 }}>
+                            {first.num} {first.month}
+                          </div>
+                          <div style={{ fontSize:11, color: sel?"rgba(255,255,255,0.75)":"#aaa", marginBottom:6 }}>
+                            → {last.num} {last.month}
+                          </div>
+                          <div style={{ display:"flex", gap:2, flexWrap:"wrap" }}>
+                            {w.days.map((d, di) => (
+                              <div key={di} style={{
+                                background: sel ? "rgba(255,255,255,0.25)" : "#F0F4F8",
+                                color: sel ? "#fff" : "#888",
+                                borderRadius:4, padding:"1px 4px",
+                                fontSize:9, fontWeight:800,
+                              }}>{d.label}</div>
+                            ))}
                           </div>
                         </div>
                       );
