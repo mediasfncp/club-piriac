@@ -4062,28 +4062,45 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
               {forfaitClub === "semaines" && (
                 <div>
                   <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:8, textTransform:"uppercase" }}>
-                    Semaine(s) sélectionnée(s) {selectedWeeks.length > 0 && `· ${selectedWeeks.length}`}
+                    Semaine(s) {selectedWeeks.length > 0 && `· ${selectedWeeks.length} sélectionnée${selectedWeeks.length>1?"s":""}`}
                   </label>
                   <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
                     {SEASON_WEEKS.map((w, i) => {
                       const sel = selectedWeeks.includes(i);
+                      const first = w.days[0];
+                      const last  = w.days[w.days.length-1];
                       return (
                         <div key={i} onClick={() => setSelectedWeeks(prev => sel ? prev.filter(x=>x!==i) : [...prev, i])}
-                          style={{ display:"flex", alignItems:"center", gap:10, background: sel ? `${C.coral}15` : "#fff", border:`2px solid ${sel?C.coral:"#e0e8f0"}`, borderRadius:14, padding:"10px 14px", cursor:"pointer" }}>
-                          <div style={{ width:28, height:28, borderRadius:8, background: sel?C.coral:"#f0f0f0", display:"flex", alignItems:"center", justifyContent:"center", color:sel?"#fff":"#bbb", fontWeight:900, fontSize:13 }}>{sel?"✓":""}</div>
+                          style={{ display:"flex", alignItems:"center", gap:10, background: sel ? `${C.coral}15` : "#fff", border:`2px solid ${sel?C.coral:"#e0e8f0"}`, borderRadius:14, padding:"10px 12px", cursor:"pointer" }}>
+                          <div style={{ width:26, height:26, borderRadius:8, background: sel?C.coral:"#f0f0f0", display:"flex", alignItems:"center", justifyContent:"center", color:sel?"#fff":"#bbb", fontWeight:900, fontSize:12, flexShrink:0 }}>{sel?"✓":""}</div>
                           <div style={{ flex:1 }}>
-                            <div style={{ fontWeight:800, color:"#2C3E50", fontSize:13 }}>{w.label}</div>
-                            <div style={{ fontSize:11, color:"#aaa" }}>6 jours · Lun → Sam</div>
+                            {/* Dates */}
+                            <div style={{ fontWeight:800, color:"#2C3E50", fontSize:13 }}>
+                              {first.num} {first.month} → {last.num} {last.month}
+                            </div>
+                            {/* Pills des jours */}
+                            <div style={{ display:"flex", gap:3, marginTop:5, flexWrap:"wrap" }}>
+                              {w.days.map((d, di) => (
+                                <div key={di} style={{
+                                  background: sel ? `${C.coral}25` : "#F0F4F8",
+                                  color: sel ? C.coral : "#888",
+                                  borderRadius:6, padding:"2px 6px",
+                                  fontSize:10, fontWeight:800,
+                                }}>
+                                  {d.label} {d.num}
+                                </div>
+                              ))}
+                            </div>
                           </div>
                         </div>
                       );
                     })}
                   </div>
                   {selectedWeeks.length > 0 && (
-                    <div>
-                      <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginTop:12, marginBottom:6, textTransform:"uppercase" }}>Session</label>
+                    <div style={{ marginTop:12 }}>
+                      <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, textTransform:"uppercase" }}>Session</label>
                       <div style={{ display:"flex", gap:8 }}>
-                        {[["matin","☀️ Matin"],["apmidi","🌊 Après-midi"],["journee","🌅 Journée complète"]].map(([k,l]) => (
+                        {[["matin","☀️ Matin"],["apmidi","🌊 Après-midi"],["journee","🌅 Journée"]].map(([k,l]) => (
                           <button key={k} onClick={() => setSessionClub(k)} style={{ flex:1, background: sessionClub===k ? C.coral : "#f0f0f0", color: sessionClub===k ? "#fff" : "#888", border:"none", borderRadius:12, padding:"8px 4px", cursor:"pointer", fontWeight:800, fontSize:10, fontFamily:"inherit" }}>{l}</button>
                         ))}
                       </div>
