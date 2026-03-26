@@ -2511,6 +2511,144 @@ function FicheModal({ membre, onClose }) {
   );
 }
 
+// ── CRÉER MEMBRE MANUELLEMENT ─────────────────────────────
+function CreerMembreModal({ onClose, onSaved }) {
+  const [form, setForm] = useState({ prenom:"", nom:"", email:"", tel:"", tel2:"", adresse:"", ville:"", cp:"", droitImage:false, droitDiffusion:false });
+  const [saving, setSaving] = useState(false);
+  const [error, setError]   = useState("");
+  const f = k => v => setForm(prev => ({ ...prev, [k]: v }));
+
+  const handleSave = async () => {
+    if (!form.prenom || !form.nom || !form.email || !form.tel) { setError("Prénom, nom, email et téléphone sont obligatoires."); return; }
+    setSaving(true);
+    try {
+      await creerMembre({ ...form, enfants: [], cgvAccepted: true });
+      onSaved();
+      onClose();
+    } catch(e) { setError("Erreur : " + e.message); setSaving(false); }
+  };
+
+  return (
+    <div style={{ position:"fixed", inset:0, zIndex:1100, display:"flex", flexDirection:"column" }}>
+      <div onClick={onClose} style={{ position:"absolute", inset:0, background:"rgba(0,20,50,0.65)", backdropFilter:"blur(5px)" }} />
+      <div style={{ position:"relative", marginTop:"auto", background:"#F0F4F8", borderRadius:"28px 28px 0 0", maxHeight:"94vh", display:"flex", flexDirection:"column", boxShadow:"0 -12px 48px rgba(0,0,0,0.3)" }}>
+        <div style={{ display:"flex", justifyContent:"center", padding:"12px 0 4px" }}>
+          <div style={{ width:40, height:5, borderRadius:10, background:"#ddd" }} />
+        </div>
+        <div style={{ background:`linear-gradient(135deg,${C.ocean},${C.sea})`, margin:"0 16px", borderRadius:20, padding:"14px 18px", position:"relative" }}>
+          <button onClick={onClose} style={{ position:"absolute", top:10, right:12, background:"rgba(255,255,255,0.25)", border:"none", color:"#fff", borderRadius:"50%", width:30, height:30, cursor:"pointer", fontWeight:900, fontSize:16, fontFamily:"inherit" }}>✕</button>
+          <div style={{ color:"#fff", fontWeight:900, fontSize:17 }}>👤 Nouveau membre</div>
+          <div style={{ color:"rgba(255,255,255,0.85)", fontSize:13, marginTop:2 }}>Création manuelle depuis l'admin</div>
+        </div>
+        <div style={{ overflowY:"auto", padding:"16px 16px 28px", display:"flex", flexDirection:"column", gap:10 }}>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+            <div><label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:4 }}>Prénom *</label><FInput value={form.prenom} onChange={f("prenom")} required /></div>
+            <div><label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:4 }}>Nom *</label><FInput value={form.nom} onChange={f("nom")} required /></div>
+          </div>
+          <div><label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:4 }}>Email *</label><FInput type="email" value={form.email} onChange={f("email")} required /></div>
+          <div><label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:4 }}>Téléphone *</label><FInput type="tel" value={form.tel} onChange={f("tel")} required /></div>
+          <div><label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:4 }}>Téléphone 2</label><FInput type="tel" value={form.tel2} onChange={f("tel2")} /></div>
+          <div><label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:4 }}>Adresse</label><FInput value={form.adresse} onChange={f("adresse")} /></div>
+          <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr", gap:10 }}>
+            <div><label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:4 }}>Ville</label><FInput value={form.ville} onChange={f("ville")} /></div>
+            <div><label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:4 }}>CP</label><FInput value={form.cp} onChange={f("cp")} /></div>
+          </div>
+          <div style={{ display:"flex", gap:10 }}>
+            {[["droitImage","📸 Droit photo"],["droitDiffusion","📡 Droit diffusion"]].map(([k,l]) => (
+              <div key={k} onClick={() => setForm(prev => ({...prev, [k]:!prev[k]}))}
+                style={{ flex:1, background: form[k]?`${C.green}15`:"#f5f5f5", border:`2px solid ${form[k]?C.green:"#e0e8f0"}`, borderRadius:14, padding:"10px", textAlign:"center", cursor:"pointer" }}>
+                <div style={{ fontSize:18 }}>{form[k]?"✅":"⬜"}</div>
+                <div style={{ fontSize:11, fontWeight:800, color: form[k]?C.green:"#aaa", marginTop:4 }}>{l}</div>
+              </div>
+            ))}
+          </div>
+          {error && <div style={{ background:"#fff0f0", border:"1.5px solid #fca5a5", borderRadius:10, padding:"9px 14px", fontSize:13, color:"#e74c3c", fontWeight:700 }}>⚠️ {error}</div>}
+          <SunBtn color={saving?"#aaa":C.green} full onClick={handleSave} disabled={saving}>
+            {saving ? "⏳ Enregistrement..." : "✅ Créer le membre"}
+          </SunBtn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── MODIFIER MEMBRE ───────────────────────────────────────
+function ModifierMembreModal({ membre, onClose, onSaved }) {
+  const [form, setForm] = useState({
+    prenom: membre.prenom || membre.name?.split(" ")[0] || "",
+    nom:    membre.nom    || membre.name?.split(" ").slice(1).join(" ") || "",
+    email:  membre.email  || "",
+    tel:    membre.phone  || membre.tel || "",
+    tel2:   membre.tel2   || "",
+    adresse:membre.adresse|| "",
+    ville:  membre.ville  || "",
+    cp:     membre.cp     || "",
+    droitImage:     membre.droitImage     || false,
+    droitDiffusion: membre.droitDiffusion || false,
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError]   = useState("");
+  const f = k => v => setForm(prev => ({...prev, [k]: v}));
+
+  const handleSave = async () => {
+    if (!form.prenom || !form.nom || !form.email || !form.tel) { setError("Prénom, nom, email et téléphone sont obligatoires."); return; }
+    setSaving(true);
+    try {
+      await sb.from("membres").update({
+        prenom: form.prenom, nom: form.nom, email: form.email,
+        tel: form.tel, tel2: form.tel2, adresse: form.adresse,
+        ville: form.ville, cp: form.cp,
+        droit_image: form.droitImage, droit_diffusion: form.droitDiffusion,
+      }).eq("id", membre.id);
+      onSaved();
+      onClose();
+    } catch(e) { setError("Erreur : " + e.message); setSaving(false); }
+  };
+
+  return (
+    <div style={{ position:"fixed", inset:0, zIndex:1100, display:"flex", flexDirection:"column" }}>
+      <div onClick={onClose} style={{ position:"absolute", inset:0, background:"rgba(0,20,50,0.65)", backdropFilter:"blur(5px)" }} />
+      <div style={{ position:"relative", marginTop:"auto", background:"#F0F4F8", borderRadius:"28px 28px 0 0", maxHeight:"94vh", display:"flex", flexDirection:"column", boxShadow:"0 -12px 48px rgba(0,0,0,0.3)" }}>
+        <div style={{ display:"flex", justifyContent:"center", padding:"12px 0 4px" }}>
+          <div style={{ width:40, height:5, borderRadius:10, background:"#ddd" }} />
+        </div>
+        <div style={{ background:`linear-gradient(135deg,${C.coral},${C.sun})`, margin:"0 16px", borderRadius:20, padding:"14px 18px", position:"relative" }}>
+          <button onClick={onClose} style={{ position:"absolute", top:10, right:12, background:"rgba(255,255,255,0.25)", border:"none", color:"#fff", borderRadius:"50%", width:30, height:30, cursor:"pointer", fontWeight:900, fontSize:16, fontFamily:"inherit" }}>✕</button>
+          <div style={{ color:"#fff", fontWeight:900, fontSize:17 }}>✏️ Modifier le membre</div>
+          <div style={{ color:"rgba(255,255,255,0.85)", fontSize:13, marginTop:2 }}>{form.prenom} {form.nom}</div>
+        </div>
+        <div style={{ overflowY:"auto", padding:"16px 16px 28px", display:"flex", flexDirection:"column", gap:10 }}>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+            <div><label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:4 }}>Prénom *</label><FInput value={form.prenom} onChange={f("prenom")} required /></div>
+            <div><label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:4 }}>Nom *</label><FInput value={form.nom} onChange={f("nom")} required /></div>
+          </div>
+          <div><label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:4 }}>Email *</label><FInput type="email" value={form.email} onChange={f("email")} required /></div>
+          <div><label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:4 }}>Téléphone *</label><FInput type="tel" value={form.tel} onChange={f("tel")} required /></div>
+          <div><label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:4 }}>Téléphone 2</label><FInput type="tel" value={form.tel2} onChange={f("tel2")} /></div>
+          <div><label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:4 }}>Adresse</label><FInput value={form.adresse} onChange={f("adresse")} /></div>
+          <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr", gap:10 }}>
+            <div><label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:4 }}>Ville</label><FInput value={form.ville} onChange={f("ville")} /></div>
+            <div><label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:4 }}>CP</label><FInput value={form.cp} onChange={f("cp")} /></div>
+          </div>
+          <div style={{ display:"flex", gap:10 }}>
+            {[["droitImage","📸 Droit photo"],["droitDiffusion","📡 Droit diffusion"]].map(([k,l]) => (
+              <div key={k} onClick={() => setForm(prev => ({...prev, [k]:!prev[k]}))}
+                style={{ flex:1, background: form[k]?`${C.green}15`:"#f5f5f5", border:`2px solid ${form[k]?C.green:"#e0e8f0"}`, borderRadius:14, padding:"10px", textAlign:"center", cursor:"pointer" }}>
+                <div style={{ fontSize:18 }}>{form[k]?"✅":"⬜"}</div>
+                <div style={{ fontSize:11, fontWeight:800, color: form[k]?C.green:"#aaa", marginTop:4 }}>{l}</div>
+              </div>
+            ))}
+          </div>
+          {error && <div style={{ background:"#fff0f0", border:"1.5px solid #fca5a5", borderRadius:10, padding:"9px 14px", fontSize:13, color:"#e74c3c", fontWeight:700 }}>⚠️ {error}</div>}
+          <SunBtn color={saving?"#aaa":C.coral} full onClick={handleSave} disabled={saving}>
+            {saving ? "⏳ Enregistrement..." : "✅ Enregistrer les modifications"}
+          </SunBtn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AjouterEnfantModal({ membre, onClose, onSaved }) {
   const [prenom, setPrenom]     = useState("");
   const [nom, setNom]           = useState("");
@@ -2596,22 +2734,17 @@ function AjouterEnfantModal({ membre, onClose, onSaved }) {
 }
 
 function MembresTab({ allResas, dbMembres, onRefresh }) {
-  const [selectedMembre, setSelectedMembre] = useState(null);
+  const [selectedMembre, setSelectedMembre]       = useState(null);
   const [ajouterEnfantPour, setAjouterEnfantPour] = useState(null);
+  const [modifierMembre, setModifierMembre]       = useState(null);
+  const [showCreer, setShowCreer]                 = useState(false);
 
   const membresSupabase = (dbMembres || []).map(m => ({
-    id: m.id,
-    name: `${m.prenom} ${m.nom}`,
-    email: m.email,
-    phone: m.tel,
-    adresse: m.adresse,
-    color: C.ocean,
-    av: "👤",
-    enfants: m.enfants || [],
-    resa: 0,
-    droitImage: m.droit_image,
-    droitDiffusion: m.droit_diffusion,
-    supabase: true,
+    id: m.id, name: `${m.prenom} ${m.nom}`, prenom: m.prenom, nom: m.nom,
+    email: m.email, phone: m.tel, tel: m.tel, tel2: m.tel2,
+    adresse: m.adresse, ville: m.ville, cp: m.cp,
+    color: C.ocean, av: "👤", enfants: m.enfants || [], resa: 0,
+    droitImage: m.droit_image, droitDiffusion: m.droit_diffusion, supabase: true,
   }));
 
   const tousLesMembres = membresSupabase.length > 0 ? membresSupabase : MEMBRES;
@@ -2619,17 +2752,17 @@ function MembresTab({ allResas, dbMembres, onRefresh }) {
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
       {selectedMembre && <FicheModal membre={selectedMembre} onClose={() => setSelectedMembre(null)} />}
-      {ajouterEnfantPour && (
-        <AjouterEnfantModal
-          membre={ajouterEnfantPour}
-          onClose={() => setAjouterEnfantPour(null)}
-          onSaved={() => { setAjouterEnfantPour(null); onRefresh && onRefresh(); }}
-        />
-      )}
+      {ajouterEnfantPour && <AjouterEnfantModal membre={ajouterEnfantPour} onClose={() => setAjouterEnfantPour(null)} onSaved={() => { setAjouterEnfantPour(null); onRefresh?.(); }} />}
+      {modifierMembre && <ModifierMembreModal membre={modifierMembre} onClose={() => setModifierMembre(null)} onSaved={() => { setModifierMembre(null); onRefresh?.(); }} />}
+      {showCreer && <CreerMembreModal onClose={() => setShowCreer(false)} onSaved={() => { setShowCreer(false); onRefresh?.(); }} />}
+
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
         <div style={{ fontWeight:900, color:"#2C3E50", fontSize:14 }}>{tousLesMembres.length} membre{tousLesMembres.length>1?"s":""} inscrit{tousLesMembres.length>1?"s":""}</div>
-        {membresSupabase.length > 0 && <Pill color={C.green}>✅ Supabase</Pill>}
+        <button onClick={() => setShowCreer(true)} style={{ background:`linear-gradient(135deg,${C.green},#1E8449)`, color:"#fff", border:"none", borderRadius:50, padding:"6px 14px", cursor:"pointer", fontWeight:900, fontSize:12, fontFamily:"inherit" }}>
+          ➕ Nouveau membre
+        </button>
       </div>
+
       {tousLesMembres.map((u, i) => (
         <div key={u.id || i} style={{ background:"#fff", borderRadius:20, padding:"14px 16px", boxShadow:"0 4px 16px rgba(0,0,0,0.06)" }}>
           <div style={{ display:"flex", alignItems:"center", gap:14, cursor:"pointer" }} onClick={() => setSelectedMembre(u)}>
@@ -2640,20 +2773,20 @@ function MembresTab({ allResas, dbMembres, onRefresh }) {
               <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
                 <div style={{ background:`${u.color}18`, color:u.color, borderRadius:50, padding:"3px 10px", fontSize:11, fontWeight:800 }}>👧 {u.enfants?.length||0} enfant{(u.enfants?.length||0)>1?"s":""}</div>
                 {u.enfants?.some(e => e.allergies) && <div style={{ background:"#FFF0F0", color:C.sunset, borderRadius:50, padding:"3px 10px", fontSize:11, fontWeight:800 }}>⚠️ Allergie</div>}
-                {u.droitImage && <div style={{ background:`${C.green}18`, color:C.green, borderRadius:50, padding:"3px 10px", fontSize:11, fontWeight:800 }}>📸 Photo OK</div>}
+                {u.droitImage && <div style={{ background:`${C.green}18`, color:C.green, borderRadius:50, padding:"3px 10px", fontSize:11, fontWeight:800 }}>📸 OK</div>}
               </div>
             </div>
             <div style={{ fontSize:20, color:"#ddd" }}>›</div>
           </div>
-          {/* Bouton ajouter enfant */}
           {u.supabase && (
-            <button onClick={() => setAjouterEnfantPour(u)} style={{
-              width:"100%", marginTop:10, background:`${C.ocean}12`, border:`1.5px dashed ${C.ocean}40`,
-              color:C.ocean, borderRadius:12, padding:"8px", cursor:"pointer",
-              fontWeight:800, fontSize:12, fontFamily:"inherit",
-            }}>
-              ➕ Ajouter un enfant
-            </button>
+            <div style={{ display:"flex", gap:8, marginTop:10 }}>
+              <button onClick={() => setModifierMembre(u)} style={{ flex:1, background:`${C.coral}12`, border:`1.5px solid ${C.coral}30`, color:C.coral, borderRadius:12, padding:"7px", cursor:"pointer", fontWeight:800, fontSize:12, fontFamily:"inherit" }}>
+                ✏️ Modifier
+              </button>
+              <button onClick={() => setAjouterEnfantPour(u)} style={{ flex:1, background:`${C.ocean}12`, border:`1.5px dashed ${C.ocean}40`, color:C.ocean, borderRadius:12, padding:"7px", cursor:"pointer", fontWeight:800, fontSize:12, fontFamily:"inherit" }}>
+                ➕ Ajouter enfant
+              </button>
+            </div>
           )}
         </div>
       ))}
