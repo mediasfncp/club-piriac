@@ -1118,9 +1118,25 @@ const SEASON_WEEKS = (() => {
 
 function ReservationClubScreen({ onNav, user, setUser, clubPlaces, setClubPlaces }) {
   const [selectedDayId, setSelectedDayId] = useState(CLUB_SEASON_DAYS[0]?.id);
-  const [selectedSession, setSelectedSession] = useState(null); // "matin" | "apmidi"
+  const [selectedSession, setSelectedSession] = useState(null);
   const [done, setDone] = useState(null);
   const [weekIdx, setWeekIdx] = useState(0);
+  const [resasClubDB, setResasClubDB] = useState([]);
+
+  // Charger les résas club pour calculer les places par date
+  useEffect(() => {
+    sb.from("reservations_club").select("date_reservation, session")
+      .then(({ data }) => setResasClubDB(data || []))
+      .catch(() => {});
+  }, []);
+
+  // Calculer places restantes pour la date et session sélectionnées
+  const getPlacesForDate = (dateISO, session) => {
+    const taken = resasClubDB.filter(r =>
+      r.date_reservation?.slice(0,10) === dateISO && r.session === session
+    ).length;
+    return Math.max(0, 45 - taken);
+  };
 
   // Build weeks
   const weeks = [];
@@ -1180,9 +1196,10 @@ function ReservationClubScreen({ onNav, user, setUser, clubPlaces, setClubPlaces
 
   const weekLabel = currentWeek.length > 0 ? `${currentWeek[0].num} ${currentWeek[0].month} – ${currentWeek[currentWeek.length-1].num} ${currentWeek[currentWeek.length-1].month}` : "";
   const selectedDay = CLUB_SEASON_DAYS.find(d => d.id === selectedDayId);
+  const selectedDayISO = selectedDay ? `${selectedDay.date.getFullYear()}-${String(selectedDay.date.getMonth()+1).padStart(2,"0")}-${String(selectedDay.date.getDate()).padStart(2,"0")}` : "";
   const SESSIONS = [
-    { id:"matin",  label:"Demi-journée Matin",      horaires:"9h30 – 12h30", color:C.coral,  emoji:"☀️", places: clubPlaces?.matin ?? 45 },
-    { id:"apmidi", label:"Demi-journée Après-midi", horaires:"14h30 – 18h00", color:C.ocean, emoji:"🌊", places: clubPlaces?.apmidi ?? 45 },
+    { id:"matin",  label:"Demi-journée Matin",      horaires:"9h30 – 12h30",  color:C.coral,  emoji:"☀️", places: getPlacesForDate(selectedDayISO, "matin")  },
+    { id:"apmidi", label:"Demi-journée Après-midi", horaires:"14h30 – 18h00", color:C.ocean,  emoji:"🌊", places: getPlacesForDate(selectedDayISO, "apmidi") },
   ];
 
   const handleConfirm = async () => {
@@ -1251,16 +1268,24 @@ function ReservationClubScreen({ onNav, user, setUser, clubPlaces, setClubPlaces
         <div style={{ display:"flex",gap:6,marginBottom:14,overflowX:"auto",paddingBottom:2 }}>
           {currentWeek.map(d => {
             const sel = selectedDayId === d.id;
+            const dISO = `${d.date.getFullYear()}-${String(d.date.getMonth()+1).padStart(2,"0")}-${String(d.date.getDate()).padStart(2,"0")}`;
+            const placesM = getPlacesForDate(dISO, "matin");
+            const placesA = getPlacesForDate(dISO, "apmidi");
+            const fullDay = placesM === 0 && placesA === 0;
             return (
               <button key={d.id} onClick={() => { setSelectedDayId(d.id); setSelectedSession(null); }} style={{
-                flexShrink:0,background:sel?`linear-gradient(135deg,${C.coral},${C.sun})`:"#fff",
+                flexShrink:0,
+                background: sel ? `linear-gradient(135deg,${C.coral},${C.sun})` : fullDay ? "#f5f5f5" : "#fff",
                 border:"none",borderRadius:16,padding:"10px 14px",cursor:"pointer",
                 fontFamily:"inherit",boxShadow:sel?`0 4px 14px ${C.coral}44`:"0 2px 8px rgba(0,0,0,0.06)",
                 transition:"all .15s",minWidth:65,textAlign:"center",
+                opacity: fullDay ? 0.5 : 1,
               }}>
                 <div style={{ fontSize:10,fontWeight:900,color:sel?"rgba(255,255,255,0.8)":"#aaa" }}>{d.label}</div>
                 <div style={{ fontSize:17,fontWeight:900,color:sel?"#fff":C.dark }}>{d.num}</div>
-                <div style={{ fontSize:9,color:sel?"rgba(255,255,255,0.7)":"#bbb",marginTop:3 }}>{d.month}</div>
+                <div style={{ fontSize:9,color:sel?"rgba(255,255,255,0.7)":fullDay?"#e74c3c":"#bbb",marginTop:3 }}>
+                  {fullDay ? "Complet" : d.month}
+                </div>
               </button>
             );
           })}
@@ -1556,6 +1581,30 @@ function ReservationScreen({ onNav, user, sessions, setSessions, reservations, s
   const [selectedEnfants, setSelectedEnfants] = useState([]);
   const [done, setDone] = useState(null);
   const [showWero, setShowWero] = useState(false);
+
+  // Synchroniser les places depuis Supabase au chargement
+  useEffect(() => {
+    sb.from("reservations_natation").select("date_seance, heure")
+      .then(({ data }) => {
+        if (!data?.length) return;
+        setSessions(prev => {
+          const next = prev.map(s => ({ ...s, spots: 2 }));
+          data.forEach(r => {
+            if (!r.date_seance || !r.heure) return;
+            const dateResa = r.date_seance.slice(0, 10);
+            for (let i = 0; i < next.length; i++) {
+              if (next[i].time !== r.heure || next[i].spots <= 0) continue;
+              const dayObj = DAYS.find(d => d.id === next[i].day);
+              if (dayObj) {
+                const iso = `2026-07-${String(dayObj.num).padStart(2,"0")}`;
+                if (iso === dateResa) { next[i] = { ...next[i], spots: next[i].spots - 1 }; break; }
+              }
+            }
+          });
+          return next;
+        });
+      }).catch(() => {});
+  }, []);
 
   const allForDay = sessions.filter(s => s.day === selectedDay);
   const morning = allForDay.filter(s => { const [h] = s.time.split(":").map(Number); return h < 13; });
