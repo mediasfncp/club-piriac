@@ -3699,8 +3699,8 @@ const AGE_GROUPS = [
   { label: "10 – 12 ans",min: 10, max: 12, color: "#9B59B6",  emoji: "🏅", bg: "#F5EEFF" },
 ];
 
-function AgeGroupCard() {
-  const [period, setPeriod] = useState("saison");    // saison | semaine | jour
+function AgeGroupCard({ dbMembres = [] }) {
+  const [period, setPeriod] = useState("saison");
   const [weekIdx, setWeekIdx] = useState(0);
   const [selectedDayId, setSelectedDayId] = useState(ALL_SEASON_DAYS[0]?.id);
   const [selectedGroup, setSelectedGroup] = useState(null);
@@ -3718,13 +3718,21 @@ function AgeGroupCard() {
     ? `${currentWeek[0].num} ${currentWeek[0].month} – ${currentWeek[currentWeek.length-1].num} ${currentWeek[currentWeek.length-1].month}`
     : "";
 
-  // Build all children list
+  // Build all children list — Supabase si dispo, sinon mock
   const allEnfants = [];
-  MEMBRES.forEach(m => {
-    m.enfants.forEach(e => {
-      allEnfants.push({ ...e, age: calcAge(e.naissance), parent: m.name, parentColor: m.color, phone: m.phone });
+  if (dbMembres.length > 0) {
+    dbMembres.forEach(m => {
+      (m.enfants || []).forEach(e => {
+        allEnfants.push({ ...e, age: calcAge(e.naissance), parent: `${m.prenom} ${m.nom}`, parentColor: C.ocean, phone: m.tel });
+      });
     });
-  });
+  } else {
+    MEMBRES.forEach(m => {
+      m.enfants.forEach(e => {
+        allEnfants.push({ ...e, age: calcAge(e.naissance), parent: m.name, parentColor: m.color, phone: m.phone });
+      });
+    });
+  }
 
   const total = allEnfants.length;
 
@@ -4459,9 +4467,23 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
 
   // Paiements réels Supabase
   const realTotal = dbPaiements.reduce((s, p) => s + Number(p.montant || 0), 0);
+
+  // Taux de remplissage natation — toute la saison
+  const totalSlotsNat  = ALL_SEASON_SLOTS_INIT.length * 2; // total places saison
+  const takenNat       = dbResas.length; // chaque resa = 1 place prise
+  const fillRateNat    = totalSlotsNat > 0 ? Math.round((takenNat / totalSlotsNat) * 100) : 0;
+  const freeNat        = Math.max(0, totalSlotsNat - takenNat);
+
+  // Taux de remplissage club — toute la saison
+  const totalJoursClub  = CLUB_SEASON_DAYS.length; // nb jours saison
+  const totalPlacesClub = totalJoursClub * 45; // 45 places/jour/session × 2 sessions
+  const takenClub       = dbResasClub.length;
+  const fillRateClub    = totalPlacesClub > 0 ? Math.round((takenClub / (totalPlacesClub * 2)) * 100) : 0;
+
+  // Pour l'affichage en header (semaine courante)
   const takenSpots = sessions.reduce((s,x) => s + (2 - x.spots), 0);
   const totalSpots = sessions.reduce((s,x) => s + x.spots, 0);
-  const fillRate = sessions.length > 0 ? Math.round((takenSpots / (sessions.length * 2)) * 100) : 0;
+  const fillRate   = fillRateNat; // utiliser le taux saison
 
   const tabs = [
     { id: "dashboard",    emoji: "📊", label: "Dashboard"  },
@@ -4486,7 +4508,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
           </div>
           <div style={{ background: "rgba(255,255,255,0.12)", borderRadius: 12, padding: "6px 12px", textAlign: "center" }}>
             <div style={{ color: "rgba(255,255,255,0.7)", fontSize: 10 }}>Remplissage</div>
-            <div style={{ color: C.sun, fontWeight: 900, fontSize: 18 }}>{fillRate}%</div>
+            <div style={{ color: C.sun, fontWeight: 900, fontSize: 18 }}>{fillRateNat}%</div>
           </div>
         </div>
         <div style={{ display: "flex", gap: 4 }}>
@@ -4506,10 +4528,10 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
             {/* KPI principaux — données réelles Supabase */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               {[
-                { label: "Membres inscrits", value: dbMembres.length,  emoji: "👤", bg: `linear-gradient(135deg, ${C.ocean}, #0052A3)`, sh: C.ocean },
-                { label: "Réservations",     value: dbResas.length + reservations.length, emoji: "👥", bg: `linear-gradient(135deg, ${C.green}, #1E8449)`, sh: C.green },
-                { label: "Places libres",    value: totalSpots,         emoji: "🌊", bg: `linear-gradient(135deg, ${C.sea}, #17A589)`,   sh: C.sea   },
-                { label: "Total encaissé",   value: `${realTotal} €`,   emoji: "💳", bg: `linear-gradient(135deg, ${C.coral}, #C0392B)`, sh: C.coral },
+                { label: "Membres inscrits",  value: dbMembres.length,               emoji: "👤", bg: `linear-gradient(135deg, ${C.ocean}, #0052A3)`, sh: C.ocean },
+                { label: "Résas natation",    value: dbResas.length,                  emoji: "🏊", bg: `linear-gradient(135deg, ${C.green}, #1E8449)`, sh: C.green },
+                { label: "Résas club",        value: dbResasClub.length,              emoji: "🏖️", bg: `linear-gradient(135deg, ${C.coral}, #C0392B)`, sh: C.coral },
+                { label: "Total encaissé",    value: `${realTotal} €`,               emoji: "💳", bg: `linear-gradient(135deg, #9B59B6, #6C3483)`,   sh: "#9B59B6" },
               ].map(s => (
                 <div key={s.label} style={{ background: s.bg, borderRadius: 20, padding: "16px 14px", boxShadow: `0 6px 20px ${s.sh}44` }}>
                   <div style={{ fontSize: 28, marginBottom: 8 }}>{s.emoji}</div>
@@ -4521,16 +4543,36 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
 
             {/* Taux de remplissage */}
             <div style={{ background: "#fff", borderRadius: 20, padding: 18, boxShadow: "0 4px 16px rgba(0,0,0,0.06)" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
-                <span style={{ fontWeight: 800, color: "#2C3E50", fontSize: 14 }}>📈 Taux de remplissage natation</span>
-                <span style={{ fontWeight: 900, color: C.ocean, fontSize: 14 }}>{fillRate}%</span>
+              <div style={{ fontWeight: 800, color: "#2C3E50", fontSize: 14, marginBottom: 14 }}>📈 Taux de remplissage — Saison 2026</div>
+
+              {/* Natation */}
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: "#555" }}>🏊 Natation</span>
+                  <span style={{ fontWeight: 900, color: C.ocean, fontSize: 13 }}>{fillRateNat}%</span>
+                </div>
+                <div style={{ background: "#EEF5FF", borderRadius: 50, height: 10, overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${fillRateNat}%`, background: `linear-gradient(90deg, ${C.ocean}, ${C.sea})`, borderRadius: 50 }} />
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, fontSize: 11, color: "#aaa" }}>
+                  <span>{takenNat} places prises</span>
+                  <span>{freeNat} places libres</span>
+                </div>
               </div>
-              <div style={{ background: "#EEF5FF", borderRadius: 50, height: 10, overflow: "hidden" }}>
-                <div style={{ height: "100%", width: `${fillRate}%`, background: `linear-gradient(90deg, ${C.ocean}, ${C.sea})`, borderRadius: 50 }} />
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, fontSize: 11, color: "#aaa" }}>
-                <span>{takenSpots} places prises</span>
-                <span>{totalSpots} places libres</span>
+
+              {/* Club */}
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: "#555" }}>🏖️ Club de Plage</span>
+                  <span style={{ fontWeight: 900, color: C.coral, fontSize: 13 }}>{fillRateClub}%</span>
+                </div>
+                <div style={{ background: "#FFF0EE", borderRadius: 50, height: 10, overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${fillRateClub}%`, background: `linear-gradient(90deg, ${C.coral}, ${C.sun})`, borderRadius: 50 }} />
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, fontSize: 11, color: "#aaa" }}>
+                  <span>{takenClub} réservations club</span>
+                  <span>{totalJoursClub} jours · 45 places/session</span>
+                </div>
               </div>
             </div>
 
@@ -4597,24 +4639,41 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
             {/* 🔔 Dernières réservations */}
             <div style={{ background: "#fff", borderRadius: 20, padding: 18, boxShadow: "0 4px 16px rgba(0,0,0,0.06)" }}>
               <div style={{ fontWeight: 800, color: "#2C3E50", fontSize: 14, marginBottom: 14 }}>🔔 Dernières réservations</div>
-              {allResas.slice(0, 5).map((r, i) => (
-                <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: i < 4 ? "1px solid #F0F4F8" : "none" }}>
-                  <div style={{ width: 38, height: 38, borderRadius: 12, background: r.status === "confirmed" ? `linear-gradient(135deg, ${C.green}, #1E8449)` : `linear-gradient(135deg, ${C.coral}, #C0392B)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0, color: "#fff", fontWeight: 900 }}>
-                    {r.status === "confirmed" ? "✓" : "⏳"}
+              {(() => {
+                // Fusionner natation + club, trier par date
+                const resasNat = dbResas.map(r => ({
+                  id: r.id, type: "natation",
+                  parent: r.membres ? `${r.membres.prenom} ${r.membres.nom}` : "—",
+                  detail: `🏊 ${r.heure} · ${r.date_seance ? new Date(r.date_seance).toLocaleDateString("fr-FR") : "—"}`,
+                  date: r.date_seance || r.created_at || "",
+                }));
+                const resasClub = dbResasClub.map(r => ({
+                  id: r.id, type: "club",
+                  parent: r.membres ? `${r.membres.prenom} ${r.membres.nom}` : "—",
+                  detail: `🏖️ ${r.session === "matin" ? "Matin" : "Après-midi"} · ${r.date_reservation ? new Date(r.date_reservation).toLocaleDateString("fr-FR") : "—"}`,
+                  date: r.date_reservation || r.created_at || "",
+                }));
+                const toutes = [...resasNat, ...resasClub]
+                  .sort((a, b) => new Date(b.date) - new Date(a.date))
+                  .slice(0, 6);
+                if (toutes.length === 0) return <div style={{ color:"#bbb", fontSize:13, textAlign:"center", padding:"12px 0" }}>Aucune réservation</div>;
+                return toutes.map((r, i) => (
+                  <div key={r.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"9px 0", borderBottom: i < toutes.length-1 ? "1px solid #F0F4F8" : "none" }}>
+                    <div style={{ width:36, height:36, borderRadius:12, background: r.type==="natation" ? `linear-gradient(135deg,${C.ocean},${C.sea})` : `linear-gradient(135deg,${C.coral},${C.sun})`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, flexShrink:0 }}>
+                      {r.type === "natation" ? "🏊" : "🏖️"}
+                    </div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontWeight:800, color:"#2C3E50", fontSize:13, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{r.parent}</div>
+                      <div style={{ fontSize:11, color:"#aaa" }}>{r.detail}</div>
+                    </div>
+                    <Pill color={C.green}>✓</Pill>
                   </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 800, color: "#2C3E50", fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.parent}</div>
-                    <div style={{ fontSize: 11, color: "#aaa" }}>🏊 {r.session}</div>
-                  </div>
-                  <div style={{ fontSize: 11, fontWeight: 800, color: r.status === "confirmed" ? C.green : C.coral, flexShrink: 0 }}>
-                    {r.status === "confirmed" ? "Confirmé" : "Attente"}
-                  </div>
-                </div>
-              ))}
+                ));
+              })()}
             </div>
 
             {/* Tri par groupe d'âge */}
-            <AgeGroupCard />
+            <AgeGroupCard dbMembres={dbMembres} />
           </div>
         )}
 
