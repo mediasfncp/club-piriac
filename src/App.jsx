@@ -2866,85 +2866,147 @@ function MembresTab({ allResas, dbMembres, onRefresh }) {
   );
 }
 
-function RechercheTab({ allResas, sessions }) {
-  const [query, setQuery] = useState("");
+function RechercheTab({ allResas, sessions, dbMembres }) {
+  const [query, setQuery]           = useState("");
+  const [filterType, setFilterType] = useState("tous"); // tous | membre | enfant | activite
   const [selectedMembre, setSelectedMembre] = useState(null);
   const q = query.toLowerCase().trim();
-  const resultsMembres = q ? MEMBRES.filter(m =>
-    m.name.toLowerCase().includes(q) ||
-    m.email.toLowerCase().includes(q) ||
-    m.phone.includes(q) ||
-    m.enfants.some(e => `${e.prenom} ${e.nom}`.toLowerCase().includes(q))
-  ) : [];
-  const resultsSessions = q ? sessions.filter(s =>
-    s.time.includes(q) ||
-    DAYS.find(d => d.id === s.day)?.label.toLowerCase().includes(q) ||
-    DAYS.find(d => d.id === s.day)?.num.includes(q)
-  ) : [];
+
+  // Construire les données depuis Supabase
+  const membresData = (dbMembres || []).map(m => ({
+    id: m.id, name: `${m.prenom} ${m.nom}`, prenom: m.prenom, nom: m.nom,
+    email: m.email, phone: m.tel, color: C.ocean, av: "👤",
+    enfants: m.enfants || [], droitImage: m.droit_image, droitDiffusion: m.droit_diffusion,
+    supabase: true,
+  }));
+  const tousLesMembres = membresData.length > 0 ? membresData : MEMBRES;
+
+  // Tous les enfants avec leur parent
+  const tousLesEnfants = tousLesMembres.flatMap(m =>
+    (m.enfants || []).map(e => ({ ...e, parent: m.name || `${m.prenom} ${m.nom}`, parentId: m.id, parentColor: m.color || C.ocean, parentPhone: m.phone || m.tel }))
+  );
+
+  // Résultats filtrés
+  const resMembres = (filterType === "tous" || filterType === "membre") && q
+    ? tousLesMembres.filter(m =>
+        m.name?.toLowerCase().includes(q) ||
+        m.email?.toLowerCase().includes(q) ||
+        m.phone?.includes(q) ||
+        (m.enfants||[]).some(e => `${e.prenom} ${e.nom}`.toLowerCase().includes(q))
+      )
+    : [];
+
+  const resEnfants = (filterType === "tous" || filterType === "enfant") && q
+    ? tousLesEnfants.filter(e =>
+        `${e.prenom} ${e.nom}`.toLowerCase().includes(q) ||
+        e.activite?.toLowerCase().includes(q) ||
+        e.niveau?.toLowerCase().includes(q) ||
+        e.allergies?.toLowerCase().includes(q)
+      )
+    : [];
+
+  const resActivites = (filterType === "tous" || filterType === "activite") && q
+    ? tousLesEnfants.filter(e => e.activite?.toLowerCase().includes(q) || e.niveau?.toLowerCase().includes(q))
+    : [];
+
+  const totalResultats = resMembres.length + resEnfants.length;
+
   return (
-    <div>
+    <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
       {selectedMembre && <FicheModal membre={selectedMembre} onClose={() => setSelectedMembre(null)} />}
-      {/* Search bar */}
-      <div style={{ position: "relative", marginBottom: 16 }}>
-        <div style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", fontSize: 16, color: "#aaa" }}>🔍</div>
-        <input
-          type="text" value={query} onChange={e => setQuery(e.target.value)}
-          placeholder="Nom, email, enfant, créneau…"
-          style={{ width: "100%", boxSizing: "border-box", border: "2px solid #E8EFF8", borderRadius: 16, padding: "13px 14px 13px 42px", fontSize: 15, fontFamily: "inherit", outline: "none", background: "#fff", boxShadow: "0 2px 10px rgba(0,0,0,0.06)" }}
+
+      {/* Barre de recherche */}
+      <div style={{ position:"relative" }}>
+        <div style={{ position:"absolute", left:14, top:"50%", transform:"translateY(-50%)", fontSize:16, color:"#aaa" }}>🔍</div>
+        <input type="text" value={query} onChange={e => setQuery(e.target.value)}
+          placeholder="Nom, email, prénom enfant, activité…"
+          style={{ width:"100%", boxSizing:"border-box", border:"2px solid #E8EFF8", borderRadius:16, padding:"13px 42px 13px 42px", fontSize:15, fontFamily:"inherit", outline:"none", background:"#fff", boxShadow:"0 2px 10px rgba(0,0,0,0.06)" }}
           onFocus={e => e.target.style.borderColor = C.ocean}
           onBlur={e => e.target.style.borderColor = "#E8EFF8"}
           autoFocus
         />
-        {query && <button onClick={() => setQuery("")} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "#eee", border: "none", borderRadius: "50%", width: 24, height: 24, cursor: "pointer", fontSize: 12, fontWeight: 900 }}>✕</button>}
+        {query && <button onClick={() => setQuery("")} style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)", background:"#eee", border:"none", borderRadius:"50%", width:24, height:24, cursor:"pointer", fontSize:12, fontWeight:900 }}>✕</button>}
       </div>
 
+      {/* Filtres */}
+      <div style={{ display:"flex", gap:8 }}>
+        {[["tous","🔍 Tout"],["membre","👤 Membres"],["enfant","👧 Enfants"],["activite","🏊 Activités"]].map(([k,l]) => (
+          <button key={k} onClick={() => setFilterType(k)}
+            style={{ flex:1, background: filterType===k ? C.ocean : "#f0f0f0", color: filterType===k ? "#fff" : "#888", border:"none", borderRadius:12, padding:"8px 4px", cursor:"pointer", fontWeight:800, fontSize:10, fontFamily:"inherit" }}>
+            {l}
+          </button>
+        ))}
+      </div>
+
+      {/* Stats rapides */}
       {!query && (
-        <div style={{ textAlign: "center", padding: "32px 0", color: "#bbb" }}>
-          <div style={{ fontSize: 48, marginBottom: 10 }}>🔍</div>
-          <div style={{ fontSize: 14 }}>Recherche par nom, email, enfant ou créneau</div>
-        </div>
-      )}
-
-      {query && resultsMembres.length === 0 && resultsSessions.length === 0 && (
-        <div style={{ textAlign: "center", padding: "32px 0", color: "#bbb" }}>
-          <div style={{ fontSize: 48, marginBottom: 10 }}>😶</div>
-          <div style={{ fontSize: 14 }}>Aucun résultat pour « {query} »</div>
-        </div>
-      )}
-
-      {resultsMembres.length > 0 && (
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontWeight: 900, color: "#2C3E50", fontSize: 12, letterSpacing: 1, textTransform: "uppercase", marginBottom: 8 }}>👥 Membres ({resultsMembres.length})</div>
-          {resultsMembres.map(u => (
-            <div key={u.id} onClick={() => setSelectedMembre(u)} style={{ background: "#fff", borderRadius: 16, padding: "12px 14px", boxShadow: "0 2px 8px rgba(0,0,0,0.06)", display: "flex", alignItems: "center", gap: 12, marginBottom: 8, cursor: "pointer" }}>
-              <div style={{ width: 42, height: 42, borderRadius: 14, background: `linear-gradient(135deg, ${u.color}, ${u.color}bb)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>{u.av}</div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 900, color: "#2C3E50", fontSize: 13 }}>{u.name}</div>
-                <div style={{ fontSize: 11, color: "#aaa" }}>{u.email}</div>
-                {u.enfants.some(e => `${e.prenom} ${e.nom}`.toLowerCase().includes(q)) && (
-                  <div style={{ fontSize: 11, color: u.color, fontWeight: 700, marginTop: 2 }}>
-                    👧 {u.enfants.filter(e => `${e.prenom} ${e.nom}`.toLowerCase().includes(q)).map(e => e.prenom).join(", ")}
-                  </div>
-                )}
-              </div>
-              <div style={{ fontSize: 18, color: "#ddd" }}>›</div>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8 }}>
+          {[
+            { label:"Membres", value: tousLesMembres.length, color: C.ocean, emoji:"👤" },
+            { label:"Enfants", value: tousLesEnfants.length, color: C.coral, emoji:"👧" },
+            { label:"Avec allergie", value: tousLesEnfants.filter(e=>e.allergies).length, color: C.sunset, emoji:"⚠️" },
+          ].map(k => (
+            <div key={k.label} style={{ background:"#fff", borderRadius:16, padding:"12px", textAlign:"center", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
+              <div style={{ fontSize:22 }}>{k.emoji}</div>
+              <div style={{ fontWeight:900, color:k.color, fontSize:20 }}>{k.value}</div>
+              <div style={{ fontSize:10, color:"#aaa", marginTop:2 }}>{k.label}</div>
             </div>
           ))}
         </div>
       )}
 
-      {resultsSessions.length > 0 && (
+      {/* Aucun résultat */}
+      {query && totalResultats === 0 && (
+        <div style={{ textAlign:"center", padding:"32px 0", color:"#bbb" }}>
+          <div style={{ fontSize:48, marginBottom:10 }}>😶</div>
+          <div style={{ fontSize:14 }}>Aucun résultat pour « {query} »</div>
+        </div>
+      )}
+
+      {/* Résultats membres */}
+      {resMembres.length > 0 && (
         <div>
-          <div style={{ fontWeight: 900, color: "#2C3E50", fontSize: 12, letterSpacing: 1, textTransform: "uppercase", marginBottom: 8 }}>🏊 Créneaux ({resultsSessions.length})</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {resultsSessions.slice(0, 20).map(s => (
-              <div key={s.id} style={{ background: "#fff", borderRadius: 12, padding: "8px 12px", boxShadow: "0 2px 8px rgba(0,0,0,0.06)", display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ width: 7, height: 7, borderRadius: "50%", background: s.spots === 0 ? C.sunset : s.spots === 1 ? C.coral : C.green }} />
-                <span style={{ fontWeight: 800, fontSize: 13, color: C.dark }}>{DAYS.find(d => d.id === s.day)?.label} {DAYS.find(d => d.id === s.day)?.num} · {s.time}</span>
-                <span style={{ fontSize: 11, color: s.spots === 0 ? C.sunset : C.green, fontWeight: 700 }}>{s.spots === 0 ? "Complet" : `${s.spots}/2`}</span>
+          <div style={{ fontWeight:900, color:"#2C3E50", fontSize:12, letterSpacing:1, textTransform:"uppercase", marginBottom:8 }}>👤 Membres ({resMembres.length})</div>
+          {resMembres.map(u => (
+            <div key={u.id} onClick={() => setSelectedMembre(u)} style={{ background:"#fff", borderRadius:16, padding:"12px 14px", boxShadow:"0 2px 8px rgba(0,0,0,0.06)", display:"flex", alignItems:"center", gap:12, marginBottom:8, cursor:"pointer" }}>
+              <div style={{ width:42, height:42, borderRadius:14, background:`linear-gradient(135deg,${u.color},${u.color}bb)`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0 }}>{u.av}</div>
+              <div style={{ flex:1 }}>
+                <div style={{ fontWeight:900, color:"#2C3E50", fontSize:13 }}>{u.name}</div>
+                <div style={{ fontSize:11, color:"#aaa" }}>{u.email}</div>
+                {(u.enfants||[]).some(e => `${e.prenom} ${e.nom}`.toLowerCase().includes(q)) && (
+                  <div style={{ fontSize:11, color:u.color, fontWeight:700, marginTop:2 }}>
+                    👧 {(u.enfants||[]).filter(e => `${e.prenom} ${e.nom}`.toLowerCase().includes(q)).map(e=>e.prenom).join(", ")}
+                  </div>
+                )}
               </div>
-            ))}
-          </div>
+              <div style={{ fontSize:18, color:"#ddd" }}>›</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Résultats enfants */}
+      {resEnfants.length > 0 && (
+        <div>
+          <div style={{ fontWeight:900, color:"#2C3E50", fontSize:12, letterSpacing:1, textTransform:"uppercase", marginBottom:8 }}>👧 Enfants ({resEnfants.length})</div>
+          {resEnfants.map((e, i) => {
+            const age = calcAge(e.naissance);
+            const actColor = e.activite === "natation" ? C.ocean : e.activite === "club" ? C.coral : "#9B59B6";
+            return (
+              <div key={i} style={{ background:"#fff", borderRadius:16, padding:"12px 14px", boxShadow:"0 2px 8px rgba(0,0,0,0.06)", display:"flex", alignItems:"center", gap:12, marginBottom:8 }}>
+                <div style={{ width:42, height:42, borderRadius:14, background:`linear-gradient(135deg,${e.parentColor},${e.parentColor}bb)`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0 }}>👧</div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontWeight:900, color:"#2C3E50", fontSize:13 }}>{e.prenom} {e.nom}</div>
+                  <div style={{ fontSize:11, color:"#aaa" }}>{age} ans · Parent : {e.parent}</div>
+                  <div style={{ display:"flex", gap:5, marginTop:4, flexWrap:"wrap" }}>
+                    <Pill color={actColor}>{e.activite === "natation" ? "🏊 Natation" : e.activite === "club" ? "🏖️ Club" : "🏊🏖️ Les deux"}</Pill>
+                    {e.allergies && <Pill color={C.sunset}>⚠️ {e.allergies}</Pill>}
+                    {e.niveau && e.activite !== "club" && <Pill color={C.sea}>{e.niveau}</Pill>}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -4800,7 +4862,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
         )}
 
         {tab === "recherche" && (
-          <RechercheTab allResas={allResas} sessions={sessions} />
+          <RechercheTab allResas={allResas} sessions={sessions} dbMembres={dbMembres} />
         )}
       </div>
     </div>
