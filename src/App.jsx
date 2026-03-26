@@ -2795,6 +2795,19 @@ function MembresTab({ allResas, dbMembres, onRefresh }) {
   const [modifierMembre, setModifierMembre]       = useState(null);
   const [showCreer, setShowCreer]                 = useState(false);
 
+  const supprimerMembre = async (membre) => {
+    if (!window.confirm(`Supprimer définitivement ${membre.name} ?\n\nAttention : ses enfants et réservations seront aussi supprimés.`)) return;
+    try {
+      // Supprimer enfants, résas, paiements, puis membre
+      await sb.from("enfants").delete().eq("membre_id", membre.id);
+      await sb.from("reservations_natation").delete().eq("membre_id", membre.id);
+      await sb.from("reservations_club").delete().eq("membre_id", membre.id);
+      await sb.from("paiements").delete().eq("membre_id", membre.id);
+      await sb.from("membres").delete().eq("id", membre.id);
+      onRefresh?.();
+    } catch(e) { alert("Erreur suppression : " + e.message); }
+  };
+
   const membresSupabase = (dbMembres || []).map(m => ({
     id: m.id, name: `${m.prenom} ${m.nom}`, prenom: m.prenom, nom: m.nom,
     email: m.email, phone: m.tel, tel: m.tel, tel2: m.tel2,
@@ -2840,7 +2853,10 @@ function MembresTab({ allResas, dbMembres, onRefresh }) {
                 ✏️ Modifier
               </button>
               <button onClick={() => setAjouterEnfantPour(u)} style={{ flex:1, background:`${C.ocean}12`, border:`1.5px dashed ${C.ocean}40`, color:C.ocean, borderRadius:12, padding:"7px", cursor:"pointer", fontWeight:800, fontSize:12, fontFamily:"inherit" }}>
-                ➕ Ajouter enfant
+                ➕ Enfant
+              </button>
+              <button onClick={() => supprimerMembre(u)} style={{ background:"#FFF0F0", border:`1.5px solid ${C.sunset}30`, color:C.sunset, borderRadius:12, padding:"7px 10px", cursor:"pointer", fontWeight:900, fontSize:13, fontFamily:"inherit" }}>
+                🗑
               </button>
             </div>
           )}
