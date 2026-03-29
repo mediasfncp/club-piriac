@@ -2570,7 +2570,20 @@ function FicheEnfantModal({ enfant, onClose }) {
 }
 
 function FicheModal({ membre, onClose }) {
-  const actLabel = a => a === "club" ? "🏖️ Club" : a === "natation" ? "🏊 Natation" : "🏖️🏊 Club & Natation";
+  const actLabel = a => {
+    if (!a) return "—";
+    const v = a.toLowerCase();
+    if (v === "club") return "🏖️ Club";
+    if (v === "natation") return "🏊 Natation";
+    return "🏖️🏊 Club & Natation";
+  };
+  const actColor = a => {
+    if (!a) return C.ocean;
+    const v = a.toLowerCase();
+    if (v === "club") return C.coral;
+    if (v === "natation") return C.ocean;
+    return "#9B59B6";
+  };
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", flexDirection: "column" }}>
       <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,20,50,0.6)", backdropFilter: "blur(5px)" }} />
@@ -2604,11 +2617,11 @@ function FicheModal({ membre, onClose }) {
               <div key={i} style={{ background: "#F8FBFF", borderRadius: 14, padding: "10px 14px", marginBottom: 8 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
                   <div style={{ fontWeight: 900, color: "#2C3E50", fontSize: 14 }}>{e.prenom} {NOM(e.nom)}</div>
-                  <div style={{ fontSize: 11, color: "#888" }}>Né(e) le {e.naissance.split("-").reverse().join("/")}</div>
+                  <div style={{ fontSize: 11, color: "#888" }}>Né(e) le {e.naissance ? e.naissance.split("-").reverse().join("/") : "—"}</div>
                 </div>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  <div style={{ background: `${membre.color}18`, color: membre.color, borderRadius: 50, padding: "2px 10px", fontSize: 11, fontWeight: 800 }}>{actLabel(e.activite)}</div>
-                  {e.activite !== "club" && <div style={{ background: `${C.sea}20`, color: C.sea, borderRadius: 50, padding: "2px 10px", fontSize: 11, fontWeight: 800 }}>Niveau : {e.niveau}</div>}
+                  <div style={{ background: `${actColor(e.activite)}18`, color: actColor(e.activite), borderRadius: 50, padding: "2px 10px", fontSize: 11, fontWeight: 800 }}>{actLabel(e.activite)}</div>
+                  {e.activite !== "club" && e.niveau && <div style={{ background: `${C.sea}20`, color: C.sea, borderRadius: 50, padding: "2px 10px", fontSize: 11, fontWeight: 800 }}>Niveau : {e.niveau}</div>}
                   {e.allergies && <div style={{ background: "#FFF0F0", color: C.sunset, borderRadius: 50, padding: "2px 10px", fontSize: 11, fontWeight: 800 }}>⚠️ {e.allergies}</div>}
                 </div>
               </div>
