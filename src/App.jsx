@@ -3495,12 +3495,30 @@ function DayDetailModal({ day, activity, session, onClose }) {
 }
 
 function PlanningTab({ allSeasonSessions, clubPlaces, reservations = [] }) {
-  const [activity, setActivity] = useState("natation"); // "natation" | "club"
-  const [viewMode, setViewMode] = useState("semaine");  // "jour" | "semaine"
+  const [activity, setActivity] = useState("natation");
+  const [viewMode, setViewMode] = useState("semaine");
   const [weekIdx, setWeekIdx] = useState(0);
   const [selectedDayId, setSelectedDayId] = useState(ALL_SEASON_DAYS[0]?.id);
-  const [modalDay, setModalDay] = useState(null);    // day object
-  const [modalSession, setModalSession] = useState(null); // "matin" | "apmidi" | null
+  const [modalDay, setModalDay] = useState(null);
+  const [modalSession, setModalSession] = useState(null);
+  const [dbResasNat, setDbResasNat] = useState([]); // résas natation Supabase
+
+  // Charger résas natation depuis Supabase
+  useEffect(() => {
+    sb.from("reservations_natation").select("*, membres(prenom, nom, tel)")
+      .then(({ data }) => setDbResasNat(data || []))
+      .catch(() => {});
+  }, []);
+
+  // Récupérer les enfants inscrits pour un jour + heure donnés
+  const getEnfantsPourCreneau = (dayId, time) => {
+    const dayObj = ALL_SEASON_DAYS.find(d => d.id === dayId);
+    if (!dayObj?.date) return [];
+    const dateISO = `${dayObj.date.getFullYear()}-${String(dayObj.date.getMonth()+1).padStart(2,"0")}-${String(dayObj.date.getDate()).padStart(2,"0")}`;
+    return dbResasNat
+      .filter(r => r.date_seance?.slice(0,10) === dateISO && r.heure === time)
+      .flatMap(r => (r.enfants || []).map(e => ({ prenom: e, parent: r.membres ? `${r.membres.prenom} ${r.membres.nom}` : "—", tel: r.membres?.tel || "" })));
+  };
 
   // Build weeks from ALL_SEASON_DAYS
   const weeks = [];
@@ -3613,13 +3631,11 @@ function PlanningTab({ allSeasonSessions, clubPlaces, reservations = [] }) {
 
         const handlePrintJour = () => {
           const makeRows = (list) => list.map(s => {
-            // Trouver les réservations pour ce créneau
-            const resasCreneau = reservations.filter(r => r.day === selectedDayId && r.time === s.time);
-            const enfantsList = resasCreneau.flatMap(r => r.enfants || []);
-            const enfantsHtml = enfantsList.length > 0
-              ? enfantsList.map(e => `<span style="display:inline-block;background:#EEF8FF;color:#1A8FE3;border-radius:6px;padding:2px 8px;margin:2px;font-size:11px;font-weight:700">👤 ${e}</span>`).join('')
+            const enfants = getEnfantsPourCreneau(selectedDayId, s.time);
+            const enfantsHtml = enfants.length > 0
+              ? enfants.map(e => `<span style="display:inline-block;background:#EEF8FF;color:#1A8FE3;border-radius:6px;padding:2px 8px;margin:2px;font-size:11px;font-weight:700">👤 ${e.prenom}</span>`).join('')
               : `<span style="color:#bbb;font-size:11px">—</span>`;
-            const parentsList = resasCreneau.map(r => r.parent).filter(Boolean).join(', ');
+            const parentsList = enfants.map(e => e.parent).filter((v,i,a)=>a.indexOf(v)===i).join(', ');
             return `<tr style="background:${s.spots===0?'#fff8f8':'#f9fbff'}">
             <td style="padding:8px 12px;font-weight:900;color:#1A8FE3;font-size:15px">${s.time}</td>
             <td style="padding:8px 12px;text-align:center;font-weight:700;color:${s.spots===0?'#e74c3c':s.spots===1?'#FF8E53':'#6BCB77'}">${s.spots===0?'🔴 Complet':s.spots===1?'🟡 1 place':'🟢 2 places'}</td>
@@ -3660,14 +3676,30 @@ ${afternoon.length>0?`<h2>🌊 Après-midi</h2><table><thead><tr><th>Heure</th><
             {[["☀️ MATIN", morning], ["🌊 APRÈS-MIDI", afternoon]].map(([title, list]) => list.length > 0 && (
               <div key={title} style={{ marginBottom: 14 }}>
                 <div style={{ fontSize: 11, fontWeight: 900, color: title.includes("MATIN") ? C.coral : C.ocean, marginBottom: 8, letterSpacing: 1 }}>{title}</div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
-                  {list.map(s => (
-                    <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 5, background: "#F8FBFF", borderRadius: 10, padding: "6px 10px", border: `1.5px solid ${nataSpotColor(s.spots)}30` }}>
-                      <div style={{ width: 7, height: 7, borderRadius: "50%", background: nataSpotColor(s.spots) }} />
-                      <span style={{ fontWeight: 800, fontSize: 12, color: C.dark }}>{s.time}</span>
-                      <span style={{ fontSize: 10, color: nataSpotColor(s.spots), fontWeight: 700 }}>{s.spots}/2</span>
-                    </div>
-                  ))}
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {list.map(s => {
+                    const enfants = getEnfantsPourCreneau(selectedDayId, s.time);
+                    return (
+                      <div key={s.id} style={{ display:"flex", alignItems:"center", gap:10, background:"#F8FBFF", borderRadius:12, padding:"8px 12px", border:`1.5px solid ${nataSpotColor(s.spots)}30` }}>
+                        {/* Heure + dispo */}
+                        <div style={{ display:"flex", alignItems:"center", gap:6, minWidth:70 }}>
+                          <div style={{ width:8, height:8, borderRadius:"50%", background:nataSpotColor(s.spots), flexShrink:0 }} />
+                          <span style={{ fontWeight:900, fontSize:13, color:C.dark }}>{s.time}</span>
+                          <span style={{ fontSize:10, color:nataSpotColor(s.spots), fontWeight:700 }}>{s.spots}/2</span>
+                        </div>
+                        {/* Enfants inscrits */}
+                        <div style={{ flex:1, display:"flex", gap:6, flexWrap:"wrap" }}>
+                          {enfants.length > 0 ? enfants.map((e, i) => (
+                            <div key={i} style={{ background:`${C.ocean}15`, color:C.ocean, borderRadius:8, padding:"3px 8px", fontSize:11, fontWeight:800 }}>
+                              👤 {e.prenom}
+                            </div>
+                          )) : s.spots === 2 ? (
+                            <span style={{ fontSize:11, color:"#bbb" }}>—</span>
+                          ) : null}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             ))}
