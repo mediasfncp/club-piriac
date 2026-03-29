@@ -3404,15 +3404,19 @@ function DayDetailModal({ day, activity, session, onClose, dbResasNat = [], dbRe
     const rows = allEnfants.map((e, i) => `
       <tr style="background:${i%2===0?'#f9fbff':'#fff'}">
         <td style="padding:8px 12px;font-weight:700;color:#2C3E50">${i+1}</td>
-        <td style="padding:8px 12px;font-weight:900;color:#2C3E50">${e.nom.toUpperCase()}</td>
+        <td style="padding:8px 12px;font-weight:900;color:#2C3E50">${(e.nom||"").toUpperCase()}</td>
         <td style="padding:8px 12px;color:#2C3E50">${e.prenom}</td>
-        <td style="padding:8px 12px;text-align:center;font-weight:700;color:${actColor}">${calcAge(e.naissance)} ans</td>
+        <td style="padding:8px 12px;text-align:center;font-weight:700;color:${actColor}">${e.naissance ? calcAge(e.naissance) + " ans" : "—"}</td>
+        ${activity === "natation" ? `<td style="padding:8px 12px;color:#1A8FE3;font-weight:700">${e.heure || "—"}</td>` : ""}
         <td style="padding:8px 12px;color:#555">${e.parent}</td>
         <td style="padding:8px 12px;color:#555">${e.phone || '—'}</td>
         <td style="padding:8px 12px;color:${e.allergies?'#e74c3c':'#aaa'};font-weight:${e.allergies?700:400}">${e.allergies || '—'}</td>
-        <td style="padding:8px 12px;color:#555">${activity==='natation'?niveauLabel(e.niveau):'—'}</td>
+        ${activity === "natation" ? `<td style="padding:8px 12px;color:#555">${niveauLabel(e.niveau)}</td>` : ""}
       </tr>
     `).join('');
+
+    const thNatation = activity === "natation" ? "<th>Heure</th>" : "";
+    const thNiveau   = activity === "natation" ? "<th>Niveau</th>" : "";
 
     const html = `<!DOCTYPE html>
 <html><head><meta charset="UTF-8">
@@ -3434,7 +3438,7 @@ function DayDetailModal({ day, activity, session, onClose, dbResasNat = [], dbRe
 </p>
 <table>
   <thead><tr>
-    <th>#</th><th>Nom</th><th>Prénom</th><th>Âge</th><th>Parent</th><th>Téléphone</th><th>Allergies</th><th>Niveau</th>
+    <th>#</th><th>Nom</th><th>Prénom</th><th>Âge</th>${thNatation}<th>Parent</th><th>Téléphone</th><th>Allergies</th>${thNiveau}
   </tr></thead>
   <tbody>${rows}</tbody>
 </table>
@@ -3804,7 +3808,14 @@ ${afternoon.length>0?`<h2>🌊 Après-midi</h2><table><thead><tr><th>Heure</th><
               const taken = slots.reduce((acc,s)=>acc+(2-s.spots),0);
               const avail = slots.reduce((acc,s)=>acc+s.spots,0);
               const rate  = slots.length*2 > 0 ? Math.round((taken/(slots.length*2))*100) : 0;
-              const fmt = (list) => list.map(s=>`<span style="display:inline-block;background:${s.spots===0?'#fee':'#e8f4ff'};color:${s.spots===0?'#e74c3c':'#1A8FE3'};border-radius:6px;padding:2px 7px;margin:2px;font-size:11px;font-weight:700">${s.time} ${s.spots===0?'●':`${s.spots}/2`}</span>`).join('');
+              const dateISO = d.date ? `${d.date.getFullYear()}-${String(d.date.getMonth()+1).padStart(2,"0")}-${String(d.date.getDate()).padStart(2,"0")}` : "";
+              const fmt = (list) => list.map(s => {
+                const enfants = dbResasNat
+                  .filter(r => r.date_seance?.slice(0,10) === dateISO && r.heure === s.time)
+                  .flatMap(r => r.enfants || []);
+                const noms = enfants.length > 0 ? enfants.map(e => `<span style="display:inline-block;background:#EEF8FF;color:#1A8FE3;border-radius:4px;padding:1px 6px;margin:1px;font-size:10px;font-weight:700">👤 ${e}</span>`).join('') : '';
+                return `<span style="display:inline-block;background:${s.spots===0?'#fee':'#e8f4ff'};color:${s.spots===0?'#e74c3c':'#1A8FE3'};border-radius:6px;padding:2px 7px;margin:2px;font-size:11px;font-weight:700">${s.time} ${s.spots===0?'●':`${s.spots}/2`}</span>${noms}`;
+              }).join('');
               return `<tr><td style="padding:10px 12px;font-weight:900;color:#2C3E50;border-bottom:1px solid #eee;vertical-align:top">${d.label} ${d.num} ${d.month}</td>
                 <td style="padding:10px 12px;border-bottom:1px solid #eee;vertical-align:top">${fmt(morning)}</td>
                 <td style="padding:10px 12px;border-bottom:1px solid #eee;vertical-align:top">${fmt(afternoon)}</td>
