@@ -2488,6 +2488,73 @@ const MEMBRES = [
     ], resa: 7, droitImage: true, droitDiffusion: true },
 ];
 
+// ── FICHE ENFANT ──────────────────────────────────────────
+function FicheEnfantModal({ enfant, onClose }) {
+  const age = calcAge(enfant.naissance);
+  const actColor = enfant.activite === "natation" ? C.ocean : enfant.activite === "club" ? C.coral : "#9B59B6";
+  const actLabel = enfant.activite === "natation" ? "🏊 Natation" : enfant.activite === "club" ? "🏖️ Club de Plage" : "🏊🏖️ Natation & Club";
+  return (
+    <div style={{ position:"fixed", inset:0, zIndex:1100, display:"flex", flexDirection:"column" }}>
+      <div onClick={onClose} style={{ position:"absolute", inset:0, background:"rgba(0,20,50,0.65)", backdropFilter:"blur(5px)" }} />
+      <div style={{ position:"relative", marginTop:"auto", background:"#F0F4F8", borderRadius:"28px 28px 0 0", maxHeight:"88vh", display:"flex", flexDirection:"column", boxShadow:"0 -12px 48px rgba(0,0,0,0.3)" }}>
+        <div style={{ display:"flex", justifyContent:"center", padding:"12px 0 4px" }}>
+          <div style={{ width:40, height:5, borderRadius:10, background:"#ddd" }} />
+        </div>
+        {/* Header */}
+        <div style={{ background:`linear-gradient(135deg,${actColor},${actColor}cc)`, margin:"0 16px", borderRadius:20, padding:"20px 18px", position:"relative", marginBottom:12 }}>
+          <button onClick={onClose} style={{ position:"absolute", top:12, right:12, background:"rgba(255,255,255,0.25)", border:"none", color:"#fff", borderRadius:"50%", width:30, height:30, cursor:"pointer", fontWeight:900, fontSize:16, fontFamily:"inherit" }}>✕</button>
+          <div style={{ display:"flex", alignItems:"center", gap:14 }}>
+            <div style={{ width:60, height:60, borderRadius:20, background:"rgba(255,255,255,0.25)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:32 }}>👧</div>
+            <div>
+              <div style={{ color:"#fff", fontWeight:900, fontSize:20 }}>{enfant.prenom} {enfant.nom}</div>
+              <div style={{ color:"rgba(255,255,255,0.85)", fontSize:13 }}>{age} ans · {actLabel}</div>
+              {enfant.parent && <div style={{ color:"rgba(255,255,255,0.75)", fontSize:12, marginTop:2 }}>👤 {enfant.parent}</div>}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ overflowY:"auto", padding:"0 16px 28px", display:"flex", flexDirection:"column", gap:10 }}>
+          {/* Infos */}
+          <div style={{ background:"#fff", borderRadius:16, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
+            <div style={{ fontWeight:800, color:"#2C3E50", fontSize:12, marginBottom:10, textTransform:"uppercase", letterSpacing:0.5 }}>📋 Informations</div>
+            <div style={{ display:"grid", gridTemplateColumns:"auto 1fr", gap:"8px 16px", fontSize:14 }}>
+              <span style={{ color:"#aaa" }}>Naissance</span>
+              <span style={{ fontWeight:700, color:"#2C3E50" }}>{enfant.naissance ? new Date(enfant.naissance).toLocaleDateString("fr-FR") : "—"} ({age} ans)</span>
+              <span style={{ color:"#aaa" }}>Activité</span>
+              <span style={{ fontWeight:700, color:actColor }}>{actLabel}</span>
+              {enfant.activite !== "club" && <><span style={{ color:"#aaa" }}>Niveau</span><span style={{ fontWeight:700, color:C.sea }}>{enfant.niveau || "—"}</span></>}
+              <span style={{ color:"#aaa" }}>Parent</span>
+              <span style={{ fontWeight:700, color:"#2C3E50" }}>{enfant.parent || "—"}</span>
+              {enfant.parentPhone && <><span style={{ color:"#aaa" }}>Téléphone</span><span style={{ fontWeight:700, color:"#2C3E50" }}>{enfant.parentPhone}</span></>}
+            </div>
+          </div>
+
+          {/* Allergies */}
+          {enfant.allergies ? (
+            <div style={{ background:"#FFF0F0", border:`1.5px solid ${C.sunset}30`, borderRadius:16, padding:"14px 16px" }}>
+              <div style={{ fontWeight:800, color:C.sunset, fontSize:12, marginBottom:6, textTransform:"uppercase" }}>⚠️ Allergies / Infos médicales</div>
+              <div style={{ fontSize:14, color:"#555", fontWeight:700 }}>{enfant.allergies}</div>
+            </div>
+          ) : (
+            <div style={{ background:`${C.green}10`, border:`1.5px solid ${C.green}30`, borderRadius:16, padding:"12px 16px" }}>
+              <div style={{ fontWeight:800, color:C.green, fontSize:13 }}>✅ Aucune allergie connue</div>
+            </div>
+          )}
+
+          {/* Groupe d'âge */}
+          <div style={{ background:"#fff", borderRadius:16, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
+            <div style={{ fontWeight:800, color:"#2C3E50", fontSize:12, marginBottom:8, textTransform:"uppercase" }}>🏷️ Groupe d'âge</div>
+            {(() => {
+              const grp = age <= 5 ? { label:"🐥 3–5 ans", color:"#FFD93D" } : age <= 9 ? { label:"🐬 6–9 ans", color:C.sea } : { label:"🏅 10–12 ans", color:C.ocean };
+              return <Pill color={grp.color}>{grp.label}</Pill>;
+            })()}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function FicheModal({ membre, onClose }) {
   const actLabel = a => a === "club" ? "🏖️ Club" : a === "natation" ? "🏊 Natation" : "🏖️🏊 Club & Natation";
   return (
@@ -2868,8 +2935,9 @@ function MembresTab({ allResas, dbMembres, onRefresh }) {
 
 function RechercheTab({ allResas, sessions, dbMembres }) {
   const [query, setQuery]           = useState("");
-  const [filterType, setFilterType] = useState("tous"); // tous | membre | enfant | activite
+  const [filterType, setFilterType] = useState("tous");
   const [selectedMembre, setSelectedMembre] = useState(null);
+  const [selectedEnfant, setSelectedEnfant] = useState(null);
   const q = query.toLowerCase().trim();
 
   // Construire les données depuis Supabase
@@ -2914,6 +2982,7 @@ function RechercheTab({ allResas, sessions, dbMembres }) {
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
       {selectedMembre && <FicheModal membre={selectedMembre} onClose={() => setSelectedMembre(null)} />}
+      {selectedEnfant && <FicheEnfantModal enfant={selectedEnfant} onClose={() => setSelectedEnfant(null)} />}
 
       {/* Barre de recherche */}
       <div style={{ position:"relative" }}>
@@ -2993,7 +3062,7 @@ function RechercheTab({ allResas, sessions, dbMembres }) {
             const age = calcAge(e.naissance);
             const actColor = e.activite === "natation" ? C.ocean : e.activite === "club" ? C.coral : "#9B59B6";
             return (
-              <div key={i} style={{ background:"#fff", borderRadius:16, padding:"12px 14px", boxShadow:"0 2px 8px rgba(0,0,0,0.06)", display:"flex", alignItems:"center", gap:12, marginBottom:8 }}>
+              <div key={i} onClick={() => setSelectedEnfant(e)} style={{ background:"#fff", borderRadius:16, padding:"12px 14px", boxShadow:"0 2px 8px rgba(0,0,0,0.06)", display:"flex", alignItems:"center", gap:12, marginBottom:8, cursor:"pointer" }}>
                 <div style={{ width:42, height:42, borderRadius:14, background:`linear-gradient(135deg,${e.parentColor},${e.parentColor}bb)`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0 }}>👧</div>
                 <div style={{ flex:1 }}>
                   <div style={{ fontWeight:900, color:"#2C3E50", fontSize:13 }}>{e.prenom} {e.nom}</div>
@@ -3004,6 +3073,7 @@ function RechercheTab({ allResas, sessions, dbMembres }) {
                     {e.niveau && e.activite !== "club" && <Pill color={C.sea}>{e.niveau}</Pill>}
                   </div>
                 </div>
+                <div style={{ fontSize:18, color:"#ddd" }}>›</div>
               </div>
             );
           })}
@@ -3783,6 +3853,7 @@ function AgeGroupCard({ dbMembres = [] }) {
   const [selectedDayId, setSelectedDayId] = useState(ALL_SEASON_DAYS[0]?.id);
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [selectedActivity, setSelectedActivity] = useState("tous");
+  const [selectedEnfant, setSelectedEnfant] = useState(null);
 
   // Build season weeks
   const weeks = [];
@@ -3911,6 +3982,7 @@ th{background:#1A8FE3;color:#fff;padding:9px 12px;text-align:left}
 
   return (
     <div style={{ background: "#fff", borderRadius: 20, padding: 18, boxShadow: "0 4px 16px rgba(0,0,0,0.06)" }}>
+      {selectedEnfant && <FicheEnfantModal enfant={selectedEnfant} onClose={() => setSelectedEnfant(null)} />}
 
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
@@ -4058,7 +4130,7 @@ th{background:#1A8FE3;color:#fff;padding:9px 12px;text-align:left}
         ) : filteredEnfants.map((e, i) => {
           const grp = AGE_GROUPS.find(g => e.age >= g.min && e.age <= g.max);
           return (
-            <div key={i} style={{ display: "grid", gridTemplateColumns: "24px 1fr 1fr 44px", background: i%2===0?"#fff":"#F8FBFF", padding: "8px 10px", alignItems: "center", borderTop: "1px solid #F0F4F8" }}>
+            <div key={i} onClick={() => setSelectedEnfant(e)} style={{ display: "grid", gridTemplateColumns: "24px 1fr 1fr 44px", background: i%2===0?"#fff":"#F8FBFF", padding: "8px 10px", alignItems: "center", borderTop: "1px solid #F0F4F8", cursor:"pointer" }}>
               <div style={{ fontSize: 10, color: "#ccc" }}>{i+1}</div>
               <div>
                 <div style={{ fontWeight: 900, color: "#2C3E50", fontSize: 12 }}>{e.nom.toUpperCase()} <span style={{ fontWeight: 600 }}>{e.prenom}</span></div>
