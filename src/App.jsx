@@ -3333,11 +3333,12 @@ function calcAge(naissance) {
   return age;
 }
 
-function DayDetailModal({ day, activity, session, onClose, dbResasNat = [] }) {
-  // Construire la liste des enfants depuis Supabase
+function DayDetailModal({ day, activity, session, onClose, dbResasNat = [], dbResasClub = [] }) {
   const allEnfants = (() => {
-    if (activity === "natation" && dbResasNat.length > 0 && day) {
-      const dateISO = `${day.date.getFullYear()}-${String(day.date.getMonth()+1).padStart(2,"0")}-${String(day.date.getDate()).padStart(2,"0")}`;
+    if (!day?.date) return [];
+    const dateISO = `${day.date.getFullYear()}-${String(day.date.getMonth()+1).padStart(2,"0")}-${String(day.date.getDate()).padStart(2,"0")}`;
+
+    if (activity === "natation" && dbResasNat.length > 0) {
       const resasJour = dbResasNat.filter(r => r.date_seance?.slice(0,10) === dateISO);
       const enfants = [];
       resasJour.forEach(r => {
@@ -3354,6 +3355,25 @@ function DayDetailModal({ day, activity, session, onClose, dbResasNat = [] }) {
       });
       return enfants.sort((a, b) => a.prenom.localeCompare(b.prenom));
     }
+
+    if (activity === "club" && dbResasClub.length > 0) {
+      const resasJour = dbResasClub.filter(r => {
+        if (r.date_reservation?.slice(0,10) !== dateISO) return false;
+        if (session && r.session !== session) return false;
+        return true;
+      });
+      return resasJour.map(r => ({
+        prenom: r.membres?.prenom || "—",
+        nom: r.membres?.nom || "",
+        naissance: "",
+        activite: "club", niveau: "", allergies: "",
+        parent: r.membres ? `${r.membres.prenom} ${r.membres.nom}` : "—",
+        parentColor: C.coral, parentAv: "👤",
+        phone: r.membres?.tel || "—",
+        session: r.session,
+      })).sort((a, b) => a.nom.localeCompare(b.nom));
+    }
+
     // Fallback mock
     const list = [];
     MEMBRES.forEach(m => {
@@ -3602,6 +3622,7 @@ function PlanningTab({ allSeasonSessions, clubPlaces, reservations = [] }) {
           activity={activity}
           session={modalSession}
           dbResasNat={dbResasNat}
+          dbResasClub={dbResasClub}
           onClose={() => { setModalDay(null); setModalSession(null); }}
         />
       )}
@@ -3932,17 +3953,17 @@ th{background:#1A8FE3;color:#fff;padding:10px 12px;text-align:left}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", padding: "12px 16px", background: "#F8FBFF", borderTop: "2px solid #EEF5FF" }}>
               <div style={{ fontSize: 12, fontWeight: 900, color: "#2C3E50" }}>SEMAINE</div>
               {["matin","apmidi"].map((sess, si) => {
-                const totalInscrits = currentWeek.reduce((acc,d) => acc + (45 - getPlacesClub(d.id, sess)), 0);
-                const col = si===0 ? C.coral : C.ocean;
+                const totalInscrits = currentWeek.reduce((acc, d) => acc + (45 - getPlacesClub(d.id, sess)), 0);
+                const totalPlaces   = currentWeek.length * 45;
+                const col = si === 0 ? C.coral : C.ocean;
                 return (
                   <div key={sess} style={{ textAlign: "center" }}>
                     <div style={{ fontWeight: 900, color: col, fontSize: 15 }}>{totalInscrits} inscrits</div>
-                    <div style={{ fontSize: 10, color: "#aaa" }}>{currentWeek.length * 45 - totalInscrits} places libres</div>
+                    <div style={{ fontSize: 10, color: "#aaa" }}>{totalPlaces - totalInscrits} places libres</div>
+                    <div style={{ fontSize: 9, color: "#bbb" }}>{currentWeek.length} jours × 45</div>
                   </div>
                 );
               })}
-                </div>
-              ))}
             </div>
           </div>
         </div>
