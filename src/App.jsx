@@ -3333,18 +3333,39 @@ function calcAge(naissance) {
   return age;
 }
 
-function DayDetailModal({ day, activity, session, onClose }) {
-  const allEnfants = [];
-  MEMBRES.forEach(m => {
-    m.enfants.forEach(e => {
-      const match = activity === "natation"
-        ? (e.activite === "natation" || e.activite === "les deux")
-        : (e.activite === "club" || e.activite === "les deux");
-      if (match) allEnfants.push({ ...e, parent: m.name, parentColor: m.color, parentAv: m.av, phone: m.phone });
+function DayDetailModal({ day, activity, session, onClose, dbResasNat = [] }) {
+  // Construire la liste des enfants depuis Supabase
+  const allEnfants = (() => {
+    if (activity === "natation" && dbResasNat.length > 0 && day) {
+      const dateISO = `${day.date.getFullYear()}-${String(day.date.getMonth()+1).padStart(2,"0")}-${String(day.date.getDate()).padStart(2,"0")}`;
+      const resasJour = dbResasNat.filter(r => r.date_seance?.slice(0,10) === dateISO);
+      const enfants = [];
+      resasJour.forEach(r => {
+        (r.enfants || []).forEach(prenom => {
+          enfants.push({
+            prenom, nom: "", naissance: "",
+            activite: "natation", niveau: r.niveau || "debutant", allergies: "",
+            parent: r.membres ? `${r.membres.prenom} ${r.membres.nom}` : "—",
+            parentColor: C.ocean, parentAv: "👤",
+            phone: r.membres?.tel || "—",
+            heure: r.heure,
+          });
+        });
+      });
+      return enfants.sort((a, b) => a.prenom.localeCompare(b.prenom));
+    }
+    // Fallback mock
+    const list = [];
+    MEMBRES.forEach(m => {
+      m.enfants.forEach(e => {
+        const match = activity === "natation"
+          ? (e.activite === "natation" || e.activite === "les deux")
+          : (e.activite === "club" || e.activite === "les deux");
+        if (match) list.push({ ...e, parent: m.name, parentColor: m.color, parentAv: m.av, phone: m.phone });
+      });
     });
-  });
-  // Sort alphabetically by nom
-  allEnfants.sort((a, b) => a.nom.localeCompare(b.nom));
+    return list.sort((a, b) => a.nom.localeCompare(b.nom));
+  })();
 
   const actColor   = activity === "natation" ? C.ocean : C.coral;
   const actLabel   = activity === "natation" ? "Natation" : "Club de Plage";
@@ -3559,6 +3580,7 @@ function PlanningTab({ allSeasonSessions, clubPlaces, reservations = [] }) {
           day={modalDay}
           activity={activity}
           session={modalSession}
+          dbResasNat={dbResasNat}
           onClose={() => { setModalDay(null); setModalSession(null); }}
         />
       )}
@@ -3754,27 +3776,41 @@ th{background:#1A8FE3;color:#fff;padding:10px 12px;text-align:left}
             const avail = slots.reduce((acc, s) => acc + s.spots, 0);
             const total = slots.length * 2;
             const rate  = total > 0 ? Math.round((taken / total) * 100) : 0;
+            // Enfants inscrits ce jour depuis Supabase
+            const dateISO = d.date ? `${d.date.getFullYear()}-${String(d.date.getMonth()+1).padStart(2,"0")}-${String(d.date.getDate()).padStart(2,"0")}` : "";
+            const resasJour = dbResasNat.filter(r => r.date_seance?.slice(0,10) === dateISO);
+            const enfantsJour = resasJour.flatMap(r => r.enfants || []);
             return (
               <div key={d.id} onClick={() => { setModalDay(d); setModalSession(null); }} style={{ background: "#fff", borderRadius: 18, padding: "14px 16px", boxShadow: "0 2px 10px rgba(0,0,0,0.05)", cursor: "pointer", transition: "transform .15s" }}
                 onMouseEnter={e => e.currentTarget.style.transform="translateY(-2px)"}
                 onMouseLeave={e => e.currentTarget.style.transform=""}
               >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <div style={{ fontWeight: 900, color: C.dark, fontSize: 14 }}>{d.label} {d.num} {d.month}</div>
                     <div style={{ fontSize: 10, color: C.ocean, fontWeight: 800 }}>👆 voir inscrits</div>
                   </div>
                   <div style={{ display: "flex", gap: 6 }}>
-                    <Pill color={C.green}>{avail}</Pill>
-                    <Pill color={C.coral}>{taken}</Pill>
+                    <Pill color={C.green}>{avail} libres</Pill>
+                    <Pill color={C.coral}>{taken} prises</Pill>
                   </div>
                 </div>
+                {/* Prénoms enfants inscrits */}
+                {enfantsJour.length > 0 && (
+                  <div style={{ display:"flex", gap:5, flexWrap:"wrap", marginBottom:8 }}>
+                    {enfantsJour.map((prenom, i) => (
+                      <div key={i} style={{ background:`${C.ocean}15`, color:C.ocean, borderRadius:8, padding:"2px 8px", fontSize:10, fontWeight:800 }}>
+                        👤 {prenom}
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <div style={{ background: "#EEF5FF", borderRadius: 50, height: 7, overflow: "hidden" }}>
                   <div style={{ height: "100%", width: `${rate}%`, background: `linear-gradient(90deg,${C.ocean},${C.sea})`, borderRadius: 50 }} />
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", marginTop: 5, fontSize: 10, color: "#bbb" }}>
                   <span>{slots.length} créneaux · {rate}% rempli</span>
-                  <span>{total} places totales</span>
+                  <span>{enfantsJour.length} enfant{enfantsJour.length>1?"s":""} inscrit{enfantsJour.length>1?"s":""}</span>
                 </div>
               </div>
             );
