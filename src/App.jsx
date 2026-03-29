@@ -3365,26 +3365,16 @@ function DayDetailModal({ day, activity, session, onClose, dbResasNat = [], dbRe
       const liste = [];
       resasJour.forEach(r => {
         const parentNom = r.membres ? `${r.membres.prenom} ${r.membres.nom}` : "—";
-        const enfants = r.membres?.enfants || [];
-        if (enfants.length > 0) {
-          enfants
-            .filter(e => e.activite === "club" || e.activite === "les deux")
-            .forEach(e => liste.push({
-            prenom: e.prenom, nom: e.nom || "",
-            naissance: e.naissance || "", activite: "club",
-            niveau: e.niveau || "", allergies: e.allergies || "",
-            parent: parentNom, parentColor: C.coral, parentAv: "👤",
-            phone: r.membres?.tel || "—",
-            session: r.session,
-          }));
-        } else {
-          liste.push({
-            prenom: r.membres?.prenom || "—", nom: r.membres?.nom || "",
-            naissance: "", activite: "club", niveau: "", allergies: "",
-            parent: parentNom, parentColor: C.coral, parentAv: "👤",
-            phone: r.membres?.tel || "—", session: r.session,
-          });
-        }
+        const enfants = (r.membres?.enfants || [])
+          .filter(e => e.activite === "club" || e.activite === "les deux");
+        enfants.forEach(e => liste.push({
+          prenom: e.prenom, nom: e.nom || "",
+          naissance: e.naissance || "", activite: "club",
+          niveau: e.niveau || "", allergies: e.allergies || "",
+          parent: parentNom, parentColor: C.coral, parentAv: "👤",
+          phone: r.membres?.tel || "—",
+          session: r.session,
+        }));
       });
       return liste.sort((a, b) => (a.nom||"").localeCompare(b.nom||""));
     }
@@ -3928,8 +3918,7 @@ th{background:#1A8FE3;color:#fff;padding:10px 12px;text-align:left}
                     {inscrits.flatMap(r => {
                       const enfants = (r.membres?.enfants || [])
                         .filter(e => e.activite === "club" || e.activite === "les deux");
-                      if (enfants.length > 0) return enfants.map(e => e.prenom);
-                      return [r.membres ? `${r.membres.prenom} ${r.membres.nom}` : "—"];
+                      return enfants.map(e => e.prenom);
                     }).slice(0,8).map((nom, i) => (
                       <div key={i} style={{ background:`${s.color}15`, color:s.color, borderRadius:8, padding:"2px 8px", fontSize:10, fontWeight:800 }}>
                         👤 {nom}
