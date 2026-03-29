@@ -3560,13 +3560,30 @@ function PlanningTab({ allSeasonSessions, clubPlaces, reservations = [] }) {
   const [dbResasNat, setDbResasNat] = useState([]);
   const [dbResasClub, setDbResasClub] = useState([]);
 
-  // Charger résas natation + club depuis Supabase
+  // Charger résas natation + club + enfants depuis Supabase
   useEffect(() => {
     sb.from("reservations_natation").select("*, membres(prenom, nom, tel)")
       .then(({ data }) => setDbResasNat(data || []))
       .catch(() => {});
-    sb.from("reservations_club").select("*, membres(prenom, nom, tel, enfants(prenom, nom, naissance, allergies, activite, niveau))")
-      .then(({ data }) => setDbResasClub(data || []))
+    // Charger résas club + enfants séparément
+    sb.from("reservations_club").select("*, membres(id, prenom, nom, tel)")
+      .then(async ({ data: resasData }) => {
+        if (!resasData?.length) { setDbResasClub([]); return; }
+        // Charger enfants pour chaque membre
+        const membreIds = [...new Set(resasData.map(r => r.membre_id).filter(Boolean))];
+        const { data: enfantsData } = await sb.from("enfants")
+          .select("membre_id, prenom, nom, activite, allergies, naissance, niveau")
+          .in("membre_id", membreIds);
+        // Joindre enfants dans chaque resa
+        const enriched = resasData.map(r => ({
+          ...r,
+          membres: r.membres ? {
+            ...r.membres,
+            enfants: (enfantsData || []).filter(e => e.membre_id === r.membre_id)
+          } : null
+        }));
+        setDbResasClub(enriched);
+      })
       .catch(() => {});
   }, []);
 
@@ -4716,7 +4733,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
       if (setAllSeasonSessions) setAllSeasonSessions(next);
     }).catch(() => {});
 
-    sb.from("reservations_club").select("*, membres(prenom, nom, email, tel, enfants(prenom, nom, naissance, allergies, activite, niveau))").order("created_at", { ascending: false })
+    sb.from("reservations_club").select("*, membres(id, prenom, nom, email, tel)").order("created_at", { ascending: false })
       .then(({ data }) => {
         setDbResasClub(data || []);
         if (data && setClubPlaces) {
