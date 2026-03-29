@@ -3367,7 +3367,9 @@ function DayDetailModal({ day, activity, session, onClose, dbResasNat = [], dbRe
         const parentNom = r.membres ? `${r.membres.prenom} ${r.membres.nom}` : "—";
         const enfants = r.membres?.enfants || [];
         if (enfants.length > 0) {
-          enfants.forEach(e => liste.push({
+          enfants
+            .filter(e => e.activite === "club" || e.activite === "les deux")
+            .forEach(e => liste.push({
             prenom: e.prenom, nom: e.nom || "",
             naissance: e.naissance || "", activite: "club",
             niveau: e.niveau || "", allergies: e.allergies || "",
@@ -3907,7 +3909,8 @@ th{background:#1A8FE3;color:#fff;padding:10px 12px;text-align:left}
                 {inscrits.length > 0 && (
                   <div style={{ display:"flex", gap:5, flexWrap:"wrap", marginBottom:8 }}>
                     {inscrits.flatMap(r => {
-                      const enfants = r.membres?.enfants || [];
+                      const enfants = (r.membres?.enfants || [])
+                        .filter(e => e.activite === "club" || e.activite === "les deux");
                       if (enfants.length > 0) return enfants.map(e => e.prenom);
                       return [r.membres ? `${r.membres.prenom} ${r.membres.nom}` : "—"];
                     }).slice(0,8).map((nom, i) => (
