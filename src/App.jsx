@@ -2686,13 +2686,19 @@ function FicheModal({ membre, onClose }) {
                   <div>
                     <div style={{ fontSize:11, fontWeight:900, color:C.coral, marginBottom:6, textTransform:"uppercase" }}>🏖️ Club · {resasClub.length} demi-journée{resasClub.length>1?"s":""}</div>
                     <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
-                      {resasClub.slice(0,5).map((r,i) => (
+                      {resasClub.slice(0,5).map((r,i) => {
+                        const enfantsClub = (membre.enfants || [])
+                          .filter(e => e.activite === "club" || e.activite === "les deux")
+                          .map(e => e.prenom);
+                        return (
                         <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", background:`${C.coral}08`, borderRadius:10, padding:"7px 10px" }}>
                           <div style={{ fontWeight:800, color:C.coral, fontSize:12 }}>{r.session==="matin"?"Matin":"Après-midi"}</div>
                           <div style={{ fontSize:11, color:"#888" }}>{r.date_reservation ? new Date(r.date_reservation).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}) : "—"}</div>
+                          {enfantsClub.length > 0 && <div style={{ fontSize:11, color:C.coral, fontWeight:700 }}>{enfantsClub.join(", ")}</div>}
                           <Pill color={C.green}>✓</Pill>
                         </div>
-                      ))}
+                        );
+                      })}
                       {resasClub.length > 5 && <div style={{ fontSize:11, color:"#aaa", textAlign:"center" }}>+{resasClub.length-5} demi-journées</div>}
                     </div>
                   </div>
