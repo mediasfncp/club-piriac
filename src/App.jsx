@@ -3522,16 +3522,20 @@ function PlanningTab({ allSeasonSessions, clubPlaces, reservations = [] }) {
   const [selectedDayId, setSelectedDayId] = useState(ALL_SEASON_DAYS[0]?.id);
   const [modalDay, setModalDay] = useState(null);
   const [modalSession, setModalSession] = useState(null);
-  const [dbResasNat, setDbResasNat] = useState([]); // résas natation Supabase
+  const [dbResasNat, setDbResasNat] = useState([]);
+  const [dbResasClub, setDbResasClub] = useState([]);
 
-  // Charger résas natation depuis Supabase
+  // Charger résas natation + club depuis Supabase
   useEffect(() => {
     sb.from("reservations_natation").select("*, membres(prenom, nom, tel)")
       .then(({ data }) => setDbResasNat(data || []))
       .catch(() => {});
+    sb.from("reservations_club").select("*, membres(prenom, nom, tel)")
+      .then(({ data }) => setDbResasClub(data || []))
+      .catch(() => {});
   }, []);
 
-  // Récupérer les enfants inscrits pour un jour + heure donnés
+  // Récupérer les enfants inscrits pour un jour + heure donnés (natation)
   const getEnfantsPourCreneau = (dayId, time) => {
     const dayObj = ALL_SEASON_DAYS.find(d => d.id === dayId);
     if (!dayObj?.date) return [];
@@ -3539,6 +3543,23 @@ function PlanningTab({ allSeasonSessions, clubPlaces, reservations = [] }) {
     return dbResasNat
       .filter(r => r.date_seance?.slice(0,10) === dateISO && r.heure === time)
       .flatMap(r => (r.enfants || []).map(e => ({ prenom: e, parent: r.membres ? `${r.membres.prenom} ${r.membres.nom}` : "—", tel: r.membres?.tel || "" })));
+  };
+
+  // Places club par date et session depuis Supabase
+  const getPlacesClub = (dayId, session) => {
+    const dayObj = ALL_SEASON_DAYS.find(d => d.id === dayId);
+    if (!dayObj?.date) return 45;
+    const dateISO = `${dayObj.date.getFullYear()}-${String(dayObj.date.getMonth()+1).padStart(2,"0")}-${String(dayObj.date.getDate()).padStart(2,"0")}`;
+    const taken = dbResasClub.filter(r => r.date_reservation?.slice(0,10) === dateISO && r.session === session).length;
+    return Math.max(0, 45 - taken);
+  };
+
+  // Membres inscrits club par date et session
+  const getMembresClub = (dayId, session) => {
+    const dayObj = ALL_SEASON_DAYS.find(d => d.id === dayId);
+    if (!dayObj?.date) return [];
+    const dateISO = `${dayObj.date.getFullYear()}-${String(dayObj.date.getMonth()+1).padStart(2,"0")}-${String(dayObj.date.getDate()).padStart(2,"0")}`;
+    return dbResasClub.filter(r => r.date_reservation?.slice(0,10) === dateISO && r.session === session);
   };
 
   // Build weeks from ALL_SEASON_DAYS
@@ -3821,16 +3842,20 @@ th{background:#1A8FE3;color:#fff;padding:10px 12px;text-align:left}
       {/* ── CLUB CONTENT ── */}
       {activity === "club" && viewMode === "jour" && (() => {
         const day = ALL_SEASON_DAYS.find(d => d.id === selectedDayId);
+        const SESSIONS_JOUR = [
+          { id:"matin",  label:"Matin",      horaires:"9h30 – 12h30",  color:C.coral, emoji:"☀️", places: getPlacesClub(selectedDayId,"matin")  },
+          { id:"apmidi", label:"Après-midi", horaires:"14h30 – 18h00", color:C.ocean, emoji:"🌊", places: getPlacesClub(selectedDayId,"apmidi") },
+        ];
         return (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {CLUB_SESSIONS.map(s => {
-              const day = ALL_SEASON_DAYS.find(d => d.id === selectedDayId);
+            {SESSIONS_JOUR.map(s => {
+              const inscrits = getMembresClub(selectedDayId, s.id);
               return (
               <div key={s.id} onClick={() => { setModalDay(day); setModalSession(s.id); }} style={{ background: "#fff", borderRadius: 20, padding: "16px 18px", boxShadow: "0 4px 16px rgba(0,0,0,0.06)", cursor: "pointer", transition: "transform .15s" }}
                 onMouseEnter={e => e.currentTarget.style.transform="translateY(-2px)"}
                 onMouseLeave={e => e.currentTarget.style.transform=""}
               >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <div style={{ width: 44, height: 44, borderRadius: 14, background: `linear-gradient(135deg,${s.color},${s.color}aa)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>{s.emoji}</div>
                     <div>
@@ -3844,6 +3869,17 @@ th{background:#1A8FE3;color:#fff;padding:10px 12px;text-align:left}
                     <div style={{ fontSize: 10, color: "#aaa" }}>/ 45 places</div>
                   </div>
                 </div>
+                {/* Membres inscrits */}
+                {inscrits.length > 0 && (
+                  <div style={{ display:"flex", gap:5, flexWrap:"wrap", marginBottom:8 }}>
+                    {inscrits.slice(0,6).map((r, i) => (
+                      <div key={i} style={{ background:`${s.color}15`, color:s.color, borderRadius:8, padding:"2px 8px", fontSize:10, fontWeight:800 }}>
+                        👤 {r.membres ? `${r.membres.prenom} ${r.membres.nom}` : "—"}
+                      </div>
+                    ))}
+                    {inscrits.length > 6 && <div style={{ fontSize:10, color:"#aaa" }}>+{inscrits.length-6}</div>}
+                  </div>
+                )}
                 <div style={{ background: "#f0f0f0", borderRadius: 50, height: 8, overflow: "hidden", marginBottom: 6 }}>
                   <div style={{ height: "100%", width: `${fillRate(s.places)}%`, background: `linear-gradient(90deg,${s.color},${s.color}cc)`, borderRadius: 50 }} />
                 </div>
@@ -3856,9 +3892,6 @@ th{background:#1A8FE3;color:#fff;padding:10px 12px;text-align:left}
                 </div>
               </div>
             );})}
-            <div style={{ background: `${C.coral}10`, borderRadius:16, padding:"10px 14px", fontSize:12, color:"#888" }}>
-              ℹ️ Les places Club sont globales à la saison et non par jour. Les chiffres reflètent le total disponible.
-            </div>
           </div>
         );
       })()}
@@ -3873,31 +3906,41 @@ th{background:#1A8FE3;color:#fff;padding:10px 12px;text-align:left}
               <div style={{ fontSize: 11, fontWeight: 900, color: C.coral, textAlign: "center" }}>☀️ MATIN</div>
               <div style={{ fontSize: 11, fontWeight: 900, color: C.ocean, textAlign: "center" }}>🌊 APRÈS-MIDI</div>
             </div>
-            {currentWeek.map((d, i) => (
+            {currentWeek.map((d, i) => {
+              const placesM = getPlacesClub(d.id, "matin");
+              const placesA = getPlacesClub(d.id, "apmidi");
+              return (
               <div key={d.id} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", padding: "12px 16px", borderTop: i > 0 ? "1px solid #F0F4F8" : "none", alignItems: "center" }}>
                 <div style={{ cursor: "pointer" }} onClick={() => { setModalDay(d); setModalSession(null); }}>
                   <div style={{ fontWeight: 900, color: C.dark, fontSize: 13 }}>{d.label} {d.num}</div>
                   <div style={{ fontSize: 10, color: "#bbb" }}>{d.month}</div>
                   <div style={{ fontSize: 9, color: C.coral, fontWeight: 800, marginTop: 2 }}>👆 inscrits</div>
                 </div>
-                {CLUB_SESSIONS.map(s => (
-                  <div key={s.id} style={{ textAlign: "center", cursor: "pointer" }} onClick={() => { setModalDay(d); setModalSession(s.id); }}>
-                    <div style={{ fontWeight: 900, color: placeColor(s.places), fontSize: 16 }}>{s.places}</div>
+                {[["matin", placesM, C.coral], ["apmidi", placesA, C.ocean]].map(([sess, places, col]) => (
+                  <div key={sess} style={{ textAlign: "center", cursor: "pointer" }} onClick={() => { setModalDay(d); setModalSession(sess); }}>
+                    <div style={{ fontWeight: 900, color: placeColor(places), fontSize: 16 }}>{places}</div>
+                    <div style={{ fontSize: 9, color: "#888" }}>{45-places} inscrits</div>
                     <div style={{ background: "#f0f0f0", borderRadius: 50, height: 4, overflow: "hidden", margin: "4px 8px 0" }}>
-                      <div style={{ height: "100%", width: `${fillRate(s.places)}%`, background: s.color, borderRadius: 50 }} />
+                      <div style={{ height: "100%", width: `${fillRate(places)}%`, background: col, borderRadius: 50 }} />
                     </div>
-                    <div style={{ fontSize: 9, color: "#bbb", marginTop: 2 }}>{fillRate(s.places)}%</div>
+                    <div style={{ fontSize: 9, color: "#bbb", marginTop: 2 }}>{fillRate(places)}%</div>
                   </div>
                 ))}
               </div>
-            ))}
+            );})}
             {/* Totaux semaine */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", padding: "12px 16px", background: "#F8FBFF", borderTop: "2px solid #EEF5FF" }}>
               <div style={{ fontSize: 12, fontWeight: 900, color: "#2C3E50" }}>SEMAINE</div>
-              {CLUB_SESSIONS.map(s => (
-                <div key={s.id} style={{ textAlign: "center" }}>
-                  <div style={{ fontWeight: 900, color: placeColor(s.places), fontSize: 15 }}>{s.places} pl.</div>
-                  <div style={{ fontSize: 10, color: "#aaa" }}>{45 - s.places} inscrits</div>
+              {["matin","apmidi"].map((sess, si) => {
+                const totalInscrits = currentWeek.reduce((acc,d) => acc + (45 - getPlacesClub(d.id, sess)), 0);
+                const col = si===0 ? C.coral : C.ocean;
+                return (
+                  <div key={sess} style={{ textAlign: "center" }}>
+                    <div style={{ fontWeight: 900, color: col, fontSize: 15 }}>{totalInscrits} inscrits</div>
+                    <div style={{ fontSize: 10, color: "#aaa" }}>{currentWeek.length * 45 - totalInscrits} places libres</div>
+                  </div>
+                );
+              })}
                 </div>
               ))}
             </div>
