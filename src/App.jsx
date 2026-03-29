@@ -12,6 +12,9 @@ import {
    🌊 FNCP – Club de Plage  |  Univers Joyeux Plage & Enfants
    ═══════════════════════════════════════════════════════ */
 
+// Helper — nom toujours en majuscules
+const NOM = (n) => (n || "").toUpperCase();
+
 const C = {
   sun:    "#FFD93D",
   sunset: "#FF6B6B",
@@ -633,9 +636,10 @@ function HomeScreen({ onNav, user }) {
             <span style={{ color: "#fff", fontSize: 18, fontWeight: 900, letterSpacing: 4, textTransform: "uppercase" }}>FNCP</span>
           </div>
           <h1 style={{ color: "#fff", fontSize: 29, margin: "6px 0 2px", fontWeight: 900, textShadow: "0 3px 14px rgba(0,0,0,0.22)", letterSpacing: -0.5 }}>Clubs de Plage</h1>
-          <p style={{ color: "rgba(255,255,255,0.9)", fontSize: 14, margin: "0 0 6px", fontWeight: 700 }}>
-            {user ? `Bonjour ${user.prenom} 👋 Prêt pour passer un été incroyable ? ☀️` : "Club de plage · Natation · Soleil pour tous !"}
+          <p style={{ color: "rgba(255,255,255,0.9)", fontSize: 14, margin: "0 0 2px", fontWeight: 700 }}>
+            {user ? `Bonjour ${user.prenom} 👋` : "Club de plage · Natation · Soleil pour tous !"}
           </p>
+          {user && <p style={{ color: "rgba(255,255,255,0.85)", fontSize: 13, margin: "0 0 6px", fontWeight: 600 }}>Prêt pour passer un été incroyable ? ☀️</p>}
         </div>
         <Wave fill={C.shell} />
       </div>
@@ -875,7 +879,7 @@ function FormulesEveilScreen({ onNav, user }) {
           <div style={{ background: "#fff", borderRadius: 20, padding: 18, boxShadow: "0 4px 16px rgba(0,0,0,0.06)" }}>
             <h3 style={{ color: C.dark, margin: "0 0 10px", fontSize: 15 }}>👤 Parent / Responsable</h3>
             <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "6px 12px", fontSize: 14 }}>
-              <span style={{ color: "#aaa" }}>Nom</span><strong>{user?.prenom} {user?.nom || "—"}</strong>
+              <span style={{ color: "#aaa" }}>Nom</span><strong>{user?.prenom} {NOM(user?.nom)}</strong>
               <span style={{ color: "#aaa" }}>Email</span><span>{user?.email || "—"}</span>
               <span style={{ color: "#aaa" }}>Tél.</span><span>{user?.tel || "—"}</span>
             </div>
@@ -1414,7 +1418,7 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser }) 
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontWeight: 800, color: C.dark, fontSize: 13, marginBottom: 8 }}>Type de session</div>
               <div style={{ display: "flex", gap: 8 }}>
-                {[["matin", "☀️ Matin", C.coral], ["apmidi", "🌊 Après-midi", C.ocean], ["journee", "🌞 Journée", C.green]].map(([k, l, col]) => {
+                {[["matin", "Matin", C.coral], ["apmidi", "Après-midi", C.ocean], ["journee", "Journée", C.green]].map(([k, l, col]) => {
                   const placesLeft = clubPlaces ? (clubPlaces[k] || 45) : 45;
                   const full = placesLeft === 0;
                   return (
@@ -1702,7 +1706,7 @@ function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSession
         <Card>
           <h3 style={{ color:C.dark, margin:"0 0 10px", fontSize:15 }}>👤 Parent / Responsable</h3>
           <div style={{ display:"grid", gridTemplateColumns:"auto 1fr", gap:"6px 12px", fontSize:14 }}>
-            <span style={{ color:"#aaa" }}>Nom</span><strong>{user?.prenom} {user?.nom||"—"}</strong>
+            <span style={{ color:"#aaa" }}>Nom</span><strong>{user?.prenom} {NOM(user?.nom)}</strong>
             <span style={{ color:"#aaa" }}>Email</span><span>{user?.email||"—"}</span>
             <span style={{ color:"#aaa" }}>Tél.</span><span>{user?.tel||"—"}</span>
           </div>
@@ -2045,7 +2049,7 @@ function InscriptionScreen({ onNav, setUser }) {
             {form.enfants.map(e => (
               <div key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: `${C.sea}18`, border: `2px solid ${C.sea}40`, borderRadius: 14, padding: "10px 14px", marginBottom: 10 }}>
                 <div>
-                  <div style={{ fontWeight: 800, color: C.dark }}>{e.prenom} {e.nom}</div>
+                  <div style={{ fontWeight: 800, color: C.dark }}>{e.prenom} {NOM(e.nom)}</div>
                   <div style={{ fontSize: 12, color: "#888" }}>
                     {e.naissance ? e.naissance.split("-").reverse().join("/") : ""} · {e.activite === "club" ? "🏖️ Club" : e.activite === "natation" ? "🏊 Natation" : "🏖️🏊 Club & Natation"}
                     {e.activite !== "club" && ` · ${e.niveau}`}
@@ -2124,7 +2128,7 @@ function InscriptionScreen({ onNav, setUser }) {
           <Card>
             <h3 style={{ color: C.dark, marginTop: 0 }}>✅ Récapitulatif</h3>
             <div style={{ background: `${C.sea}15`, border: `2px solid ${C.sea}40`, borderRadius: 14, padding: 14, marginBottom: 14 }}>
-              <div style={{ fontWeight: 900, fontSize: 17, color: C.dark }}>{form.prenom} {form.nom}</div>
+              <div style={{ fontWeight: 900, fontSize: 17, color: C.dark }}>{form.prenom} {NOM(form.nom)}</div>
               <div style={{ color: "#666", fontSize: 14 }}>{form.email} · {form.tel}{form.tel2 ? ` · ${form.tel2}` : ""}</div>
             </div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
@@ -2135,7 +2139,7 @@ function InscriptionScreen({ onNav, setUser }) {
             </div>
             {form.enfants.length === 0 ? <p style={{ color: "#bbb", fontSize: 14 }}>Aucun enfant ajouté</p> : form.enfants.map(e => (
               <div key={e.id} style={{ background: `${C.sun}30`, borderRadius: 12, padding: "8px 14px", marginBottom: 8 }}>
-                <div style={{ fontWeight: 700 }}>{e.prenom} {e.nom} <span style={{ fontWeight: 500, fontSize: 13, color: "#666" }}>— {e.activite === "club" ? "🏖️ Club" : e.activite === "natation" ? "🏊 Natation" : "🏖️🏊 Club & Natation"}{e.activite !== "club" ? ` · ${e.niveau}` : ""}</span></div>
+                <div style={{ fontWeight: 700 }}>{e.prenom} {NOM(e.nom)} <span style={{ fontWeight: 500, fontSize: 13, color: "#666" }}>— {e.activite === "club" ? "🏖️ Club" : e.activite === "natation" ? "🏊 Natation" : "🏖️🏊 Club & Natation"}{e.activite !== "club" ? ` · ${e.niveau}` : ""}</span></div>
                 {e.allergies && <div style={{ fontSize: 12, color: C.sunset, marginTop: 2 }}>⚠️ {e.allergies}</div>}
               </div>
             ))}
@@ -2187,6 +2191,7 @@ function InscriptionScreen({ onNav, setUser }) {
 
 // ── INFOS ─────────────────────────────────────────────────
 function InfosScreen({ onNav }) {
+  const [showCGV, setShowCGV] = useState(false);
   return (
     <div style={{ background: C.shell, minHeight: "100%" }}>
       <div style={{ background: `linear-gradient(135deg, #9B59B6, #8E44AD)`, padding: "20px 20px 0" }}>
@@ -2256,44 +2261,53 @@ function InfosScreen({ onNav }) {
           </div>
         </Card>
 
-        {/* CGV */}
-        <Card style={{ border: `2px solid ${C.deep}22` }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-            <div style={{ width: 40, height: 40, borderRadius: 14, background: `linear-gradient(135deg, ${C.deep}, ${C.ocean})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>📄</div>
-            <div>
-              <h3 style={{ color: C.deep, margin: 0, fontSize: 15 }}>Conditions Générales de Vente</h3>
-              <div style={{ fontSize: 11, color: "#aaa" }}>Saison 2026</div>
-            </div>
+        {/* CGV — bouton cliquable */}
+        <div onClick={() => setShowCGV(true)} style={{ background:"#fff", borderRadius:20, padding:"16px 18px", boxShadow:"0 4px 16px rgba(0,0,0,0.06)", display:"flex", alignItems:"center", gap:14, cursor:"pointer" }}>
+          <div style={{ width:48, height:48, borderRadius:16, background:`linear-gradient(135deg,${C.deep},${C.ocean})`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:24, flexShrink:0 }}>📄</div>
+          <div style={{ flex:1 }}>
+            <div style={{ fontWeight:900, color:C.deep, fontSize:15 }}>Conditions Générales de Vente</div>
+            <div style={{ fontSize:12, color:"#aaa" }}>Saison 2026 · Appuyez pour consulter</div>
           </div>
+          <div style={{ fontSize:20, color:"#ddd" }}>›</div>
+        </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {/* Remboursement */}
-            <div style={{ background: `${C.sunset}12`, border: `1.5px solid ${C.sunset}40`, borderRadius: 14, padding: "12px 14px" }}>
-              <div style={{ fontWeight: 900, color: C.sunset, fontSize: 13, marginBottom: 6 }}>💶 Remboursement</div>
-              <div style={{ fontSize: 13, color: "#555", lineHeight: 1.7 }}>
-                Aucune prestation ne pourra être remboursée, <strong>excepté sur présentation d'une attestation médicale</strong> justifiant l'impossibilité de participer aux activités.
+        {/* Modal CGV */}
+        {showCGV && (
+          <div style={{ position:"fixed", inset:0, zIndex:1100, display:"flex", flexDirection:"column" }}>
+            <div onClick={() => setShowCGV(false)} style={{ position:"absolute", inset:0, background:"rgba(0,20,50,0.65)", backdropFilter:"blur(5px)" }} />
+            <div style={{ position:"relative", marginTop:"auto", background:"#F0F4F8", borderRadius:"28px 28px 0 0", maxHeight:"92vh", display:"flex", flexDirection:"column", boxShadow:"0 -12px 48px rgba(0,0,0,0.3)" }}>
+              <div style={{ display:"flex", justifyContent:"center", padding:"12px 0 4px" }}>
+                <div style={{ width:40, height:5, borderRadius:10, background:"#ddd" }} />
+              </div>
+              <div style={{ background:`linear-gradient(135deg,${C.deep},${C.ocean})`, margin:"0 16px", borderRadius:20, padding:"14px 18px", position:"relative" }}>
+                <button onClick={() => setShowCGV(false)} style={{ position:"absolute", top:10, right:12, background:"rgba(255,255,255,0.25)", border:"none", color:"#fff", borderRadius:"50%", width:30, height:30, cursor:"pointer", fontWeight:900, fontSize:16, fontFamily:"inherit" }}>✕</button>
+                <div style={{ color:"#fff", fontWeight:900, fontSize:17 }}>📄 Conditions Générales de Vente</div>
+                <div style={{ color:"rgba(255,255,255,0.8)", fontSize:12, marginTop:2 }}>Saison 2026</div>
+              </div>
+              <div style={{ overflowY:"auto", padding:"16px 16px 28px", display:"flex", flexDirection:"column", gap:10 }}>
+                <div style={{ background:`${C.sunset}12`, border:`1.5px solid ${C.sunset}40`, borderRadius:14, padding:"12px 14px" }}>
+                  <div style={{ fontWeight:900, color:C.sunset, fontSize:13, marginBottom:6 }}>💶 Remboursement</div>
+                  <div style={{ fontSize:13, color:"#555", lineHeight:1.7 }}>Aucune prestation ne pourra être remboursée, <strong>excepté sur présentation d'une attestation médicale</strong> justifiant l'impossibilité de participer aux activités.</div>
+                </div>
+                {[
+                  { icon:"📅", title:"Validité", text:"Les forfaits et cartes Liberté sont valables uniquement sur la saison 2026, du 6 juillet au 22 août. Aucun report sur une saison ultérieure n'est possible." },
+                  { icon:"🔄", title:"Report de séance", text:"En cas d'annulation par le club (météo, force majeure), les séances seront reportées ou remboursées au prorata." },
+                  { icon:"👶", title:"Responsabilité", text:"Les enfants sont placés sous la responsabilité des moniteurs diplômés pendant la durée de la prestation. Les parents sont responsables avant et après la séance." },
+                  { icon:"⚠️", title:"Informations médicales", text:"Tout problème de santé, allergie ou contre-indication doit être signalé lors de l'inscription. Le club se réserve le droit de refuser un enfant pour des raisons de sécurité." },
+                ].map(item => (
+                  <div key={item.title} style={{ background:"#fff", borderRadius:14, padding:"12px 14px" }}>
+                    <div style={{ fontWeight:900, color:C.deep, fontSize:13, marginBottom:4 }}>{item.icon} {item.title}</div>
+                    <div style={{ fontSize:13, color:"#666", lineHeight:1.6 }}>{item.text}</div>
+                  </div>
+                ))}
+                <div style={{ background:"#F0F4F8", borderRadius:12, padding:"10px 12px", fontSize:11, color:"#888", textAlign:"center" }}>
+                  En effectuant une réservation, vous acceptez l'intégralité des présentes CGV.<br />
+                  <span style={{ color:C.ocean, fontWeight:700 }}>FNCP · Club de Plage · La Baule · Saison 2026</span>
+                </div>
               </div>
             </div>
-
-            {/* Autres points */}
-            {[
-              { icon: "📅", title: "Validité", text: "Les forfaits et cartes Liberté sont valables uniquement sur la saison 2026, du 6 juillet au 22 août. Aucun report sur une saison ultérieure n'est possible." },
-              { icon: "🔄", title: "Report de séance", text: "En cas d'annulation par le club (météo, force majeure), les séances seront reportées ou remboursées au prorata." },
-              { icon: "👶", title: "Responsabilité", text: "Les enfants sont placés sous la responsabilité des moniteurs diplômés pendant la durée de la prestation. Les parents sont responsables avant et après la séance." },
-              { icon: "⚠️", title: "Informations médicales", text: "Tout problème de santé, allergie ou contre-indication doit être signalé lors de l'inscription. Le club se réserve le droit de refuser un enfant pour des raisons de sécurité." },
-            ].map(item => (
-              <div key={item.title} style={{ background: "#F8FBFF", borderRadius: 14, padding: "12px 14px" }}>
-                <div style={{ fontWeight: 900, color: C.deep, fontSize: 13, marginBottom: 4 }}>{item.icon} {item.title}</div>
-                <div style={{ fontSize: 13, color: "#666", lineHeight: 1.6 }}>{item.text}</div>
-              </div>
-            ))}
           </div>
-
-          <div style={{ marginTop: 14, background: "#F0F4F8", borderRadius: 12, padding: "10px 12px", fontSize: 11, color: "#888", textAlign: "center" }}>
-            En effectuant une réservation, vous acceptez l'intégralité des présentes CGV.<br />
-            <span style={{ color: C.ocean, fontWeight: 700 }}>FNCP · Club de Plage · La Baule · Saison 2026</span>
-          </div>
-        </Card>
+        )}
       </div>
     </div>
   );
@@ -2506,7 +2520,7 @@ function FicheEnfantModal({ enfant, onClose }) {
           <div style={{ display:"flex", alignItems:"center", gap:14 }}>
             <div style={{ width:60, height:60, borderRadius:20, background:"rgba(255,255,255,0.25)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:32 }}>👧</div>
             <div>
-              <div style={{ color:"#fff", fontWeight:900, fontSize:20 }}>{enfant.prenom} {enfant.nom}</div>
+              <div style={{ color:"#fff", fontWeight:900, fontSize:20 }}>{enfant.prenom} {NOM(enfant.nom)}</div>
               <div style={{ color:"rgba(255,255,255,0.85)", fontSize:13 }}>{age} ans · {actLabel}</div>
               {enfant.parent && <div style={{ color:"rgba(255,255,255,0.75)", fontSize:12, marginTop:2 }}>👤 {enfant.parent}</div>}
             </div>
@@ -2589,7 +2603,7 @@ function FicheModal({ membre, onClose }) {
             {membre.enfants.map((e, i) => (
               <div key={i} style={{ background: "#F8FBFF", borderRadius: 14, padding: "10px 14px", marginBottom: 8 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                  <div style={{ fontWeight: 900, color: "#2C3E50", fontSize: 14 }}>{e.prenom} {e.nom}</div>
+                  <div style={{ fontWeight: 900, color: "#2C3E50", fontSize: 14 }}>{e.prenom} {NOM(e.nom)}</div>
                   <div style={{ fontSize: 11, color: "#888" }}>Né(e) le {e.naissance.split("-").reverse().join("/")}</div>
                 </div>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -2738,7 +2752,7 @@ function ModifierMembreModal({ membre, onClose, onSaved }) {
         <div style={{ background:`linear-gradient(135deg,${C.coral},${C.sun})`, margin:"0 16px", borderRadius:20, padding:"14px 18px", position:"relative" }}>
           <button onClick={onClose} style={{ position:"absolute", top:10, right:12, background:"rgba(255,255,255,0.25)", border:"none", color:"#fff", borderRadius:"50%", width:30, height:30, cursor:"pointer", fontWeight:900, fontSize:16, fontFamily:"inherit" }}>✕</button>
           <div style={{ color:"#fff", fontWeight:900, fontSize:17 }}>✏️ Modifier le membre</div>
-          <div style={{ color:"rgba(255,255,255,0.85)", fontSize:13, marginTop:2 }}>{form.prenom} {form.nom}</div>
+          <div style={{ color:"rgba(255,255,255,0.85)", fontSize:13, marginTop:2 }}>{form.prenom} {NOM(form.nom)}</div>
         </div>
         <div style={{ overflowY:"auto", padding:"16px 16px 28px", display:"flex", flexDirection:"column", gap:10 }}>
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
@@ -3065,7 +3079,7 @@ function RechercheTab({ allResas, sessions, dbMembres }) {
               <div key={i} onClick={() => setSelectedEnfant(e)} style={{ background:"#fff", borderRadius:16, padding:"12px 14px", boxShadow:"0 2px 8px rgba(0,0,0,0.06)", display:"flex", alignItems:"center", gap:12, marginBottom:8, cursor:"pointer" }}>
                 <div style={{ width:42, height:42, borderRadius:14, background:`linear-gradient(135deg,${e.parentColor},${e.parentColor}bb)`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0 }}>👧</div>
                 <div style={{ flex:1 }}>
-                  <div style={{ fontWeight:900, color:"#2C3E50", fontSize:13 }}>{e.prenom} {e.nom}</div>
+                  <div style={{ fontWeight:900, color:"#2C3E50", fontSize:13 }}>{e.prenom} {NOM(e.nom)}</div>
                   <div style={{ fontSize:11, color:"#aaa" }}>{age} ans · Parent : {e.parent}</div>
                   <div style={{ display:"flex", gap:5, marginTop:4, flexWrap:"wrap" }}>
                     <Pill color={actColor}>{e.activite === "natation" ? "🏊 Natation" : e.activite === "club" ? "🏖️ Club" : "🏊🏖️ Les deux"}</Pill>
@@ -4489,7 +4503,7 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
             <select value={membreId} onChange={e => handleMembreChange(e.target.value)}
               style={{ width:"100%", border:"2px solid #e0e8f0", borderRadius:12, padding:"10px 12px", fontSize:14, fontFamily:"inherit", outline:"none", background:"#fff" }}>
               <option value="">— Sélectionner —</option>
-              {dbMembres.map(m => <option key={m.id} value={m.id}>{m.prenom} {m.nom}</option>)}
+              {dbMembres.map(m => <option key={m.id} value={m.id}>{m.prenom} {NOM(m.nom)}</option>)}
             </select>
           </div>
 
@@ -4511,7 +4525,7 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
                     }}>
                       <div style={{ width:28, height:28, borderRadius:8, background: sel ? C.ocean : "#f0f0f0", display:"flex", alignItems:"center", justifyContent:"center", color: sel?"#fff":"#bbb", fontWeight:900, fontSize:13 }}>{sel?"✓":""}</div>
                       <div style={{ flex:1 }}>
-                        <div style={{ fontWeight:900, color:"#2C3E50", fontSize:13 }}>{e.prenom} {e.nom}</div>
+                        <div style={{ fontWeight:900, color:"#2C3E50", fontSize:13 }}>{e.prenom} {NOM(e.nom)}</div>
                         <div style={{ fontSize:11, color:"#aaa" }}>{calcAge(e.naissance)} ans</div>
                       </div>
                       {e.allergies && <div style={{ background:"#FFF0F0", color:C.sunset, borderRadius:50, padding:"2px 8px", fontSize:10, fontWeight:800 }}>⚠️</div>}
@@ -4568,7 +4582,7 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
               <div>
                 <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, textTransform:"uppercase" }}>Formule</label>
                 <div style={{ display:"flex", gap:6 }}>
-                  {[["unite","📅 Unité"],["semaines","🗓️ Semaine(s)"],["liberte","🎟️ Carte Liberté"]].map(([k,l]) => (
+                  {[["unite","Unité"],["semaines","Semaine(s)"],["liberte","Carte Liberté"]].map(([k,l]) => (
                     <button key={k} onClick={() => { setForfaitClub(k); setSelectedWeeks([]); setSeancesClub([{date:"",session:"matin"}]); }} style={{ flex:1, background: forfaitClub===k ? C.coral : "#f0f0f0", color: forfaitClub===k ? "#fff" : "#888", border:"none", borderRadius:12, padding:"8px 4px", cursor:"pointer", fontWeight:800, fontSize:10, fontFamily:"inherit" }}>{l}</button>
                   ))}
                 </div>
@@ -4641,7 +4655,7 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
                     <div style={{ marginTop:12 }}>
                       <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, textTransform:"uppercase" }}>Session</label>
                       <div style={{ display:"flex", gap:8 }}>
-                        {[["matin","☀️ Matin"],["apmidi","🌊 Après-midi"],["journee","🌅 Journée"]].map(([k,l]) => (
+                        {[["matin","Matin"],["apmidi","Après-midi"],["journee","Journée"]].map(([k,l]) => (
                           <button key={k} onClick={() => setSessionClub(k)} style={{ flex:1, background: sessionClub===k ? C.coral : "#f0f0f0", color: sessionClub===k ? "#fff" : "#888", border:"none", borderRadius:12, padding:"8px 4px", cursor:"pointer", fontWeight:800, fontSize:10, fontFamily:"inherit" }}>{l}</button>
                         ))}
                       </div>
@@ -4943,7 +4957,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                 <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: i < Math.min(dbMembres.length,5)-1 ? "1px solid #F0F4F8" : "none" }}>
                   <div style={{ width: 38, height: 38, borderRadius: 12, background: `linear-gradient(135deg, ${C.ocean}, ${C.sea})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>👤</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 800, color: "#2C3E50", fontSize: 13 }}>{m.prenom} {m.nom}</div>
+                    <div style={{ fontWeight: 800, color: "#2C3E50", fontSize: 13 }}>{m.prenom} {NOM(m.nom)}</div>
                     <div style={{ fontSize: 11, color: "#aaa" }}>{m.email}</div>
                     <div style={{ fontSize: 10, color: "#bbb" }}>
                       {m.enfants?.length || 0} enfant{(m.enfants?.length||0)>1?"s":""} · {new Date(m.created_at).toLocaleDateString("fr-FR")}
@@ -5133,6 +5147,125 @@ function BottomNav({ current, onNav }) {
 // ── ADMIN CODE ACCESS ─────────────────────────────────────
 const ADMIN_CODE = "club2026";
 
+function ProfilConnecte({ user, setUser, setScreen, reservations }) {
+  const [resasNat, setResasNat] = useState([]);
+  const [resasClub, setResasClub] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user?.supabaseId) { setLoading(false); return; }
+    Promise.all([
+      sb.from("reservations_natation").select("*").eq("membre_id", user.supabaseId).order("date_seance"),
+      sb.from("reservations_club").select("*").eq("membre_id", user.supabaseId).order("date_reservation"),
+    ]).then(([{data: nat}, {data: club}]) => {
+      setResasNat(nat || []);
+      setResasClub(club || []);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, [user?.supabaseId]);
+
+  return (
+    <>
+      <Card style={{ marginTop:14, textAlign:"center" }}>
+        <div style={{ width:80, height:80, borderRadius:26, background:`linear-gradient(135deg,${C.ocean},${C.sea})`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:40, margin:"0 auto 14px" }}>👤</div>
+        <h2 style={{ color:C.dark, margin:"0 0 4px" }}>{user.prenom} {NOM(user.nom)}</h2>
+        <p style={{ color:"#888", fontSize:14, margin:"0 0 2px" }}>{user.email}</p>
+        <p style={{ color:"#888", fontSize:14, margin:"0 0 16px" }}>{user.tel}</p>
+        {user.enfants?.length > 0 && <div style={{ marginBottom:16, display:"flex", gap:6, flexWrap:"wrap", justifyContent:"center" }}>{user.enfants.map(e => <Pill key={e.id} color={C.sea}>{e.prenom}</Pill>)}</div>}
+        <SunBtn color={C.sunset} onClick={async () => {
+          try { await sb.auth.signOut(); } catch(e) {}
+          setUser(null); setScreen("home");
+        }}>Se déconnecter</SunBtn>
+      </Card>
+
+      <div style={{ marginTop:16 }}>
+        <div style={{ fontWeight:900, color:C.dark, fontSize:14, marginBottom:10 }}>🎫 Mes accès saison 2026</div>
+
+        {/* Carte Liberté */}
+        {(user.liberteBalance > 0 || user.liberteTotal > 0) ? (
+          <div style={{ background:`linear-gradient(135deg,${C.coral},${C.sun})`, borderRadius:20, padding:18, marginBottom:12, boxShadow:`0 6px 20px ${C.coral}44` }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
+              <div>
+                <div style={{ color:"#fff", fontWeight:900, fontSize:16 }}>🎟️ Carte Liberté</div>
+                <div style={{ color:"rgba(255,255,255,0.8)", fontSize:11 }}>Valable saison 2026 · 6 juil – 22 août</div>
+              </div>
+              <div style={{ textAlign:"right" }}>
+                <div style={{ color:"#fff", fontWeight:900, fontSize:28, lineHeight:1 }}>{user.liberteBalance || 0}</div>
+                <div style={{ color:"rgba(255,255,255,0.8)", fontSize:11 }}>demi-j. restantes</div>
+              </div>
+            </div>
+            <div style={{ background:"rgba(255,255,255,0.25)", borderRadius:50, height:8, overflow:"hidden", marginBottom:8 }}>
+              <div style={{ height:"100%", width:`${((user.liberteBalance||0)/(user.liberteTotal||1))*100}%`, background:"#fff", borderRadius:50 }} />
+            </div>
+            <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, color:"rgba(255,255,255,0.75)" }}>
+              <span>{(user.liberteTotal||0)-(user.liberteBalance||0)} utilisée{((user.liberteTotal||0)-(user.liberteBalance||0))>1?"s":""}</span>
+              <span>{user.liberteTotal||0} au total</span>
+            </div>
+            {(user.liberteBalance||0) > 0 && (
+              <div style={{ marginTop:12 }}>
+                <button onClick={() => setScreen("reservation-club")} style={{ width:"100%", background:"rgba(255,255,255,0.25)", border:"2px solid rgba(255,255,255,0.5)", color:"#fff", borderRadius:50, padding:"11px", fontWeight:900, fontSize:14, cursor:"pointer", fontFamily:"inherit" }}>
+                  📅 Réserver avec ma carte
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div style={{ background:"#fff", borderRadius:18, padding:16, marginBottom:12, boxShadow:"0 2px 10px rgba(0,0,0,0.06)", display:"flex", alignItems:"center", gap:12 }}>
+            <div style={{ fontSize:32 }}>🎟️</div>
+            <div style={{ flex:1 }}>
+              <div style={{ fontWeight:800, color:C.dark }}>Carte Liberté</div>
+              <div style={{ fontSize:12, color:"#aaa" }}>Pas encore de carte active</div>
+            </div>
+            <button onClick={() => setScreen("prestations")} style={{ background:`linear-gradient(135deg,${C.coral},${C.sun})`, border:"none", color:"#fff", borderRadius:50, padding:"8px 14px", fontWeight:900, fontSize:12, cursor:"pointer", fontFamily:"inherit" }}>Acheter</button>
+          </div>
+        )}
+
+        {/* Réservations Natation */}
+        <div style={{ background:"#fff", borderRadius:18, padding:16, marginBottom:12, boxShadow:"0 2px 10px rgba(0,0,0,0.06)" }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+            <div style={{ fontWeight:800, color:C.dark, fontSize:15 }}>🏊 Natation</div>
+            <Pill color={C.ocean}>{resasNat.length} séance{resasNat.length>1?"s":""}</Pill>
+          </div>
+          {loading ? <div style={{ fontSize:12, color:"#bbb", textAlign:"center" }}>Chargement…</div>
+          : resasNat.length === 0 ? <div style={{ fontSize:12, color:"#bbb", textAlign:"center", padding:"8px 0" }}>Aucune séance réservée</div>
+          : <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+              {resasNat.slice(0,4).map((r,i) => (
+                <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", background:`${C.ocean}08`, borderRadius:12, padding:"8px 12px" }}>
+                  <div style={{ fontSize:13, fontWeight:800, color:C.ocean }}>{r.heure}</div>
+                  <div style={{ fontSize:11, color:"#888" }}>{r.date_seance ? new Date(r.date_seance).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}) : "—"}</div>
+                  <Pill color={C.green}>✓</Pill>
+                </div>
+              ))}
+              {resasNat.length > 4 && <div style={{ fontSize:11, color:"#aaa", textAlign:"center" }}>+{resasNat.length-4} séances</div>}
+            </div>
+          }
+        </div>
+
+        {/* Réservations Club */}
+        <div style={{ background:"#fff", borderRadius:18, padding:16, marginBottom:12, boxShadow:"0 2px 10px rgba(0,0,0,0.06)" }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+            <div style={{ fontWeight:800, color:C.dark, fontSize:15 }}>🏖️ Club de Plage</div>
+            <Pill color={C.coral}>{resasClub.length} demi-j.</Pill>
+          </div>
+          {loading ? <div style={{ fontSize:12, color:"#bbb", textAlign:"center" }}>Chargement…</div>
+          : resasClub.length === 0 ? <div style={{ fontSize:12, color:"#bbb", textAlign:"center", padding:"8px 0" }}>Aucune réservation club</div>
+          : <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+              {resasClub.slice(0,4).map((r,i) => (
+                <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", background:`${C.coral}08`, borderRadius:12, padding:"8px 12px" }}>
+                  <div style={{ fontSize:12, fontWeight:800, color:C.coral }}>{r.session==="matin"?"Matin":"Après-midi"}</div>
+                  <div style={{ fontSize:11, color:"#888" }}>{r.date_reservation ? new Date(r.date_reservation).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}) : "—"}</div>
+                  <Pill color={C.green}>✓</Pill>
+                </div>
+              ))}
+              {resasClub.length > 4 && <div style={{ fontSize:11, color:"#aaa", textAlign:"center" }}>+{resasClub.length-4} demi-journées</div>}
+            </div>
+          }
+        </div>
+      </div>
+    </>
+  );
+}
+
 function AdminCodeAccess({ onUnlock }) {
   const [open, setOpen]   = useState(false);
   const [code, setCode]   = useState("");
@@ -5304,88 +5437,7 @@ export default function App() {
         <div style={{ padding:24, background:C.shell, minHeight:"100%" }}>
           <button onClick={() => setScreen("home")} style={{ background:"none", border:"none", fontSize:22, cursor:"pointer" }}>←</button>
           {user ? (
-            <>
-              <Card style={{ marginTop:14, textAlign:"center" }}>
-                <div style={{ width:80, height:80, borderRadius:26, background:`linear-gradient(135deg,${C.ocean},${C.sea})`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:40, margin:"0 auto 14px" }}>👤</div>
-                <h2 style={{ color:C.dark, margin:"0 0 4px" }}>{user.prenom} {user.nom}</h2>
-                <p style={{ color:"#888", fontSize:14, margin:"0 0 2px" }}>{user.email}</p>
-                <p style={{ color:"#888", fontSize:14, margin:"0 0 16px" }}>{user.tel}</p>
-                {user.enfants?.length > 0 && <div style={{ marginBottom:16, display:"flex", gap:6, flexWrap:"wrap", justifyContent:"center" }}>{user.enfants.map(e => <Pill key={e.id} color={C.sea}>{e.prenom}</Pill>)}</div>}
-                <SunBtn color={C.sunset} onClick={async () => {
-                  try { await sb.auth.signOut(); } catch(e) {}
-                  setUser(null); setScreen("home");
-                }}>Se déconnecter</SunBtn>
-              </Card>
-
-              {/* Mes accès */}
-              <div style={{ marginTop:16 }}>
-                <div style={{ fontWeight:900, color:C.dark, fontSize:14, marginBottom:10 }}>🎫 Mes accès saison 2026</div>
-
-                {/* Carte Liberté */}
-                {user.liberteBalance > 0 || user.liberteTotal > 0 ? (
-                  <div style={{ background:`linear-gradient(135deg,${C.coral},${C.sun})`, borderRadius:20, padding:18, marginBottom:12, boxShadow:`0 6px 20px ${C.coral}44` }}>
-                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
-                      <div>
-                        <div style={{ color:"#fff", fontWeight:900, fontSize:16 }}>🎟️ Carte Liberté</div>
-                        <div style={{ color:"rgba(255,255,255,0.8)", fontSize:11 }}>Valable saison 2026 · 6 juil – 22 août</div>
-                      </div>
-                      <div style={{ textAlign:"right" }}>
-                        <div style={{ color:"#fff", fontWeight:900, fontSize:28, lineHeight:1 }}>{user.liberteBalance || 0}</div>
-                        <div style={{ color:"rgba(255,255,255,0.8)", fontSize:11 }}>demi-j. restantes</div>
-                      </div>
-                    </div>
-                    {/* Barre de progression */}
-                    <div style={{ background:"rgba(255,255,255,0.25)", borderRadius:50, height:8, overflow:"hidden", marginBottom:8 }}>
-                      <div style={{ height:"100%", width:`${((user.liberteBalance||0)/(user.liberteTotal||1))*100}%`, background:"#fff", borderRadius:50, transition:"width .4s" }} />
-                    </div>
-                    <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, color:"rgba(255,255,255,0.75)" }}>
-                      <span>{(user.liberteTotal||0) - (user.liberteBalance||0)} utilisée{((user.liberteTotal||0)-(user.liberteBalance||0))>1?"s":""}</span>
-                      <span>{user.liberteTotal || 0} au total</span>
-                    </div>
-                    {(user.liberteBalance || 0) > 0 && (
-                      <div style={{ marginTop:12 }}>
-                        <button onClick={() => setScreen("reservation-club")} style={{ width:"100%", background:"rgba(255,255,255,0.25)", border:"2px solid rgba(255,255,255,0.5)", color:"#fff", borderRadius:50, padding:"11px", fontWeight:900, fontSize:14, cursor:"pointer", fontFamily:"inherit" }}>
-                          📅 Réserver avec ma carte
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div style={{ background:"#fff", borderRadius:18, padding:16, marginBottom:12, boxShadow:"0 2px 10px rgba(0,0,0,0.06)", display:"flex", alignItems:"center", gap:12 }}>
-                    <div style={{ fontSize:32 }}>🎟️</div>
-                    <div style={{ flex:1 }}>
-                      <div style={{ fontWeight:800, color:C.dark }}>Carte Liberté</div>
-                      <div style={{ fontSize:12, color:"#aaa" }}>Pas encore de carte active</div>
-                    </div>
-                    <button onClick={() => setScreen("prestations")} style={{ background:`linear-gradient(135deg,${C.coral},${C.sun})`, border:"none", color:"#fff", borderRadius:50, padding:"8px 14px", fontWeight:900, fontSize:12, cursor:"pointer", fontFamily:"inherit" }}>Acheter</button>
-                  </div>
-                )}
-
-                {/* Natation */}
-                <div style={{ background:"#fff", borderRadius:18, padding:16, marginBottom:12, boxShadow:"0 2px 10px rgba(0,0,0,0.06)" }}>
-                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
-                    <div style={{ fontWeight:800, color:C.dark, fontSize:15 }}>🏊 Natation</div>
-                    <div style={{ background:`${C.ocean}15`, borderRadius:50, padding:"4px 14px" }}>
-                      <span style={{ fontWeight:900, color:C.ocean, fontSize:14 }}>{reservations.length}</span>
-                      <span style={{ fontSize:11, color:"#aaa" }}> séance{reservations.length>1?"s":""} réservée{reservations.length>1?"s":""}</span>
-                    </div>
-                  </div>
-                  {reservations.length === 0 ? (
-                    <div style={{ fontSize:12, color:"#bbb", textAlign:"center", padding:"8px 0" }}>Aucune séance réservée</div>
-                  ) : (
-                    <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
-                      {reservations.slice(0,3).map(r => (
-                        <div key={r.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", background:`${C.ocean}08`, borderRadius:12, padding:"8px 12px" }}>
-                          <div style={{ fontSize:13, fontWeight:800, color:C.ocean }}>{r.time}</div>
-                          <div style={{ fontSize:11, color:"#888" }}>{DAYS.find(d=>d.id===r.day)?.label} {DAYS.find(d=>d.id===r.day)?.num} Juil.</div>
-                          <Pill color={C.green}>✓</Pill>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </>
+            <ProfilConnecte user={user} setUser={setUser} setScreen={setScreen} reservations={reservations} />
           ) : (
             <Card style={{ textAlign:"center", marginTop:14 }}>
               <div style={{ fontSize:60, marginBottom:8 }}>🌊</div>
