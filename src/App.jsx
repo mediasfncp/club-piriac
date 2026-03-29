@@ -2570,6 +2570,22 @@ function FicheEnfantModal({ enfant, onClose }) {
 }
 
 function FicheModal({ membre, onClose }) {
+  const [resasNat, setResasNat] = useState([]);
+  const [resasClub, setResasClub] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!membre?.id) { setLoading(false); return; }
+    Promise.all([
+      sb.from("reservations_natation").select("*").eq("membre_id", membre.id).order("date_seance"),
+      sb.from("reservations_club").select("*").eq("membre_id", membre.id).order("date_reservation"),
+    ]).then(([{data: nat}, {data: club}]) => {
+      setResasNat(nat || []);
+      setResasClub(club || []);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, [membre?.id]);
+
   const actLabel = a => {
     if (!a) return "—";
     const v = a.toLowerCase();
@@ -2641,19 +2657,50 @@ function FicheModal({ membre, onClose }) {
               </div>
             </div>
           </div>
-          {/* Stats */}
+          {/* Réservations */}
           <div style={{ background: "#fff", borderRadius: 16, padding: "12px 16px", boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}>
-            <div style={{ fontWeight: 800, color: "#2C3E50", fontSize: 12, marginBottom: 8 }}>📊 ACTIVITÉ</div>
-            <div style={{ display: "flex", gap: 10 }}>
-              <div style={{ flex: 1, background: `${C.ocean}10`, borderRadius: 12, padding: "10px", textAlign: "center" }}>
-                <div style={{ fontSize: 22, fontWeight: 900, color: C.ocean }}>{membre.resa}</div>
-                <div style={{ fontSize: 11, color: "#aaa" }}>Réservations</div>
-              </div>
-              <div style={{ flex: 1, background: `${C.sea}10`, borderRadius: 12, padding: "10px", textAlign: "center" }}>
-                <div style={{ fontSize: 22, fontWeight: 900, color: C.sea }}>{membre.enfants.length}</div>
-                <div style={{ fontSize: 11, color: "#aaa" }}>Enfants</div>
-              </div>
-            </div>
+            <div style={{ fontWeight: 800, color: "#2C3E50", fontSize: 12, marginBottom: 10 }}>📅 RÉSERVATIONS</div>
+            {loading ? (
+              <div style={{ textAlign:"center", color:"#bbb", fontSize:13, padding:"8px 0" }}>Chargement…</div>
+            ) : (
+              <>
+                {/* Natation */}
+                {resasNat.length > 0 && (
+                  <div style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize:11, fontWeight:900, color:C.ocean, marginBottom:6, textTransform:"uppercase" }}>🏊 Natation · {resasNat.length} séance{resasNat.length>1?"s":""}</div>
+                    <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
+                      {resasNat.slice(0,5).map((r,i) => (
+                        <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", background:`${C.ocean}08`, borderRadius:10, padding:"7px 10px" }}>
+                          <div style={{ fontWeight:800, color:C.ocean, fontSize:13 }}>{r.heure}</div>
+                          <div style={{ fontSize:11, color:"#888" }}>{r.date_seance ? new Date(r.date_seance).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}) : "—"}</div>
+                          <Pill color={C.green}>✓</Pill>
+                        </div>
+                      ))}
+                      {resasNat.length > 5 && <div style={{ fontSize:11, color:"#aaa", textAlign:"center" }}>+{resasNat.length-5} séances</div>}
+                    </div>
+                  </div>
+                )}
+                {/* Club */}
+                {resasClub.length > 0 && (
+                  <div>
+                    <div style={{ fontSize:11, fontWeight:900, color:C.coral, marginBottom:6, textTransform:"uppercase" }}>🏖️ Club · {resasClub.length} demi-journée{resasClub.length>1?"s":""}</div>
+                    <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
+                      {resasClub.slice(0,5).map((r,i) => (
+                        <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", background:`${C.coral}08`, borderRadius:10, padding:"7px 10px" }}>
+                          <div style={{ fontWeight:800, color:C.coral, fontSize:12 }}>{r.session==="matin"?"Matin":"Après-midi"}</div>
+                          <div style={{ fontSize:11, color:"#888" }}>{r.date_reservation ? new Date(r.date_reservation).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}) : "—"}</div>
+                          <Pill color={C.green}>✓</Pill>
+                        </div>
+                      ))}
+                      {resasClub.length > 5 && <div style={{ fontSize:11, color:"#aaa", textAlign:"center" }}>+{resasClub.length-5} demi-journées</div>}
+                    </div>
+                  </div>
+                )}
+                {resasNat.length === 0 && resasClub.length === 0 && (
+                  <div style={{ textAlign:"center", color:"#bbb", fontSize:13, padding:"8px 0" }}>Aucune réservation</div>
+                )}
+              </>
+            )}
           </div>
         </div>
       </div>
