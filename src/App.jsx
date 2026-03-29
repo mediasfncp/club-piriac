@@ -2673,6 +2673,7 @@ function FicheModal({ membre, onClose }) {
                         <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", background:`${C.ocean}08`, borderRadius:10, padding:"7px 10px" }}>
                           <div style={{ fontWeight:800, color:C.ocean, fontSize:13 }}>{r.heure}</div>
                           <div style={{ fontSize:11, color:"#888" }}>{r.date_seance ? new Date(r.date_seance).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}) : "—"}</div>
+                          {r.enfants?.length > 0 && <div style={{ fontSize:11, color:C.ocean, fontWeight:700 }}>{r.enfants.join(", ")}</div>}
                           <Pill color={C.green}>✓</Pill>
                         </div>
                       ))}
