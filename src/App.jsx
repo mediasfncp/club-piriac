@@ -3362,16 +3362,29 @@ function DayDetailModal({ day, activity, session, onClose, dbResasNat = [], dbRe
         if (session && r.session !== session) return false;
         return true;
       });
-      return resasJour.map(r => ({
-        prenom: r.membres?.prenom || "—",
-        nom: r.membres?.nom || "",
-        naissance: "",
-        activite: "club", niveau: "", allergies: "",
-        parent: r.membres ? `${r.membres.prenom} ${r.membres.nom}` : "—",
-        parentColor: C.coral, parentAv: "👤",
-        phone: r.membres?.tel || "—",
-        session: r.session,
-      })).sort((a, b) => a.nom.localeCompare(b.nom));
+      const liste = [];
+      resasJour.forEach(r => {
+        const parentNom = r.membres ? `${r.membres.prenom} ${r.membres.nom}` : "—";
+        const enfants = r.membres?.enfants || [];
+        if (enfants.length > 0) {
+          enfants.forEach(e => liste.push({
+            prenom: e.prenom, nom: e.nom || "",
+            naissance: e.naissance || "", activite: "club",
+            niveau: e.niveau || "", allergies: e.allergies || "",
+            parent: parentNom, parentColor: C.coral, parentAv: "👤",
+            phone: r.membres?.tel || "—",
+            session: r.session,
+          }));
+        } else {
+          liste.push({
+            prenom: r.membres?.prenom || "—", nom: r.membres?.nom || "",
+            naissance: "", activite: "club", niveau: "", allergies: "",
+            parent: parentNom, parentColor: C.coral, parentAv: "👤",
+            phone: r.membres?.tel || "—", session: r.session,
+          });
+        }
+      });
+      return liste.sort((a, b) => (a.nom||"").localeCompare(b.nom||""));
     }
 
     // Fallback mock
@@ -3550,7 +3563,7 @@ function PlanningTab({ allSeasonSessions, clubPlaces, reservations = [] }) {
     sb.from("reservations_natation").select("*, membres(prenom, nom, tel)")
       .then(({ data }) => setDbResasNat(data || []))
       .catch(() => {});
-    sb.from("reservations_club").select("*, membres(prenom, nom, tel)")
+    sb.from("reservations_club").select("*, membres(prenom, nom, tel, enfants(prenom, nom, naissance, allergies, activite, niveau))")
       .then(({ data }) => setDbResasClub(data || []))
       .catch(() => {});
   }, []);
@@ -3890,15 +3903,18 @@ th{background:#1A8FE3;color:#fff;padding:10px 12px;text-align:left}
                     <div style={{ fontSize: 10, color: "#aaa" }}>/ 45 places</div>
                   </div>
                 </div>
-                {/* Membres inscrits */}
+                {/* Enfants inscrits */}
                 {inscrits.length > 0 && (
                   <div style={{ display:"flex", gap:5, flexWrap:"wrap", marginBottom:8 }}>
-                    {inscrits.slice(0,6).map((r, i) => (
+                    {inscrits.flatMap(r => {
+                      const enfants = r.membres?.enfants || [];
+                      if (enfants.length > 0) return enfants.map(e => e.prenom);
+                      return [r.membres ? `${r.membres.prenom} ${r.membres.nom}` : "—"];
+                    }).slice(0,8).map((nom, i) => (
                       <div key={i} style={{ background:`${s.color}15`, color:s.color, borderRadius:8, padding:"2px 8px", fontSize:10, fontWeight:800 }}>
-                        👤 {r.membres ? `${r.membres.prenom} ${r.membres.nom}` : "—"}
+                        👤 {nom}
                       </div>
                     ))}
-                    {inscrits.length > 6 && <div style={{ fontSize:10, color:"#aaa" }}>+{inscrits.length-6}</div>}
                   </div>
                 )}
                 <div style={{ background: "#f0f0f0", borderRadius: 50, height: 8, overflow: "hidden", marginBottom: 6 }}>
@@ -4697,7 +4713,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
       if (setAllSeasonSessions) setAllSeasonSessions(next);
     }).catch(() => {});
 
-    sb.from("reservations_club").select("*, membres(prenom, nom, email, tel)").order("created_at", { ascending: false })
+    sb.from("reservations_club").select("*, membres(prenom, nom, email, tel, enfants(prenom, nom, naissance, allergies, activite, niveau))").order("created_at", { ascending: false })
       .then(({ data }) => {
         setDbResasClub(data || []);
         if (data && setClubPlaces) {
