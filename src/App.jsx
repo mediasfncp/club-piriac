@@ -5445,15 +5445,31 @@ function AdminCodeAccess({ onUnlock }) {
 // ── ROOT ──────────────────────────────────────────────────
 export default function App() {
   const [screen, setScreen] = useState("home");
-  const [user, setUser] = useState(null);
+
+  // Restaurer user depuis localStorage si disponible
+  const [user, setUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem("fncp_user");
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
+  });
+
   const [sessions, setSessions] = useState(INIT_SESSIONS);
   const [allSeasonSessions, setAllSeasonSessions] = useState(ALL_SEASON_SLOTS_INIT);
   const [reservations, setReservations] = useState([]);
   const [clubPlaces, setClubPlaces] = useState({ matin: 45, apmidi: 45, journee: 45 });
 
+  // Sauvegarder user dans localStorage à chaque changement
+  useEffect(() => {
+    try {
+      if (user) localStorage.setItem("fncp_user", JSON.stringify(user));
+      else localStorage.removeItem("fncp_user");
+    } catch {}
+  }, [user]);
+
   // Écouter les changements d'authentification Supabase (magic link)
   useEffect(() => {
-      // Vérifier si déjà connecté
+      // Vérifier si déjà connecté (session Supabase active)
       sb.auth.getSession().then(({ data: { session } }) => {
         if (session?.user) {
           sb.from("membres").select("*, enfants(*)").eq("email", session.user.email).single()
@@ -5463,6 +5479,12 @@ export default function App() {
             });
         }
       });
+
+      // Auto-refresh de session toutes les 10 min
+      const refreshInterval = setInterval(() => {
+        sb.auth.refreshSession().catch(() => {});
+      }, 10 * 60 * 1000);
+
       // Écouter les connexions (magic link cliqué)
       const { data: { subscription } } = sb.auth.onAuthStateChange((event, session) => {
         if (event === "SIGNED_IN" && session?.user) {
@@ -5479,10 +5501,22 @@ export default function App() {
         }
         if (event === "SIGNED_OUT") {
           setUser(null);
+          localStorage.removeItem("fncp_user");
           setScreen("home");
         }
+        if (event === "TOKEN_REFRESHED" && session?.user) {
+          // Rafraîchir les données membre silencieusement
+          sb.from("membres").select("*, enfants(*)").eq("email", session.user.email).single()
+            .then(({ data }) => {
+              if (data) setUser(prev => prev ? { ...prev, ...data, supabaseId: data.id } : null);
+            }).catch(() => {});
+        }
       });
-      return () => subscription.unsubscribe();
+
+      return () => {
+        subscription.unsubscribe();
+        clearInterval(refreshInterval);
+      };
   }, []);
   const props = { onNav: setScreen, user, setUser, sessions, setSessions, reservations, setReservations, allSeasonSessions, setAllSeasonSessions, clubPlaces, setClubPlaces };
 
