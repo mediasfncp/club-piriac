@@ -1370,7 +1370,10 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser }) 
   // Nombre de jours requis selon la formule
   const getNbJours = (label) => {
     if (!label) return 1;
-    if (label.includes("Journée")) return 1;
+    if (label.toLowerCase().includes("semaine")) {
+      const n = parseInt(label);
+      return isNaN(n) ? 1 : n;
+    }
     if (label.includes("5")) return 5;
     if (label.includes("10")) return 10;
     if (label.includes("15")) return 15;
@@ -1378,14 +1381,50 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser }) 
     return 1;
   };
 
-  const nbJoursRequis = selectedRow ? getNbJours(selectedRow.label) : 1;
+  const isFormulaSemai = (label) => label?.toLowerCase().includes("semaine");
+  const nbSemaines     = selectedRow ? getNbJours(selectedRow.label) : 1;
+  const nbJoursRequis  = selectedRow ? (isFormulaSemai(selectedRow.label) ? nbSemaines * 6 : getNbJours(selectedRow.label)) : 1;
 
+  // Pour les formules semaines : clic sur un jour = sélection automatique des 6 jours de sa semaine
   const toggleDate = (iso) => {
-    setSelectedDates(prev => {
-      if (prev.includes(iso)) return prev.filter(d => d !== iso);
-      if (prev.length >= nbJoursRequis) return [...prev.slice(1), iso]; // replace oldest if full
-      return [...prev, iso];
-    });
+    if (isFormulaSemai(selectedRow?.label)) {
+      // Trouver les 6 jours consécutifs sans dimanche à partir du jour sélectionné
+      const clickedIdx = CLUB_SEASON_DAYS.findIndex(d => {
+        const dISO = `${d.date.getFullYear()}-${String(d.date.getMonth()+1).padStart(2,"0")}-${String(d.date.getDate()).padStart(2,"0")}`;
+        return dISO === iso;
+      });
+      if (clickedIdx === -1) return;
+      // Trouver le début de la semaine (remonter au lundi ou garder le jour cliqué)
+      let startIdx = clickedIdx;
+      while (startIdx > 0 && CLUB_SEASON_DAYS[startIdx - 1]?.label !== "Sam") {
+        startIdx--;
+      }
+      const weekDays = CLUB_SEASON_DAYS.slice(startIdx, startIdx + 6).map(d =>
+        `${d.date.getFullYear()}-${String(d.date.getMonth()+1).padStart(2,"0")}-${String(d.date.getDate()).padStart(2,"0")}`
+      );
+      // Toggle la semaine entière
+      const alreadySel = weekDays.every(d => selectedDates.includes(d));
+      if (alreadySel) {
+        setSelectedDates(prev => prev.filter(d => !weekDays.includes(d)));
+      } else {
+        setSelectedDates(prev => {
+          const without = prev.filter(d => !weekDays.includes(d));
+          const maxSemaines = nbSemaines;
+          const currentSemaines = Math.ceil(without.length / 6);
+          if (currentSemaines >= maxSemaines) {
+            // Retirer la 1ère semaine pour faire de la place
+            return [...without.slice(6), ...weekDays];
+          }
+          return [...without, ...weekDays];
+        });
+      }
+    } else {
+      setSelectedDates(prev => {
+        if (prev.includes(iso)) return prev.filter(d => d !== iso);
+        if (prev.length >= nbJoursRequis) return [...prev.slice(1), iso];
+        return [...prev, iso];
+      });
+    }
   };
 
   const getDjCount = (label) => parseInt(label);
@@ -1530,11 +1569,16 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser }) 
             {selectedRow && step === "dates" && (
               <div style={{ background:"#fff", borderRadius:20, padding:16, boxShadow:"0 4px 16px rgba(0,0,0,0.06)" }}>
                 <div style={{ fontWeight:900, color:C.dark, fontSize:14, marginBottom:4 }}>
-                  📅 Choisissez {nbJoursRequis} jour{nbJoursRequis>1?"s":""}
+                  📅 {isFormulaSemai(selectedRow.label)
+                    ? `Choisissez ${nbSemaines} semaine${nbSemaines>1?"s":""}`
+                    : `Choisissez ${nbJoursRequis} jour${nbJoursRequis>1?"s":""}`}
                 </div>
                 <div style={{ fontSize:12, color:"#888", marginBottom:12 }}>
-                  {selectedDates.length}/{nbJoursRequis} sélectionné{selectedDates.length>1?"s":""}
+                  {isFormulaSemai(selectedRow.label)
+                    ? `${Math.floor(selectedDates.length/6)}/${nbSemaines} semaine${nbSemaines>1?"s":""} sélectionnée${nbSemaines>1?"s":""}`
+                    : `${selectedDates.length}/${nbJoursRequis} jour${nbJoursRequis>1?"s":""} sélectionné${nbJoursRequis>1?"s":""}`}
                 </div>
+
                 {/* Toggle Juillet / Août */}
                 <div style={{ display:"flex", gap:8, marginBottom:10 }}>
                   {[["juil","Juillet"],["aout","Août"]].map(([k,l]) => (
@@ -1544,30 +1588,66 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser }) 
                     </button>
                   ))}
                 </div>
-                {/* Grille des jours */}
-                <div style={{ display:"grid", gridTemplateColumns:"repeat(6, 1fr)", gap:6 }}>
-                  {CLUB_SEASON_DAYS.filter(d => moisFilter === "juil" ? d.date.getMonth() === 6 : d.date.getMonth() === 7).map(d => {
-                    const iso = `${d.date.getFullYear()}-${String(d.date.getMonth()+1).padStart(2,"0")}-${String(d.date.getDate()).padStart(2,"0")}`;
-                    const sel = selectedDates.includes(iso);
-                    return (
-                      <div key={iso} onClick={() => toggleDate(iso)} style={{
-                        background: sel ? `linear-gradient(135deg,${tarifData.color},${tarifData.color}cc)` : "#F8FBFF",
-                        border: `2px solid ${sel ? tarifData.color : "#e0e8f0"}`,
-                        borderRadius:10, padding:"6px 2px", textAlign:"center", cursor:"pointer",
-                        boxShadow: sel ? `0 3px 10px ${tarifData.color}44` : "none",
-                      }}>
-                        <div style={{ fontSize:9, color: sel?"rgba(255,255,255,0.8)":"#aaa", fontWeight:700 }}>{d.label}</div>
-                        <div style={{ fontSize:13, fontWeight:900, color: sel?"#fff":C.dark }}>{d.num}</div>
-                      </div>
-                    );
-                  })}
-                </div>
+
+                {/* Affichage semaines ou jours */}
+                {isFormulaSemai(selectedRow.label) ? (
+                  // Afficher les semaines (Lun→Sam)
+                  <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                    {SEASON_WEEKS.filter(w => moisFilter === "juil" ? w.days[0].date.getMonth() === 6 : w.days[0].date.getMonth() === 7).map((w, wi) => {
+                      const firstISO = `${w.days[0].date.getFullYear()}-${String(w.days[0].date.getMonth()+1).padStart(2,"0")}-${String(w.days[0].date.getDate()).padStart(2,"0")}`;
+                      const weekISOs = w.days.map(d => `${d.date.getFullYear()}-${String(d.date.getMonth()+1).padStart(2,"0")}-${String(d.date.getDate()).padStart(2,"0")}`);
+                      const sel = weekISOs.every(iso => selectedDates.includes(iso));
+                      const partial = weekISOs.some(iso => selectedDates.includes(iso)) && !sel;
+                      return (
+                        <div key={wi} onClick={() => toggleDate(firstISO)} style={{
+                          display:"flex", alignItems:"center", gap:10,
+                          background: sel ? `linear-gradient(135deg,${tarifData.color},${tarifData.color}cc)` : partial ? `${tarifData.color}10` : "#F8FBFF",
+                          border: `2px solid ${sel ? tarifData.color : partial ? `${tarifData.color}50` : "#e0e8f0"}`,
+                          borderRadius:14, padding:"10px 12px", cursor:"pointer",
+                          boxShadow: sel ? `0 4px 14px ${tarifData.color}44` : "none",
+                        }}>
+                          <div style={{ width:24, height:24, borderRadius:8, background: sel?"rgba(255,255,255,0.35)":"#f0f0f0", display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, color: sel?"#fff":"#bbb", fontWeight:900 }}>{sel?"✓":""}</div>
+                          <div style={{ flex:1 }}>
+                            <div style={{ fontWeight:900, color: sel?"#fff":C.dark, fontSize:13 }}>
+                              {w.days[0].num} {w.days[0].month} → {w.days[w.days.length-1].num} {w.days[w.days.length-1].month}
+                            </div>
+                            <div style={{ display:"flex", gap:3, marginTop:4, flexWrap:"wrap" }}>
+                              {w.days.map((d,di) => (
+                                <div key={di} style={{ background: sel?"rgba(255,255,255,0.25)":"#F0F4F8", color: sel?"#fff":"#888", borderRadius:4, padding:"1px 5px", fontSize:9, fontWeight:800 }}>{d.label}</div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  // Afficher les jours individuels
+                  <div style={{ display:"grid", gridTemplateColumns:"repeat(6, 1fr)", gap:6 }}>
+                    {CLUB_SEASON_DAYS.filter(d => moisFilter === "juil" ? d.date.getMonth() === 6 : d.date.getMonth() === 7).map(d => {
+                      const iso = `${d.date.getFullYear()}-${String(d.date.getMonth()+1).padStart(2,"0")}-${String(d.date.getDate()).padStart(2,"0")}`;
+                      const sel = selectedDates.includes(iso);
+                      return (
+                        <div key={iso} onClick={() => toggleDate(iso)} style={{
+                          background: sel ? `linear-gradient(135deg,${tarifData.color},${tarifData.color}cc)` : "#F8FBFF",
+                          border: `2px solid ${sel ? tarifData.color : "#e0e8f0"}`,
+                          borderRadius:10, padding:"6px 2px", textAlign:"center", cursor:"pointer",
+                          boxShadow: sel ? `0 3px 10px ${tarifData.color}44` : "none",
+                        }}>
+                          <div style={{ fontSize:9, color: sel?"rgba(255,255,255,0.8)":"#aaa", fontWeight:700 }}>{d.label}</div>
+                          <div style={{ fontSize:13, fontWeight:900, color: sel?"#fff":C.dark }}>{d.num}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
                 <div style={{ display:"flex", gap:8, marginTop:14 }}>
                   <button onClick={() => setStep("choix")} style={{ flex:1, background:"#f0f0f0", border:"none", color:"#888", borderRadius:14, padding:"11px", cursor:"pointer", fontWeight:800, fontFamily:"inherit" }}>← Retour</button>
-                  <SunBtn color={selectedDates.length === nbJoursRequis ? tarifData.color : "#bbb"}
+                  <SunBtn color={selectedDates.length >= nbJoursRequis ? tarifData.color : "#bbb"}
                     disabled={selectedDates.length < nbJoursRequis}
-                    onClick={() => { if (selectedDates.length === nbJoursRequis) setStep("confirm"); }}>
-                    Confirmer ({selectedDates.length}/{nbJoursRequis}) →
+                    onClick={() => { if (selectedDates.length >= nbJoursRequis) setStep("confirm"); }}>
+                    Confirmer →
                   </SunBtn>
                 </div>
               </div>
