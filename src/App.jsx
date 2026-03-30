@@ -1385,39 +1385,27 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser }) 
   const nbSemaines     = selectedRow ? getNbJours(selectedRow.label) : 1;
   const nbJoursRequis  = selectedRow ? (isFormulaSemai(selectedRow.label) ? nbSemaines * 6 : getNbJours(selectedRow.label)) : 1;
 
-  // Pour les formules semaines : clic sur un jour = sélection automatique des 6 jours de sa semaine
+  // Pour les formules semaines : clic sur une semaine = sélection automatique de N semaines consécutives
   const toggleDate = (iso) => {
     if (isFormulaSemai(selectedRow?.label)) {
-      // Trouver les 6 jours consécutifs sans dimanche à partir du jour sélectionné
-      const clickedIdx = CLUB_SEASON_DAYS.findIndex(d => {
-        const dISO = `${d.date.getFullYear()}-${String(d.date.getMonth()+1).padStart(2,"0")}-${String(d.date.getDate()).padStart(2,"0")}`;
-        return dISO === iso;
+      // Trouver l'index de la semaine cliquée dans SEASON_WEEKS
+      const clickedWeekIdx = SEASON_WEEKS.findIndex(w => {
+        const firstISO = `${w.days[0].date.getFullYear()}-${String(w.days[0].date.getMonth()+1).padStart(2,"0")}-${String(w.days[0].date.getDate()).padStart(2,"0")}`;
+        return firstISO === iso;
       });
-      if (clickedIdx === -1) return;
-      // Trouver le début de la semaine (remonter au lundi ou garder le jour cliqué)
-      let startIdx = clickedIdx;
-      while (startIdx > 0 && CLUB_SEASON_DAYS[startIdx - 1]?.label !== "Sam") {
-        startIdx--;
-      }
-      const weekDays = CLUB_SEASON_DAYS.slice(startIdx, startIdx + 6).map(d =>
-        `${d.date.getFullYear()}-${String(d.date.getMonth()+1).padStart(2,"0")}-${String(d.date.getDate()).padStart(2,"0")}`
+      if (clickedWeekIdx === -1) return;
+
+      // Prendre N semaines consécutives à partir de la semaine cliquée
+      const weeksToSelect = SEASON_WEEKS.slice(clickedWeekIdx, clickedWeekIdx + nbSemaines);
+      if (weeksToSelect.length < nbSemaines) return; // pas assez de semaines après
+
+      const allISOs = weeksToSelect.flatMap(w =>
+        w.days.map(d => `${d.date.getFullYear()}-${String(d.date.getMonth()+1).padStart(2,"0")}-${String(d.date.getDate()).padStart(2,"0")}`)
       );
-      // Toggle la semaine entière
-      const alreadySel = weekDays.every(d => selectedDates.includes(d));
-      if (alreadySel) {
-        setSelectedDates(prev => prev.filter(d => !weekDays.includes(d)));
-      } else {
-        setSelectedDates(prev => {
-          const without = prev.filter(d => !weekDays.includes(d));
-          const maxSemaines = nbSemaines;
-          const currentSemaines = Math.ceil(without.length / 6);
-          if (currentSemaines >= maxSemaines) {
-            // Retirer la 1ère semaine pour faire de la place
-            return [...without.slice(6), ...weekDays];
-          }
-          return [...without, ...weekDays];
-        });
-      }
+
+      // Si déjà sélectionnées → désélectionner
+      const alreadySel = allISOs.every(d => selectedDates.includes(d));
+      setSelectedDates(alreadySel ? [] : allISOs);
     } else {
       setSelectedDates(prev => {
         if (prev.includes(iso)) return prev.filter(d => d !== iso);
@@ -1594,27 +1582,32 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser }) 
                   // Afficher les semaines (Lun→Sam)
                   <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
                     {SEASON_WEEKS.filter(w => moisFilter === "juil" ? w.days[0].date.getMonth() === 6 : w.days[0].date.getMonth() === 7).map((w, wi) => {
+                      const realIdx = SEASON_WEEKS.indexOf(w);
                       const firstISO = `${w.days[0].date.getFullYear()}-${String(w.days[0].date.getMonth()+1).padStart(2,"0")}-${String(w.days[0].date.getDate()).padStart(2,"0")}`;
                       const weekISOs = w.days.map(d => `${d.date.getFullYear()}-${String(d.date.getMonth()+1).padStart(2,"0")}-${String(d.date.getDate()).padStart(2,"0")}`);
                       const sel = weekISOs.every(iso => selectedDates.includes(iso));
-                      const partial = weekISOs.some(iso => selectedDates.includes(iso)) && !sel;
+                      const disabled = SEASON_WEEKS.slice(realIdx, realIdx + nbSemaines).length < nbSemaines;
                       return (
-                        <div key={wi} onClick={() => toggleDate(firstISO)} style={{
+                        <div key={wi} onClick={() => !disabled && toggleDate(firstISO)} style={{
                           display:"flex", alignItems:"center", gap:10,
-                          background: sel ? `linear-gradient(135deg,${tarifData.color},${tarifData.color}cc)` : partial ? `${tarifData.color}10` : "#F8FBFF",
-                          border: `2px solid ${sel ? tarifData.color : partial ? `${tarifData.color}50` : "#e0e8f0"}`,
-                          borderRadius:14, padding:"10px 12px", cursor:"pointer",
+                          background: sel ? `linear-gradient(135deg,${tarifData.color},${tarifData.color}cc)` : disabled ? "#f5f5f5" : "#F8FBFF",
+                          border: `2px solid ${sel ? tarifData.color : disabled ? "#e0e0e0" : "#e0e8f0"}`,
+                          borderRadius:14, padding:"10px 12px",
+                          cursor: disabled ? "not-allowed" : "pointer",
+                          opacity: disabled ? 0.5 : 1,
                           boxShadow: sel ? `0 4px 14px ${tarifData.color}44` : "none",
                         }}>
-                          <div style={{ width:24, height:24, borderRadius:8, background: sel?"rgba(255,255,255,0.35)":"#f0f0f0", display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, color: sel?"#fff":"#bbb", fontWeight:900 }}>{sel?"✓":""}</div>
+                          <div style={{ width:24, height:24, borderRadius:8, background: sel?"rgba(255,255,255,0.35)":"#f0f0f0", display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, color: sel?"#fff":"#bbb", fontWeight:900 }}>{sel?"✓":disabled?"✗":""}</div>
                           <div style={{ flex:1 }}>
-                            <div style={{ fontWeight:900, color: sel?"#fff":C.dark, fontSize:13 }}>
-                              {w.days[0].num} {w.days[0].month} → {w.days[w.days.length-1].num} {w.days[w.days.length-1].month}
+                            <div style={{ fontWeight:900, color: sel?"#fff":disabled?"#bbb":C.dark, fontSize:13 }}>
+                              {w.days[0].num} {w.days[0].month}
+                              {nbSemaines > 1 && !disabled && ` → ${SEASON_WEEKS[realIdx + nbSemaines - 1]?.days[5]?.num} ${SEASON_WEEKS[realIdx + nbSemaines - 1]?.days[5]?.month}`}
                             </div>
                             <div style={{ display:"flex", gap:3, marginTop:4, flexWrap:"wrap" }}>
                               {w.days.map((d,di) => (
                                 <div key={di} style={{ background: sel?"rgba(255,255,255,0.25)":"#F0F4F8", color: sel?"#fff":"#888", borderRadius:4, padding:"1px 5px", fontSize:9, fontWeight:800 }}>{d.label}</div>
                               ))}
+                              {nbSemaines > 1 && !disabled && <div style={{ color: sel?"rgba(255,255,255,0.6)":"#bbb", fontSize:9, fontWeight:700 }}>+{nbSemaines-1} sem.</div>}
                             </div>
                           </div>
                         </div>
