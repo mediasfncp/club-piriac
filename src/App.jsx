@@ -1385,22 +1385,23 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser }) 
   const nbSemaines     = selectedRow ? getNbJours(selectedRow.label) : 1;
   const nbJoursRequis  = selectedRow ? (isFormulaSemai(selectedRow.label) ? nbSemaines * 6 : getNbJours(selectedRow.label)) : 1;
 
-  // Pour les formules semaines : clic sur une semaine = sélection automatique de N semaines consécutives
+  // Pour les formules semaines : clic sur le 1er jour = N semaines × 6 jours consécutifs
   const toggleDate = (iso) => {
     if (isFormulaSemai(selectedRow?.label)) {
-      // Trouver l'index de la semaine cliquée dans SEASON_WEEKS
-      const clickedWeekIdx = SEASON_WEEKS.findIndex(w => {
-        const firstISO = `${w.days[0].date.getFullYear()}-${String(w.days[0].date.getMonth()+1).padStart(2,"0")}-${String(w.days[0].date.getDate()).padStart(2,"0")}`;
-        return firstISO === iso;
+      // Trouver l'index du jour cliqué dans CLUB_SEASON_DAYS
+      const startIdx = CLUB_SEASON_DAYS.findIndex(d => {
+        const dISO = `${d.date.getFullYear()}-${String(d.date.getMonth()+1).padStart(2,"0")}-${String(d.date.getDate()).padStart(2,"0")}`;
+        return dISO === iso;
       });
-      if (clickedWeekIdx === -1) return;
+      if (startIdx === -1) return;
 
-      // Prendre N semaines consécutives à partir de la semaine cliquée
-      const weeksToSelect = SEASON_WEEKS.slice(clickedWeekIdx, clickedWeekIdx + nbSemaines);
-      if (weeksToSelect.length < nbSemaines) return; // pas assez de semaines après
+      // Prendre N semaines × 6 jours consécutifs
+      const totalJours = nbSemaines * 6;
+      const jours = CLUB_SEASON_DAYS.slice(startIdx, startIdx + totalJours);
+      if (jours.length < totalJours) return; // pas assez de jours après
 
-      const allISOs = weeksToSelect.flatMap(w =>
-        w.days.map(d => `${d.date.getFullYear()}-${String(d.date.getMonth()+1).padStart(2,"0")}-${String(d.date.getDate()).padStart(2,"0")}`)
+      const allISOs = jours.map(d =>
+        `${d.date.getFullYear()}-${String(d.date.getMonth()+1).padStart(2,"0")}-${String(d.date.getDate()).padStart(2,"0")}`
       );
 
       // Si déjà sélectionnées → désélectionner
@@ -1558,80 +1559,106 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser }) 
               <div style={{ background:"#fff", borderRadius:20, padding:16, boxShadow:"0 4px 16px rgba(0,0,0,0.06)" }}>
                 <div style={{ fontWeight:900, color:C.dark, fontSize:14, marginBottom:4 }}>
                   📅 {isFormulaSemai(selectedRow.label)
-                    ? `Choisissez ${nbSemaines} semaine${nbSemaines>1?"s":""}`
+                    ? `Choisissez votre 1er jour (${nbSemaines} sem. · ${nbSemaines*6} jours)`
                     : `Choisissez ${nbJoursRequis} jour${nbJoursRequis>1?"s":""}`}
                 </div>
                 <div style={{ fontSize:12, color:"#888", marginBottom:12 }}>
-                  {isFormulaSemai(selectedRow.label)
-                    ? `${Math.floor(selectedDates.length/6)}/${nbSemaines} semaine${nbSemaines>1?"s":""} sélectionnée${nbSemaines>1?"s":""}`
-                    : `${selectedDates.length}/${nbJoursRequis} jour${nbJoursRequis>1?"s":""} sélectionné${nbJoursRequis>1?"s":""}`}
+                  {selectedDates.length > 0
+                    ? `Du ${new Date(selectedDates[0]).toLocaleDateString("fr-FR",{day:"numeric",month:"long"})} au ${new Date(selectedDates[selectedDates.length-1]).toLocaleDateString("fr-FR",{day:"numeric",month:"long"})}`
+                    : "Cliquez sur un jour pour démarrer"}
                 </div>
 
                 {/* Toggle Juillet / Août */}
-                <div style={{ display:"flex", gap:8, marginBottom:10 }}>
-                  {[["juil","Juillet"],["aout","Août"]].map(([k,l]) => (
+                <div style={{ display:"flex", gap:8, marginBottom:12 }}>
+                  {[["juil","Juillet 2026"],["aout","Août 2026"]].map(([k,l]) => (
                     <button key={k} onClick={() => setMoisFilter(k)}
-                      style={{ flex:1, background: moisFilter===k ? `linear-gradient(135deg,${C.ocean},${C.sea})` : "#f0f0f0", color: moisFilter===k?"#fff":"#888", border:"none", borderRadius:12, padding:"8px", cursor:"pointer", fontWeight:900, fontSize:13, fontFamily:"inherit" }}>
+                      style={{ flex:1, background: moisFilter===k ? `linear-gradient(135deg,${tarifData.color},${tarifData.color}cc)` : "#f0f0f0", color: moisFilter===k?"#fff":"#888", border:"none", borderRadius:12, padding:"9px", cursor:"pointer", fontWeight:900, fontSize:13, fontFamily:"inherit" }}>
                       {l}
                     </button>
                   ))}
                 </div>
 
-                {/* Affichage semaines ou jours */}
-                {isFormulaSemai(selectedRow.label) ? (
-                  // Afficher les semaines (Lun→Sam)
-                  <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-                    {SEASON_WEEKS.filter(w => moisFilter === "juil" ? w.days[0].date.getMonth() === 6 : w.days[0].date.getMonth() === 7).map((w, wi) => {
-                      const realIdx = SEASON_WEEKS.indexOf(w);
-                      const firstISO = `${w.days[0].date.getFullYear()}-${String(w.days[0].date.getMonth()+1).padStart(2,"0")}-${String(w.days[0].date.getDate()).padStart(2,"0")}`;
-                      const weekISOs = w.days.map(d => `${d.date.getFullYear()}-${String(d.date.getMonth()+1).padStart(2,"0")}-${String(d.date.getDate()).padStart(2,"0")}`);
-                      const sel = weekISOs.every(iso => selectedDates.includes(iso));
-                      const disabled = SEASON_WEEKS.slice(realIdx, realIdx + nbSemaines).length < nbSemaines;
-                      return (
-                        <div key={wi} onClick={() => !disabled && toggleDate(firstISO)} style={{
-                          display:"flex", alignItems:"center", gap:10,
-                          background: sel ? `linear-gradient(135deg,${tarifData.color},${tarifData.color}cc)` : disabled ? "#f5f5f5" : "#F8FBFF",
-                          border: `2px solid ${sel ? tarifData.color : disabled ? "#e0e0e0" : "#e0e8f0"}`,
-                          borderRadius:14, padding:"10px 12px",
-                          cursor: disabled ? "not-allowed" : "pointer",
-                          opacity: disabled ? 0.5 : 1,
-                          boxShadow: sel ? `0 4px 14px ${tarifData.color}44` : "none",
-                        }}>
-                          <div style={{ width:24, height:24, borderRadius:8, background: sel?"rgba(255,255,255,0.35)":"#f0f0f0", display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, color: sel?"#fff":"#bbb", fontWeight:900 }}>{sel?"✓":disabled?"✗":""}</div>
-                          <div style={{ flex:1 }}>
-                            <div style={{ fontWeight:900, color: sel?"#fff":disabled?"#bbb":C.dark, fontSize:13 }}>
-                              {w.days[0].num} {w.days[0].month}
-                              {nbSemaines > 1 && !disabled && ` → ${SEASON_WEEKS[realIdx + nbSemaines - 1]?.days[5]?.num} ${SEASON_WEEKS[realIdx + nbSemaines - 1]?.days[5]?.month}`}
+                {/* Calendrier */}
+                {(() => {
+                  const year = 2026;
+                  const month = moisFilter === "juil" ? 6 : 7; // 0-indexed
+                  const firstDay = new Date(year, month, 1).getDay(); // 0=dim
+                  const daysInMonth = new Date(year, month + 1, 0).getDate();
+                  const dowLabels = ["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"];
+                  // Décalage : semaine commence lundi
+                  const offset = firstDay === 0 ? 6 : firstDay - 1;
+
+                  return (
+                    <div>
+                      {/* En-têtes jours */}
+                      <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:3, marginBottom:4 }}>
+                        {dowLabels.map(d => (
+                          <div key={d} style={{ textAlign:"center", fontSize:10, fontWeight:900, color:"#aaa", padding:"4px 0" }}>{d}</div>
+                        ))}
+                      </div>
+                      {/* Grille */}
+                      <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:3 }}>
+                        {/* Cases vides avant le 1er */}
+                        {Array.from({length: offset}).map((_,i) => <div key={`e${i}`} />)}
+                        {/* Jours du mois */}
+                        {Array.from({length: daysInMonth}).map((_,i) => {
+                          const day = i + 1;
+                          const date = new Date(year, month, day);
+                          const dow = date.getDay(); // 0=dim
+                          const iso = `${year}-${String(month+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+                          const isDimanche = dow === 0;
+                          const inSeason = CLUB_SEASON_DAYS.some(d => {
+                            const dISO = `${d.date.getFullYear()}-${String(d.date.getMonth()+1).padStart(2,"0")}-${String(d.date.getDate()).padStart(2,"0")}`;
+                            return dISO === iso;
+                          });
+
+                          // Vérifier si disabled (pas assez de jours après pour les semaines)
+                          let disabled = !inSeason || isDimanche;
+                          if (!disabled && isFormulaSemai(selectedRow.label)) {
+                            const startIdx = CLUB_SEASON_DAYS.findIndex(d => {
+                              const dISO = `${d.date.getFullYear()}-${String(d.date.getMonth()+1).padStart(2,"0")}-${String(d.date.getDate()).padStart(2,"0")}`;
+                              return dISO === iso;
+                            });
+                            disabled = startIdx === -1 || CLUB_SEASON_DAYS.slice(startIdx, startIdx + nbSemaines * 6).length < nbSemaines * 6;
+                          }
+
+                          const sel = selectedDates.includes(iso);
+                          const inRange = selectedDates.includes(iso);
+
+                          return (
+                            <div key={day} onClick={() => !disabled && toggleDate(iso)} style={{
+                              height:36, borderRadius:10, display:"flex", alignItems:"center", justifyContent:"center",
+                              fontSize:13, fontWeight: inSeason ? 800 : 400,
+                              background: sel ? `linear-gradient(135deg,${tarifData.color},${tarifData.color}cc)`
+                                : !inSeason || isDimanche ? "transparent"
+                                : "#F8FBFF",
+                              color: sel ? "#fff"
+                                : !inSeason || isDimanche ? "#ddd"
+                                : disabled ? "#ccc"
+                                : C.dark,
+                              border: sel ? `2px solid ${tarifData.color}` : "2px solid transparent",
+                              cursor: disabled || !inSeason || isDimanche ? "default" : "pointer",
+                              boxShadow: sel ? `0 3px 10px ${tarifData.color}44` : "none",
+                              transition:"all .12s",
+                            }}>
+                              {day}
                             </div>
-                            <div style={{ display:"flex", gap:3, marginTop:4, flexWrap:"wrap" }}>
-                              {w.days.map((d,di) => (
-                                <div key={di} style={{ background: sel?"rgba(255,255,255,0.25)":"#F0F4F8", color: sel?"#fff":"#888", borderRadius:4, padding:"1px 5px", fontSize:9, fontWeight:800 }}>{d.label}</div>
-                              ))}
-                              {nbSemaines > 1 && !disabled && <div style={{ color: sel?"rgba(255,255,255,0.6)":"#bbb", fontSize:9, fontWeight:700 }}>+{nbSemaines-1} sem.</div>}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  // Afficher les jours individuels
-                  <div style={{ display:"grid", gridTemplateColumns:"repeat(6, 1fr)", gap:6 }}>
-                    {CLUB_SEASON_DAYS.filter(d => moisFilter === "juil" ? d.date.getMonth() === 6 : d.date.getMonth() === 7).map(d => {
-                      const iso = `${d.date.getFullYear()}-${String(d.date.getMonth()+1).padStart(2,"0")}-${String(d.date.getDate()).padStart(2,"0")}`;
-                      const sel = selectedDates.includes(iso);
-                      return (
-                        <div key={iso} onClick={() => toggleDate(iso)} style={{
-                          background: sel ? `linear-gradient(135deg,${tarifData.color},${tarifData.color}cc)` : "#F8FBFF",
-                          border: `2px solid ${sel ? tarifData.color : "#e0e8f0"}`,
-                          borderRadius:10, padding:"6px 2px", textAlign:"center", cursor:"pointer",
-                          boxShadow: sel ? `0 3px 10px ${tarifData.color}44` : "none",
-                        }}>
-                          <div style={{ fontSize:9, color: sel?"rgba(255,255,255,0.8)":"#aaa", fontWeight:700 }}>{d.label}</div>
-                          <div style={{ fontSize:13, fontWeight:900, color: sel?"#fff":C.dark }}>{d.num}</div>
-                        </div>
-                      );
-                    })}
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Récap dates sélectionnées */}
+                {selectedDates.length > 0 && (
+                  <div style={{ marginTop:12, background:`${tarifData.color}10`, borderRadius:12, padding:"8px 12px", fontSize:12, color:tarifData.color, fontWeight:700 }}>
+                    ✓ {isFormulaSemai(selectedRow.label)
+                      ? `${nbSemaines} sem. · ${selectedDates[0] ? new Date(selectedDates[0]).toLocaleDateString("fr-FR",{day:"numeric",month:"long"}) : ""} → ${selectedDates[selectedDates.length-1] ? new Date(selectedDates[selectedDates.length-1]).toLocaleDateString("fr-FR",{day:"numeric",month:"long"}) : ""}`
+                      : `${selectedDates.length}/${nbJoursRequis} jour${nbJoursRequis>1?"s":""}`}
+                    {selectedDates.length > 0 && (
+                      <button onClick={() => setSelectedDates([])} style={{ marginLeft:8, background:"none", border:"none", color:tarifData.color, cursor:"pointer", fontFamily:"inherit", fontWeight:900, fontSize:12 }}>✕ Effacer</button>
+                    )}
                   </div>
                 )}
 
