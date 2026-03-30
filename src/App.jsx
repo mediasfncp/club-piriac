@@ -4372,6 +4372,16 @@ function AgeGroupCard({ dbMembres = [] }) {
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [selectedActivity, setSelectedActivity] = useState("tous");
   const [selectedEnfant, setSelectedEnfant] = useState(null);
+  const [dbResasNat, setDbResasNat] = useState([]);
+  const [dbResasClub, setDbResasClub] = useState([]);
+
+  // Charger vraies résas depuis Supabase
+  useEffect(() => {
+    sb.from("reservations_natation").select("membre_id, date_seance, enfants")
+      .then(({ data }) => setDbResasNat(data || [])).catch(() => {});
+    sb.from("reservations_club").select("membre_id, date_reservation, session")
+      .then(({ data }) => setDbResasClub(data || [])).catch(() => {});
+  }, []);
 
   // Build season weeks
   const weeks = [];
@@ -4385,47 +4395,85 @@ function AgeGroupCard({ dbMembres = [] }) {
     ? `${currentWeek[0].num} ${currentWeek[0].month} – ${currentWeek[currentWeek.length-1].num} ${currentWeek[currentWeek.length-1].month}`
     : "";
 
-  // Build all children list — Supabase si dispo, sinon mock
+  // Build all children list — Supabase si dispo, sinon mock — UNIQUE par enfant
   const allEnfants = [];
+  const seenEnfants = new Set();
   if (dbMembres.length > 0) {
     dbMembres.forEach(m => {
       (m.enfants || []).forEach(e => {
-        allEnfants.push({ ...e, age: calcAge(e.naissance), parent: `${m.prenom} ${m.nom}`, parentColor: C.ocean, phone: m.tel });
+        const key = `${e.prenom}-${e.nom}-${e.naissance}`;
+        if (!seenEnfants.has(key)) {
+          seenEnfants.add(key);
+          allEnfants.push({ ...e, age: calcAge(e.naissance), parent: `${m.prenom} ${NOM(m.nom)}`, parentColor: C.ocean, phone: m.tel });
+        }
       });
     });
   } else {
     MEMBRES.forEach(m => {
       m.enfants.forEach(e => {
-        allEnfants.push({ ...e, age: calcAge(e.naissance), parent: m.name, parentColor: m.color, phone: m.phone });
+        const key = `${e.prenom}-${e.nom}-${e.naissance}`;
+        if (!seenEnfants.has(key)) {
+          seenEnfants.add(key);
+          allEnfants.push({ ...e, age: calcAge(e.naissance), parent: m.name, parentColor: m.color, phone: m.phone });
+        }
       });
     });
   }
 
   const total = allEnfants.length;
 
-  // For période jour/semaine: simulate attendance per day based on activity
-  // (in real app would use actual booking data)
-  const getAttendanceForDay = (dayId) => {
-    // Simulate: each child attends ~3 days/week on average
-    const seed = dayId.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
-    return allEnfants.filter((_, i) => (i + seed) % 3 !== 0);
-  };
+  // Helper — obtenir les dates ISO d'une période
+  const getDayISO = (dayObj) => dayObj?.date
+    ? `${dayObj.date.getFullYear()}-${String(dayObj.date.getMonth()+1).padStart(2,"0")}-${String(dayObj.date.getDate()).padStart(2,"0")}`
+    : null;
 
-  const getAttendanceForWeek = (weekDays) => {
-    const seen = new Set();
-    const result = [];
-    weekDays.forEach(d => {
-      getAttendanceForDay(d.id).forEach(e => {
-        const key = `${e.prenom}-${e.nom}`;
-        if (!seen.has(key)) { seen.add(key); result.push(e); }
-      });
+  // Trouver les enfants réellement inscrits selon la période
+  const getEnfantsForPeriod = () => {
+    if (period === "saison") return allEnfants;
+
+    // Dates concernées
+    let dates = [];
+    if (period === "jour") {
+      const iso = getDayISO(ALL_SEASON_DAYS.find(d => d.id === selectedDayId));
+      if (iso) dates = [iso];
+    } else if (period === "semaine") {
+      dates = currentWeek.map(d => getDayISO(d)).filter(Boolean);
+    }
+
+    if (!dates.length) return allEnfants;
+
+    // Trouver les membres_id ayant une résa sur ces dates
+    const membreIdsNat = new Set(
+      dbResasNat.filter(r => dates.includes(r.date_seance?.slice(0,10))).map(r => r.membre_id)
+    );
+    const membreIdsClub = new Set(
+      dbResasClub.filter(r => dates.includes(r.date_reservation?.slice(0,10))).map(r => r.membre_id)
+    );
+
+    // Trouver les prénoms d'enfants en natation depuis les résas
+    const prenomNat = new Set(
+      dbResasNat
+        .filter(r => dates.includes(r.date_seance?.slice(0,10)))
+        .flatMap(r => r.enfants || [])
+    );
+
+    // Filtrer les enfants qui ont une resa sur ces dates
+    return allEnfants.filter(e => {
+      const membre = dbMembres.find(m => (m.enfants || []).some(me => me.prenom === e.prenom && me.nom === e.nom));
+      if (!membre) return false;
+      // Natation → vérifier prénom dans résas
+      if (e.activite === "natation" || e.activite === "les deux") {
+        if (prenomNat.has(e.prenom) && membreIdsNat.has(membre.id)) return true;
+      }
+      // Club → vérifier membre_id dans résas club
+      if (e.activite === "club" || e.activite === "les deux") {
+        if (membreIdsClub.has(membre.id)) return true;
+      }
+      return false;
     });
-    return result;
   };
 
-  const baseList = period === "saison" ? allEnfants
-    : period === "semaine" ? getAttendanceForWeek(currentWeek)
-    : getAttendanceForDay(selectedDayId);
+  const baseList = getEnfantsForPeriod();
 
   const groupCounts = AGE_GROUPS.map(g => ({
     ...g,
