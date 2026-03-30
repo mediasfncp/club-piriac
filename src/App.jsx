@@ -1354,9 +1354,9 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser }) 
   const [done, setDone]             = useState(null);
   const [showWero, setShowWero]     = useState(false);
   const [selectedLiberte, setSelectedLiberte] = useState(null);
-  // Nouvelle étape — sélection des dates
-  const [step, setStep]             = useState("choix"); // "choix" | "dates" | "confirm"
-  const [selectedDates, setSelectedDates] = useState([]); // dates ISO sélectionnées
+  const [step, setStep]             = useState("choix");
+  const [selectedDates, setSelectedDates] = useState([]);
+  const [moisFilter, setMoisFilter] = useState("juil");
 
   const tarifData = formulType === "matin" ? TARIFS_MATIN : formulType === "apmidi" ? TARIFS_APMIDI : TARIFS_JOURNEE;
 
@@ -1535,51 +1535,38 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser }) 
                 <div style={{ fontSize:12, color:"#888", marginBottom:12 }}>
                   {selectedDates.length}/{nbJoursRequis} sélectionné{selectedDates.length>1?"s":""}
                 </div>
-
                 {/* Toggle Juillet / Août */}
-                {(() => {
-                  const [moisFilter, setMoisFilter] = useState("juil");
-                  const dowL = ["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
-                  const jours = CLUB_SEASON_DAYS.filter(d => {
-                    const m = d.date.getMonth();
-                    return moisFilter === "juil" ? m === 6 : m === 7;
-                  });
-                  return (
-                    <>
-                      <div style={{ display:"flex", gap:8, marginBottom:10 }}>
-                        {[["juil","Juillet"],["aout","Août"]].map(([k,l]) => (
-                          <button key={k} onClick={() => setMoisFilter(k)}
-                            style={{ flex:1, background: moisFilter===k ? `linear-gradient(135deg,${C.ocean},${C.sea})` : "#f0f0f0", color: moisFilter===k?"#fff":"#888", border:"none", borderRadius:12, padding:"8px", cursor:"pointer", fontWeight:900, fontSize:13, fontFamily:"inherit" }}>
-                            {l}
-                          </button>
-                        ))}
+                <div style={{ display:"flex", gap:8, marginBottom:10 }}>
+                  {[["juil","Juillet"],["aout","Août"]].map(([k,l]) => (
+                    <button key={k} onClick={() => setMoisFilter(k)}
+                      style={{ flex:1, background: moisFilter===k ? `linear-gradient(135deg,${C.ocean},${C.sea})` : "#f0f0f0", color: moisFilter===k?"#fff":"#888", border:"none", borderRadius:12, padding:"8px", cursor:"pointer", fontWeight:900, fontSize:13, fontFamily:"inherit" }}>
+                      {l}
+                    </button>
+                  ))}
+                </div>
+                {/* Grille des jours */}
+                <div style={{ display:"grid", gridTemplateColumns:"repeat(6, 1fr)", gap:6 }}>
+                  {CLUB_SEASON_DAYS.filter(d => moisFilter === "juil" ? d.date.getMonth() === 6 : d.date.getMonth() === 7).map(d => {
+                    const iso = `${d.date.getFullYear()}-${String(d.date.getMonth()+1).padStart(2,"0")}-${String(d.date.getDate()).padStart(2,"0")}`;
+                    const sel = selectedDates.includes(iso);
+                    return (
+                      <div key={iso} onClick={() => toggleDate(iso)} style={{
+                        background: sel ? `linear-gradient(135deg,${tarifData.color},${tarifData.color}cc)` : "#F8FBFF",
+                        border: `2px solid ${sel ? tarifData.color : "#e0e8f0"}`,
+                        borderRadius:10, padding:"6px 2px", textAlign:"center", cursor:"pointer",
+                        boxShadow: sel ? `0 3px 10px ${tarifData.color}44` : "none",
+                      }}>
+                        <div style={{ fontSize:9, color: sel?"rgba(255,255,255,0.8)":"#aaa", fontWeight:700 }}>{d.label}</div>
+                        <div style={{ fontSize:13, fontWeight:900, color: sel?"#fff":C.dark }}>{d.num}</div>
                       </div>
-                      <div style={{ display:"grid", gridTemplateColumns:"repeat(6, 1fr)", gap:6 }}>
-                        {jours.map(d => {
-                          const iso = `${d.date.getFullYear()}-${String(d.date.getMonth()+1).padStart(2,"0")}-${String(d.date.getDate()).padStart(2,"0")}`;
-                          const sel = selectedDates.includes(iso);
-                          return (
-                            <div key={iso} onClick={() => toggleDate(iso)} style={{
-                              background: sel ? `linear-gradient(135deg,${tarifData.color},${tarifData.color}cc)` : "#F8FBFF",
-                              border: `2px solid ${sel ? tarifData.color : "#e0e8f0"}`,
-                              borderRadius:10, padding:"6px 2px", textAlign:"center", cursor:"pointer",
-                              boxShadow: sel ? `0 3px 10px ${tarifData.color}44` : "none",
-                            }}>
-                              <div style={{ fontSize:9, color: sel?"rgba(255,255,255,0.8)":"#aaa", fontWeight:700 }}>{d.label}</div>
-                              <div style={{ fontSize:13, fontWeight:900, color: sel?"#fff":C.dark }}>{d.num}</div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </>
-                  );
-                })()}
-
+                    );
+                  })}
+                </div>
                 <div style={{ display:"flex", gap:8, marginTop:14 }}>
                   <button onClick={() => setStep("choix")} style={{ flex:1, background:"#f0f0f0", border:"none", color:"#888", borderRadius:14, padding:"11px", cursor:"pointer", fontWeight:800, fontFamily:"inherit" }}>← Retour</button>
                   <SunBtn color={selectedDates.length === nbJoursRequis ? tarifData.color : "#bbb"}
                     disabled={selectedDates.length < nbJoursRequis}
-                    onClick={() => setStep("confirm")}>
+                    onClick={() => { if (selectedDates.length === nbJoursRequis) setStep("confirm"); }}>
                     Confirmer ({selectedDates.length}/{nbJoursRequis}) →
                   </SunBtn>
                 </div>
