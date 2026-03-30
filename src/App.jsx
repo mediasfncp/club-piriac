@@ -1347,13 +1347,16 @@ function ReservationClubScreen({ onNav, user, setUser, clubPlaces, setClubPlaces
 }
 
 function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser }) {
-  const [tab, setTab] = useState("club");
+  const [tab, setTab]               = useState("club");
   const [formulType, setFormulType] = useState("matin");
-  const [nbEnfants, setNbEnfants] = useState(1);
+  const [nbEnfants, setNbEnfants]   = useState(1);
   const [selectedRow, setSelectedRow] = useState(null);
-  const [done, setDone] = useState(null); // null | "club" | "liberte"
-  const [showWero, setShowWero] = useState(false);
+  const [done, setDone]             = useState(null);
+  const [showWero, setShowWero]     = useState(false);
   const [selectedLiberte, setSelectedLiberte] = useState(null);
+  // Nouvelle étape — sélection des dates
+  const [step, setStep]             = useState("choix"); // "choix" | "dates" | "confirm"
+  const [selectedDates, setSelectedDates] = useState([]); // dates ISO sélectionnées
 
   const tarifData = formulType === "matin" ? TARIFS_MATIN : formulType === "apmidi" ? TARIFS_APMIDI : TARIFS_JOURNEE;
 
@@ -1364,7 +1367,27 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser }) 
     return row.e3 + (nbEnfants - 3) * row.sup;
   };
 
-  // Extract nb demi-journées from label like "6 demi-journées"
+  // Nombre de jours requis selon la formule
+  const getNbJours = (label) => {
+    if (!label) return 1;
+    if (label.includes("Journée")) return 1;
+    if (label.includes("5")) return 5;
+    if (label.includes("10")) return 10;
+    if (label.includes("15")) return 15;
+    if (label.includes("20")) return 20;
+    return 1;
+  };
+
+  const nbJoursRequis = selectedRow ? getNbJours(selectedRow.label) : 1;
+
+  const toggleDate = (iso) => {
+    setSelectedDates(prev => {
+      if (prev.includes(iso)) return prev.filter(d => d !== iso);
+      if (prev.length >= nbJoursRequis) return [...prev.slice(1), iso]; // replace oldest if full
+      return [...prev, iso];
+    });
+  };
+
   const getDjCount = (label) => parseInt(label);
 
   if (done === "liberte" && selectedLiberte) return (
@@ -1475,7 +1498,7 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser }) 
                   const dailyRate = priceForRow(tarifData.rows[0]);
                   const savings = i > 0 ? Math.round((dailyRate * (i === 1 ? 5 : i === 2 ? 10 : i === 3 ? 15 : 20)) - price) : 0;
                   return (
-                    <div key={row.label} onClick={() => setSelectedRow({ ...row, price })} style={{
+                    <div key={row.label} onClick={() => { setSelectedRow({ ...row, price }); setStep("choix"); setSelectedDates([]); }} style={{
                       display: "flex", alignItems: "center", justifyContent: "space-between",
                       background: sel ? `linear-gradient(135deg, ${tarifData.color}18, ${tarifData.color}06)` : "#fff",
                       border: `2.5px solid ${sel ? tarifData.color : "#f0f0f0"}`,
@@ -1497,15 +1520,95 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser }) 
               </div>
             </div>
 
-            {selectedRow && (
+            {selectedRow && step === "choix" && (
+              <SunBtn color={tarifData.color} full onClick={() => { setStep("dates"); setSelectedDates([]); }}>
+                Choisir mes dates →
+              </SunBtn>
+            )}
+
+            {/* Étape 2 — Sélection des dates */}
+            {selectedRow && step === "dates" && (
+              <div style={{ background:"#fff", borderRadius:20, padding:16, boxShadow:"0 4px 16px rgba(0,0,0,0.06)" }}>
+                <div style={{ fontWeight:900, color:C.dark, fontSize:14, marginBottom:4 }}>
+                  📅 Choisissez {nbJoursRequis} jour{nbJoursRequis>1?"s":""}
+                </div>
+                <div style={{ fontSize:12, color:"#888", marginBottom:12 }}>
+                  {selectedDates.length}/{nbJoursRequis} sélectionné{selectedDates.length>1?"s":""}
+                </div>
+
+                {/* Toggle Juillet / Août */}
+                {(() => {
+                  const [moisFilter, setMoisFilter] = useState("juil");
+                  const dowL = ["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
+                  const jours = CLUB_SEASON_DAYS.filter(d => {
+                    const m = d.date.getMonth();
+                    return moisFilter === "juil" ? m === 6 : m === 7;
+                  });
+                  return (
+                    <>
+                      <div style={{ display:"flex", gap:8, marginBottom:10 }}>
+                        {[["juil","Juillet"],["aout","Août"]].map(([k,l]) => (
+                          <button key={k} onClick={() => setMoisFilter(k)}
+                            style={{ flex:1, background: moisFilter===k ? `linear-gradient(135deg,${C.ocean},${C.sea})` : "#f0f0f0", color: moisFilter===k?"#fff":"#888", border:"none", borderRadius:12, padding:"8px", cursor:"pointer", fontWeight:900, fontSize:13, fontFamily:"inherit" }}>
+                            {l}
+                          </button>
+                        ))}
+                      </div>
+                      <div style={{ display:"grid", gridTemplateColumns:"repeat(6, 1fr)", gap:6 }}>
+                        {jours.map(d => {
+                          const iso = `${d.date.getFullYear()}-${String(d.date.getMonth()+1).padStart(2,"0")}-${String(d.date.getDate()).padStart(2,"0")}`;
+                          const sel = selectedDates.includes(iso);
+                          return (
+                            <div key={iso} onClick={() => toggleDate(iso)} style={{
+                              background: sel ? `linear-gradient(135deg,${tarifData.color},${tarifData.color}cc)` : "#F8FBFF",
+                              border: `2px solid ${sel ? tarifData.color : "#e0e8f0"}`,
+                              borderRadius:10, padding:"6px 2px", textAlign:"center", cursor:"pointer",
+                              boxShadow: sel ? `0 3px 10px ${tarifData.color}44` : "none",
+                            }}>
+                              <div style={{ fontSize:9, color: sel?"rgba(255,255,255,0.8)":"#aaa", fontWeight:700 }}>{d.label}</div>
+                              <div style={{ fontSize:13, fontWeight:900, color: sel?"#fff":C.dark }}>{d.num}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  );
+                })()}
+
+                <div style={{ display:"flex", gap:8, marginTop:14 }}>
+                  <button onClick={() => setStep("choix")} style={{ flex:1, background:"#f0f0f0", border:"none", color:"#888", borderRadius:14, padding:"11px", cursor:"pointer", fontWeight:800, fontFamily:"inherit" }}>← Retour</button>
+                  <SunBtn color={selectedDates.length === nbJoursRequis ? tarifData.color : "#bbb"}
+                    disabled={selectedDates.length < nbJoursRequis}
+                    onClick={() => setStep("confirm")}>
+                    Confirmer ({selectedDates.length}/{nbJoursRequis}) →
+                  </SunBtn>
+                </div>
+              </div>
+            )}
+
+            {selectedRow && step === "confirm" && (
               <Card style={{ background: `linear-gradient(135deg, ${tarifData.color}15, ${tarifData.color}05)`, border: `2px solid ${tarifData.color}40`, textAlign: "center" }}>
                 <div style={{ fontWeight: 900, color: C.dark, marginBottom: 2 }}>{tarifData.emoji} {tarifData.label} · {selectedRow.label}</div>
                 <div style={{ fontWeight: 900, color: C.dark, fontSize: 13, marginBottom: 4 }}>👧 {nbEnfants} enfant{nbEnfants > 1 ? "s" : ""}</div>
+                {/* Dates sélectionnées */}
+                <div style={{ display:"flex", flexWrap:"wrap", gap:6, justifyContent:"center", marginBottom:12 }}>
+                  {selectedDates.map(iso => {
+                    const d = new Date(iso);
+                    return (
+                      <div key={iso} style={{ background:`${tarifData.color}20`, color:tarifData.color, borderRadius:8, padding:"3px 10px", fontSize:12, fontWeight:800 }}>
+                        {d.toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"})}
+                      </div>
+                    );
+                  })}
+                </div>
                 <div style={{ fontSize: 28, fontWeight: 900, color: tarifData.color, marginBottom: 16 }}>{selectedRow.price} €</div>
-                <SunBtn color={tarifData.color} full onClick={() => {
-                  if (setClubPlaces) setClubPlaces(prev => ({ ...prev, [formulType]: Math.max(0, (prev[formulType] || 45) - nbEnfants) }));
-                  setDone("club");
-                }}>Confirmer la réservation ✓</SunBtn>
+                <div style={{ display:"flex", gap:8 }}>
+                  <button onClick={() => setStep("dates")} style={{ flex:1, background:"#f0f0f0", border:"none", color:"#888", borderRadius:14, padding:"11px", cursor:"pointer", fontWeight:800, fontFamily:"inherit" }}>← Dates</button>
+                  <SunBtn color={tarifData.color} onClick={() => {
+                    if (setClubPlaces) setClubPlaces(prev => ({ ...prev, [formulType]: Math.max(0, (prev[formulType] || 45) - nbEnfants) }));
+                    setDone("club");
+                  }}>Payer {selectedRow.price} € ✓</SunBtn>
+                </div>
               </Card>
             )}
           </>
