@@ -2322,13 +2322,30 @@ function SeancesTab({ sessions, setSessions }) {
     week.push(d);
     if (d.label === "Sam" || i === ALL_SEASON_DAYS.length - 1) { weeks.push(week); week = []; }
   });
-  const [weekIdx, setWeekIdx]         = useState(0);
-  const currentWeek                    = weeks[Math.min(weekIdx, weeks.length - 1)] || [];
+  const [weekIdx, setWeekIdx]             = useState(0);
+  const currentWeek                        = weeks[Math.min(weekIdx, weeks.length - 1)] || [];
   const [selectedDayId, setSelectedDayId] = useState(ALL_SEASON_DAYS[0]?.id);
   const [confirmCancel, setConfirmCancel] = useState(null);
   const [showAddModal, setShowAddModal]   = useState(false);
   const [newHeure, setNewHeure]           = useState("09:00");
   const [addError, setAddError]           = useState("");
+  const [dbResasNat, setDbResasNat]       = useState([]);
+
+  // Charger résas natation depuis Supabase
+  useEffect(() => {
+    sb.from("reservations_natation").select("date_seance, heure")
+      .then(({ data }) => setDbResasNat(data || []))
+      .catch(() => {});
+  }, []);
+
+  // Calculer places réelles par créneau selon Supabase
+  const getSpots = (dayId, time) => {
+    const dayObj = ALL_SEASON_DAYS.find(d => d.id === dayId);
+    if (!dayObj?.date) return 2;
+    const dateISO = `${dayObj.date.getFullYear()}-${String(dayObj.date.getMonth()+1).padStart(2,"0")}-${String(dayObj.date.getDate()).padStart(2,"0")}`;
+    const taken = dbResasNat.filter(r => r.date_seance?.slice(0,10) === dateISO && r.heure === time).length;
+    return Math.max(0, 2 - taken);
+  };
 
   const handleWeekChange = (idx) => {
     setWeekIdx(idx);
@@ -2336,11 +2353,17 @@ function SeancesTab({ sessions, setSessions }) {
     if (w?.length) setSelectedDayId(w[0].id);
   };
 
-  const daySessions = sessions.filter(s => s.day === selectedDayId);
-  const morning     = daySessions.filter(s => parseInt(s.time) < 13);
-  const afternoon   = daySessions.filter(s => parseInt(s.time) >= 13);
-  const weekSessions = sessions.filter(s => currentWeek.some(d => d.id === s.day));
-  const weekTotal   = weekSessions.reduce((acc) => acc + 2, 0);
+  const daySessions  = sessions.filter(s => s.day === selectedDayId)
+    .map(s => ({ ...s, spots: getSpots(s.day, s.time) }));
+  const morning      = daySessions.filter(s => parseInt(s.time) < 13);
+  const afternoon    = daySessions.filter(s => parseInt(s.time) >= 13);
+  const weekSessions = sessions.filter(s => currentWeek.some(d => d.id === s.day))
+    .map(s => ({ ...s, spots: getSpots(s.day, s.time) }));
+
+  // Places réelles semaine
+  const weekLibres  = weekSessions.reduce((acc, s) => acc + s.spots, 0);
+  const weekPrises  = weekSessions.reduce((acc, s) => acc + (2 - s.spots), 0);
+  const weekTotal   = weekLibres + weekPrises; // total = nb créneaux × 2
   const dayAvail    = daySessions.reduce((acc, s) => acc + s.spots, 0);
   const dayPrises   = daySessions.reduce((acc, s) => acc + (2 - s.spots), 0);
   const spotColor   = n => n === 0 ? C.sunset : n === 1 ? C.coral : C.green;
@@ -2433,9 +2456,9 @@ function SeancesTab({ sessions, setSessions }) {
       {/* Summary bar */}
       <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
         {[
-          { label: "Places semaine", value: weekTotal,  color: C.ocean },
-          { label: "Places dispo",   value: dayAvail,   color: C.green },
-          { label: "Places prises",  value: dayPrises,  color: C.sunset },
+          { label: "Places semaine", value: weekTotal,   color: C.ocean   },
+          { label: "Libres",          value: weekLibres,  color: C.green   },
+          { label: "Réservées",       value: weekPrises,  color: C.sunset  },
         ].map(s => (
           <div key={s.label} style={{ flex: 1, background: "#fff", borderRadius: 14, padding: "10px 8px", textAlign: "center", boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}>
             <div style={{ fontSize: 18, fontWeight: 900, color: s.color }}>{s.value}</div>
