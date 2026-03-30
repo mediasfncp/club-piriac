@@ -2316,52 +2316,102 @@ function InfosScreen({ onNav }) {
 // ── ADMIN ─────────────────────────────────────────────────
 // ── ADMIN SÉANCES TAB ─────────────────────────────────────
 function SeancesTab({ sessions, setSessions }) {
-  // Build season weeks
   const weeks = [];
   let week = [];
   ALL_SEASON_DAYS.forEach((d, i) => {
     week.push(d);
-    if (d.label === "Sam" || i === ALL_SEASON_DAYS.length - 1) {
-      weeks.push(week);
-      week = [];
-    }
+    if (d.label === "Sam" || i === ALL_SEASON_DAYS.length - 1) { weeks.push(week); week = []; }
   });
-  const [weekIdx, setWeekIdx] = useState(0);
-  const currentWeek = weeks[Math.min(weekIdx, weeks.length - 1)] || [];
+  const [weekIdx, setWeekIdx]         = useState(0);
+  const currentWeek                    = weeks[Math.min(weekIdx, weeks.length - 1)] || [];
   const [selectedDayId, setSelectedDayId] = useState(ALL_SEASON_DAYS[0]?.id);
   const [confirmCancel, setConfirmCancel] = useState(null);
+  const [showAddModal, setShowAddModal]   = useState(false);
+  const [newHeure, setNewHeure]           = useState("09:00");
+  const [addError, setAddError]           = useState("");
 
-  // When week changes, auto-select first day of that week
   const handleWeekChange = (idx) => {
     setWeekIdx(idx);
     const w = weeks[Math.min(idx, weeks.length - 1)];
     if (w?.length) setSelectedDayId(w[0].id);
   };
 
-  // All season slots stored in admin state (passed as allSeasonSlots)
   const daySessions = sessions.filter(s => s.day === selectedDayId);
-  const morning  = daySessions.filter(s => parseInt(s.time) < 13);
-  const afternoon = daySessions.filter(s => parseInt(s.time) >= 13);
-
+  const morning     = daySessions.filter(s => parseInt(s.time) < 13);
+  const afternoon   = daySessions.filter(s => parseInt(s.time) >= 13);
   const weekSessions = sessions.filter(s => currentWeek.some(d => d.id === s.day));
-  const weekTotal  = weekSessions.reduce((acc) => acc + 2, 0);
-  const dayAvail   = daySessions.reduce((acc, s) => acc + s.spots, 0);
-  const dayPrises  = daySessions.reduce((acc, s) => acc + (2 - s.spots), 0);
+  const weekTotal   = weekSessions.reduce((acc) => acc + 2, 0);
+  const dayAvail    = daySessions.reduce((acc, s) => acc + s.spots, 0);
+  const dayPrises   = daySessions.reduce((acc, s) => acc + (2 - s.spots), 0);
+  const spotColor   = n => n === 0 ? C.sunset : n === 1 ? C.coral : C.green;
+  const spotDot     = n => n === 0 ? "#FF6B6B" : n === 1 ? "#FF8E53" : "#6BCB77";
 
-  const spotColor = n => n === 0 ? C.sunset : n === 1 ? C.coral : C.green;
-  const spotDot   = n => n === 0 ? "#FF6B6B" : n === 1 ? "#FF8E53" : "#6BCB77";
-
-  const doCancel = (id) => {
-    setSessions(prev => prev.filter(x => x.id !== id));
-    setConfirmCancel(null);
-  };
+  const doCancel = (id) => { setSessions(prev => prev.filter(x => x.id !== id)); setConfirmCancel(null); };
 
   const weekLabel = currentWeek.length > 0
     ? `${currentWeek[0].num} ${currentWeek[0].month} – ${currentWeek[currentWeek.length-1].num} ${currentWeek[currentWeek.length-1].month}`
     : "";
 
+  const heuresDisponibles = [
+    "09:00","09:30","10:00","10:30","11:00","11:30","12:00","12:30",
+    "13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00","18:30","19:00"
+  ];
+
+  const handleAddCreneau = () => {
+    setAddError("");
+    // Vérifier si ce créneau existe déjà ce jour
+    const exists = daySessions.some(s => s.time === newHeure);
+    if (exists) { setAddError(`Un créneau à ${newHeure} existe déjà ce jour.`); return; }
+    const newSlot = {
+      id: `custom-${selectedDayId}-${newHeure}-${Date.now()}`,
+      day: selectedDayId,
+      time: newHeure,
+      spots: 2,
+    };
+    setSessions(prev => [...prev, newSlot].sort((a, b) => {
+      if (a.day !== b.day) return 0;
+      return a.time.localeCompare(b.time);
+    }));
+    setShowAddModal(false);
+    setAddError("");
+  };
+
   return (
     <div>
+      {/* Modal ajout créneau */}
+      {showAddModal && (
+        <div style={{ position:"fixed", inset:0, zIndex:1100, display:"flex", flexDirection:"column" }}>
+          <div onClick={() => setShowAddModal(false)} style={{ position:"absolute", inset:0, background:"rgba(0,20,50,0.65)", backdropFilter:"blur(5px)" }} />
+          <div style={{ position:"relative", marginTop:"auto", background:"#F0F4F8", borderRadius:"28px 28px 0 0", boxShadow:"0 -12px 48px rgba(0,0,0,0.3)" }}>
+            <div style={{ display:"flex", justifyContent:"center", padding:"12px 0 4px" }}>
+              <div style={{ width:40, height:5, borderRadius:10, background:"#ddd" }} />
+            </div>
+            <div style={{ background:`linear-gradient(135deg,${C.ocean},${C.sea})`, margin:"0 16px", borderRadius:20, padding:"14px 18px", position:"relative" }}>
+              <button onClick={() => setShowAddModal(false)} style={{ position:"absolute", top:10, right:12, background:"rgba(255,255,255,0.25)", border:"none", color:"#fff", borderRadius:"50%", width:30, height:30, cursor:"pointer", fontWeight:900, fontSize:16, fontFamily:"inherit" }}>✕</button>
+              <div style={{ color:"#fff", fontWeight:900, fontSize:17 }}>➕ Ajouter un créneau</div>
+              <div style={{ color:"rgba(255,255,255,0.85)", fontSize:13, marginTop:2 }}>
+                {(() => { const d = ALL_SEASON_DAYS.find(d => d.id === selectedDayId); return d ? `${d.label} ${d.num} ${d.month} 2026` : ""; })()}
+              </div>
+            </div>
+            <div style={{ padding:"16px 16px 28px", display:"flex", flexDirection:"column", gap:12 }}>
+              <div>
+                <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, textTransform:"uppercase" }}>Heure du créneau</label>
+                <select value={newHeure} onChange={e => setNewHeure(e.target.value)}
+                  style={{ width:"100%", border:"2px solid #e0e8f0", borderRadius:14, padding:"12px", fontSize:15, fontFamily:"inherit", outline:"none", background:"#fff" }}>
+                  {heuresDisponibles.map(h => (
+                    <option key={h} value={h}>{h}</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ background:`${C.ocean}10`, border:`1.5px solid ${C.ocean}20`, borderRadius:12, padding:"10px 14px", fontSize:13, color:C.ocean, fontWeight:700 }}>
+                🏊 2 places · 30 min · Ouvert aux réservations immédiatement
+              </div>
+              {addError && <div style={{ background:"#fff0f0", border:"1.5px solid #fca5a5", borderRadius:10, padding:"9px 14px", fontSize:13, color:"#e74c3c", fontWeight:700 }}>⚠️ {addError}</div>}
+              <SunBtn color={C.ocean} full onClick={handleAddCreneau}>✅ Ajouter ce créneau</SunBtn>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Week navigator */}
       <div style={{ background: "#fff", borderRadius: 16, padding: "10px 14px", marginBottom: 12, boxShadow: "0 2px 8px rgba(0,0,0,0.05)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <button onClick={() => handleWeekChange(Math.max(0, weekIdx-1))} disabled={weekIdx === 0}
@@ -2373,6 +2423,12 @@ function SeancesTab({ sessions, setSessions }) {
         <button onClick={() => handleWeekChange(Math.min(weeks.length-1, weekIdx+1))} disabled={weekIdx >= weeks.length-1}
           style={{ background: weekIdx >= weeks.length-1 ? "#f0f0f0" : C.ocean, border: "none", color: weekIdx >= weeks.length-1 ? "#bbb" : "#fff", borderRadius: "50%", width: 30, height: 30, cursor: weekIdx >= weeks.length-1 ? "not-allowed" : "pointer", fontWeight: 900, fontSize: 16, fontFamily: "inherit" }}>›</button>
       </div>
+
+      {/* Bouton ajouter créneau */}
+      <button onClick={() => { setShowAddModal(true); setAddError(""); }}
+        style={{ width:"100%", background:`linear-gradient(135deg,${C.ocean},${C.sea})`, color:"#fff", border:"none", borderRadius:14, padding:"11px", cursor:"pointer", fontWeight:900, fontSize:14, fontFamily:"inherit", marginBottom:12, boxShadow:`0 4px 14px ${C.ocean}44` }}>
+        ➕ Ajouter un créneau natation
+      </button>
 
       {/* Summary bar */}
       <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
