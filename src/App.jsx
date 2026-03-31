@@ -4395,30 +4395,18 @@ function AgeGroupCard({ dbMembres = [] }) {
     ? `${currentWeek[0].num} ${currentWeek[0].month} – ${currentWeek[currentWeek.length-1].num} ${currentWeek[currentWeek.length-1].month}`
     : "";
 
-  // Build all children list — Supabase si dispo, sinon mock — UNIQUE par enfant
+  // Build all children list — Supabase uniquement, pas de données mock
   const allEnfants = [];
   const seenEnfants = new Set();
-  if (dbMembres.length > 0) {
-    dbMembres.forEach(m => {
-      (m.enfants || []).forEach(e => {
-        const key = `${e.prenom}-${e.nom}-${e.naissance}`;
-        if (!seenEnfants.has(key)) {
-          seenEnfants.add(key);
-          allEnfants.push({ ...e, age: calcAge(e.naissance), parent: `${m.prenom} ${NOM(m.nom)}`, parentColor: C.ocean, phone: m.tel });
-        }
-      });
+  dbMembres.forEach(m => {
+    (m.enfants || []).forEach(e => {
+      const key = `${e.prenom}-${e.nom}-${e.naissance}`;
+      if (!seenEnfants.has(key)) {
+        seenEnfants.add(key);
+        allEnfants.push({ ...e, age: calcAge(e.naissance), parent: `${m.prenom} ${NOM(m.nom)}`, parentColor: C.ocean, phone: m.tel });
+      }
     });
-  } else {
-    MEMBRES.forEach(m => {
-      m.enfants.forEach(e => {
-        const key = `${e.prenom}-${e.nom}-${e.naissance}`;
-        if (!seenEnfants.has(key)) {
-          seenEnfants.add(key);
-          allEnfants.push({ ...e, age: calcAge(e.naissance), parent: m.name, parentColor: m.color, phone: m.phone });
-        }
-      });
-    });
-  }
+  });
 
   const total = allEnfants.length;
 
