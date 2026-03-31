@@ -826,12 +826,7 @@ function FormulesEveilScreen({ onNav, user }) {
     setBooking({ sundayIdx, slotId });
   };
 
-  const confirmBook = () => {
-    setShowWero(true);
-  };
-
-  const onWeroSuccess = () => {
-    setShowWero(false);
+  const confirmBook = async () => {
     setEveilSundays(prev => prev.map((sun, si) =>
       si === booking.sundayIdx
         ? { ...sun, slots: sun.slots.map(sl => sl.id === booking.slotId ? { ...sl, spots: Math.max(0, sl.spots - 1) } : sl) }
@@ -839,36 +834,34 @@ function FormulesEveilScreen({ onNav, user }) {
     ));
     const sun = eveilSundays[booking.sundayIdx];
     const sl = sun.slots.find(s => s.id === booking.slotId);
-    // Programmer rappel veille à 20h
     const resaDate = new Date(sun.date);
     const resaDateISO = `${resaDate.getFullYear()}-${String(resaDate.getMonth()+1).padStart(2,"0")}-${String(resaDate.getDate()).padStart(2,"0")}`;
     const rappelDate = getRappelDate(resaDateISO);
-    scheduleRappel({
-      titre: "🌊 Rappel Éveil Aquatique demain !",
-      corps: `Séance d'éveil aquatique demain à ${sl.time}. N'oublie pas !`,
-      dateStr: rappelDate,
-    });
+    scheduleRappel({ titre:"🌊 Rappel Éveil Aquatique demain !", corps:`Séance d'éveil aquatique demain à ${sl.time}. N'oublie pas !`, dateStr: rappelDate });
+    try {
+      if (user?.supabaseId) {
+        await sb.from("reservations_natation").insert([{ membre_id: user.supabaseId, heure: sl.time, date_seance: resaDateISO, enfants: [], statut: "pending", montant: 20 }]);
+      }
+    } catch(e) { console.warn(e); }
     setDone({ sunday: sun.label, slot: sl.time, rappelDate });
     setBooking(null);
   };
 
   if (done) return (
-    <div style={{ padding: 32, textAlign: "center", background: C.shell, minHeight: "100%" }}>
-      <div style={{ width: 90, height: 90, borderRadius: "50%", background: "linear-gradient(135deg, #9B59B6, #8E44AD)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 42, margin: "0 auto 20px" }}>✓</div>
-      <h2 style={{ color: "#9B59B6", fontSize: 24, margin: "0 0 8px" }}>Réservation confirmée !</h2>
-      <p style={{ color: "#666", fontSize: 15, lineHeight: 1.6 }}>
-        🌊 Éveil Aquatique<br />
-        <strong>{done.sunday}</strong><br />
-        🕐 {done.slot}
-      </p>
-      <p style={{ color: "#aaa", fontSize: 13 }}>20 €</p>
-      {done.rappelDate && <RappelBanner rappels={[done]} />}
-      <div style={{ marginTop: 16 }}>
-        <SunBtn color="#9B59B6" onClick={() => { setDone(null); }}>Réserver un autre créneau</SunBtn>
+    <div style={{ padding:32, textAlign:"center", background:C.shell, minHeight:"100%" }}>
+      <div style={{ fontSize:80 }}>📨</div>
+      <h2 style={{ color:"#9B59B6" }}>Demande envoyée ! 🎉</h2>
+      <div style={{ background:"#fff", borderRadius:20, padding:20, margin:"16px 0", boxShadow:"0 4px 16px rgba(0,0,0,0.06)" }}>
+        <p style={{ color:"#666", fontSize:14, lineHeight:1.8 }}>
+          🌊 Éveil Aquatique · <strong>{done.sunday}</strong> à {done.slot}<br/>
+          L'équipe FNCP vous contactera pour le paiement.<br/>
+          🏦 Virement · ✉️ Chèque · 🎫 Chèques vacances
+        </p>
+        <div style={{ background:"#F3E8FF", borderRadius:12, padding:"10px 14px", fontSize:13, color:"#9B59B6", fontWeight:700 }}>
+          ⏳ Votre accès sera activé à réception du paiement
+        </div>
       </div>
-      <div style={{ marginTop: 14 }}>
-        <button onClick={() => onNav("home")} style={{ background: "none", border: "none", color: "#aaa", fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>← Retour à l'accueil</button>
-      </div>
+      <SunBtn color="#9B59B6" onClick={() => { setDone(null); onNav("home"); }}>Retour à l'accueil</SunBtn>
     </div>
   );
 
@@ -899,15 +892,16 @@ function FormulesEveilScreen({ onNav, user }) {
             <div style={{ fontWeight: 900, color: "#9B59B6", marginBottom: 4 }}>💰 Tarif : 20 €</div>
             <div style={{ fontSize: 13, color: "#777" }}>1 séance d'éveil aquatique · 30 min</div>
           </div>
-          <SunBtn color="#9B59B6" full onClick={confirmBook}>🌊 Payer et confirmer · 20 €</SunBtn>
-          {showWero && (
-            <WeroModal
-              amount={20}
-              label="Éveil Aquatique · 1 séance"
-              onSuccess={onWeroSuccess}
-              onCancel={() => setShowWero(false)}
-            />
-          )}
+          <div style={{ background:"#F8FBFF", borderRadius:14, padding:"12px 14px", marginBottom:8 }}>
+            <div style={{ fontWeight:900, color:C.dark, fontSize:12, marginBottom:8 }}>💳 Modes de paiement acceptés</div>
+            {[["🏦","Virement bancaire"],["✉️","Chèque"],["🎫","Chèques vacances"]].map(([icon,label]) => (
+              <div key={label} style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4, fontSize:12, color:"#555" }}>
+                <span>{icon}</span>{label}
+              </div>
+            ))}
+            <div style={{ fontSize:11, color:"#aaa", marginTop:6, fontStyle:"italic" }}>Votre accès sera activé à réception du paiement.</div>
+          </div>
+          <SunBtn color="#9B59B6" full onClick={confirmBook}>📨 Envoyer la demande · 20 €</SunBtn>
         </div>
       </div>
     );
@@ -1002,10 +996,19 @@ function FormulesNatationScreen({ onNav }) {
   const [done, setDone] = useState(false);
   const [showWero, setShowWero] = useState(false);
   if (done) return (
-    <div style={{ padding: 32, textAlign: "center", background: C.shell, minHeight: "100%" }}>
-      <div style={{ fontSize: 90 }}>🎉</div>
-      <h2 style={{ color: C.green, fontSize: 24 }}>Super choix !</h2>
-      <p style={{ color: "#666" }}>Ta formule <strong>{selected?.label}</strong> ({selected?.price} €) est enregistrée.</p>
+    <div style={{ padding:32, textAlign:"center", background:C.shell, minHeight:"100%" }}>
+      <div style={{ fontSize:80 }}>📨</div>
+      <h2 style={{ color:C.ocean }}>Demande envoyée ! 🎉</h2>
+      <div style={{ background:"#fff", borderRadius:20, padding:20, margin:"16px 0", boxShadow:"0 4px 16px rgba(0,0,0,0.06)" }}>
+        <p style={{ color:"#666", fontSize:14, lineHeight:1.8 }}>
+          Formule <strong>{selected?.label}</strong> ({selected?.price} €) enregistrée.<br/>
+          L'équipe FNCP vous contactera pour le paiement.<br/>
+          🏦 Virement · ✉️ Chèque · 🎫 Chèques vacances
+        </p>
+        <div style={{ background:`${C.ocean}10`, borderRadius:12, padding:"10px 14px", fontSize:13, color:C.ocean, fontWeight:700 }}>
+          ⏳ Votre accès sera activé à réception du paiement
+        </div>
+      </div>
       <SunBtn color={C.ocean} onClick={() => { setDone(false); setSelected(null); onNav("home"); }}>Retour à l'accueil</SunBtn>
     </div>
   );
@@ -1042,19 +1045,20 @@ function FormulesNatationScreen({ onNav }) {
           })}
         </div>
         {selected && (
-          <Card style={{ background: `linear-gradient(135deg, ${selected.color}15, ${selected.color}05)`, border: `2px solid ${selected.color}40`, textAlign: "center" }}>
-            <div style={{ fontSize: 30, marginBottom: 6 }}>{selected.emoji}</div>
-            <div style={{ fontWeight: 900, color: C.dark, marginBottom: 2 }}>Formule : {selected.label}</div>
-            <div style={{ fontSize: 26, fontWeight: 900, color: selected.color, marginBottom: 16 }}>{selected.price} €</div>
-            <SunBtn color={selected.color} full onClick={() => setShowWero(true)}>🔒 Payer et commander · {selected?.price} €</SunBtn>
-            {showWero && (
-              <WeroModal
-                amount={selected?.price}
-                label={`Formule Natation · ${selected?.label}`}
-                onSuccess={() => { setShowWero(false); setDone(true); }}
-                onCancel={() => setShowWero(false)}
-              />
-            )}
+          <Card style={{ background: `linear-gradient(135deg, ${selected.color}15, ${selected.color}05)`, border: `2px solid ${selected.color}40` }}>
+            <div style={{ fontSize:30, marginBottom:6, textAlign:"center" }}>{selected.emoji}</div>
+            <div style={{ fontWeight:900, color:C.dark, marginBottom:2, textAlign:"center" }}>Formule : {selected.label}</div>
+            <div style={{ fontSize:26, fontWeight:900, color:selected.color, marginBottom:10, textAlign:"center" }}>{selected.price} €</div>
+            <div style={{ background:"#F8FBFF", borderRadius:12, padding:"10px 12px", marginBottom:14 }}>
+              <div style={{ fontWeight:900, color:C.dark, fontSize:12, marginBottom:6 }}>💳 Modes de paiement acceptés</div>
+              {[["🏦","Virement bancaire"],["✉️","Chèque"],["🎫","Chèques vacances"]].map(([icon,label]) => (
+                <div key={label} style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4, fontSize:12, color:"#555" }}>
+                  <span>{icon}</span>{label}
+                </div>
+              ))}
+              <div style={{ fontSize:11, color:"#aaa", marginTop:6, fontStyle:"italic" }}>Votre accès sera activé à réception du paiement.</div>
+            </div>
+            <SunBtn color={selected.color} full onClick={() => setDone(true)}>📨 Envoyer la demande · {selected?.price} €</SunBtn>
           </Card>
         )}
       </div>
@@ -5272,7 +5276,6 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
   useEffect(() => {
     refreshResas();
     getAllMembres().then(d => setDbMembres(d)).catch(() => {});
-    getPaiements().then(d => setDbPaiements(d)).catch(() => {});
   }, []);
 
   const MOCK_RESAS = [
@@ -5293,8 +5296,12 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
     session: `${r.time} - ${DAYS.find(d=>d.id===r.day)?.label} ${DAYS.find(d=>d.id===r.day)?.num}`, status: "confirmed"
   }))];
 
-  // Paiements réels Supabase
-  const realTotal = dbPaiements.reduce((s, p) => s + Number(p.montant || 0), 0);
+  // Total encaissé = résas confirmées uniquement
+  const confirmedNat  = dbResas.filter(r => r.statut === "confirmed");
+  const confirmedClub = dbResasClub.filter(r => r.statut === "confirmed");
+  const realTotal = confirmedNat.reduce((s, r) => s + Number(r.montant || 20), 0)
+                  + confirmedClub.reduce((s, r) => s + Number(r.montant || 0), 0);
+  const pendingCount = dbResas.filter(r => r.statut === "pending").length + dbResasClub.filter(r => r.statut === "pending").length;
 
   // Taux de remplissage natation — toute la saison
   const totalSlotsNat  = ALL_SEASON_SLOTS_INIT.length * 2; // total places saison
@@ -5404,19 +5411,19 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
               </div>
             </div>
 
-            {/* 💳 Paiements réels Supabase */}
+            {/* 💳 Paiements */}
             <div style={{ background: "#fff", borderRadius: 20, padding: 18, boxShadow: "0 4px 16px rgba(0,0,0,0.06)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-                <div style={{ fontWeight: 800, color: "#2C3E50", fontSize: 14 }}>💳 Paiements reçus</div>
+                <div style={{ fontWeight: 800, color: "#2C3E50", fontSize: 14 }}>💳 Paiements</div>
                 <div style={{ background: `${C.green}18`, color: C.green, borderRadius: 50, padding: "4px 14px", fontWeight: 900, fontSize: 13 }}>
                   {realTotal} € encaissés
                 </div>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 14 }}>
                 {[
-                  { label: "Total", value: `${realTotal} €`, color: C.green },
-                  { label: "Transactions", value: dbPaiements.length, color: C.ocean },
-                  { label: "Moyenne", value: dbPaiements.length > 0 ? `${Math.round(realTotal/dbPaiements.length)} €` : "—", color: "#9B59B6" },
+                  { label: "Confirmées", value: confirmedNat.length + confirmedClub.length, color: C.green },
+                  { label: "En attente", value: pendingCount, color: C.sun },
+                  { label: "Total résas", value: dbResas.length + dbResasClub.length, color: C.ocean },
                 ].map(k => (
                   <div key={k.label} style={{ background: `${k.color}12`, borderRadius: 14, padding: "10px 8px", textAlign: "center" }}>
                     <div style={{ fontWeight: 900, color: k.color, fontSize: 16 }}>{k.value}</div>
@@ -5424,24 +5431,31 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                   </div>
                 ))}
               </div>
-              {dbPaiements.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "12px 0", color: "#bbb", fontSize: 13 }}>Aucun paiement enregistré</div>
-              ) : dbPaiements.slice(0, 6).map((p, i) => {
-                const catColor = p.type === "natation" ? C.ocean : p.type === "club" ? C.coral : p.type === "liberte" ? "#FF9500" : "#9B59B6";
-                const dateStr = p.date_paiement ? new Date(p.date_paiement).toLocaleDateString("fr-FR") : "—";
-                return (
-                  <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: i < Math.min(dbPaiements.length,6)-1 ? "1px solid #F0F4F8" : "none" }}>
-                    <div style={{ width: 34, height: 34, borderRadius: 12, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, background: `${catColor}18`, color: catColor, fontWeight: 900 }}>✓</div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 800, fontSize: 13, color: "#2C3E50", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {p.membres ? `${p.membres.prenom} ${p.membres.nom}` : "—"}
+              {/* Dernières résas confirmées */}
+              {[...confirmedNat.slice(-3), ...confirmedClub.slice(-3)]
+                .sort((a,b) => (b.date_seance||b.date_reservation||"").localeCompare(a.date_seance||a.date_reservation||""))
+                .slice(0, 5)
+                .map((r, i, arr) => {
+                  const isNat = !!r.date_seance;
+                  const color = isNat ? C.ocean : C.coral;
+                  const label = isNat ? `🏊 ${r.heure}` : `🏖️ ${r.session === "matin" ? "Matin" : "Après-midi"}`;
+                  const date  = (r.date_seance || r.date_reservation)?.slice(0,10);
+                  return (
+                    <div key={`${isNat?"n":"c"}-${r.id}`} style={{ display:"flex", alignItems:"center", gap:10, padding:"9px 0", borderBottom: i < arr.length-1 ? "1px solid #F0F4F8" : "none" }}>
+                      <div style={{ width:34, height:34, borderRadius:12, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, background:`${color}18`, color, fontWeight:900 }}>✓</div>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontWeight:800, fontSize:13, color:"#2C3E50", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                          {r.membres ? `${r.membres.prenom} ${NOM(r.membres.nom)}` : "—"}
+                        </div>
+                        <div style={{ fontSize:11, color:"#aaa" }}>{label} · {date ? new Date(date).toLocaleDateString("fr-FR") : "—"}</div>
                       </div>
-                      <div style={{ fontSize: 11, color: "#aaa" }}>{p.label} · {dateStr}</div>
+                      <div style={{ fontWeight:900, fontSize:13, color:C.green, flexShrink:0 }}>✓ Payé</div>
                     </div>
-                    <div style={{ fontWeight: 900, fontSize: 14, color: catColor, flexShrink: 0 }}>{p.montant} €</div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              {confirmedNat.length + confirmedClub.length === 0 && (
+                <div style={{ textAlign:"center", padding:"12px 0", color:"#bbb", fontSize:13 }}>Aucun paiement confirmé</div>
+              )}
             </div>
 
             {/* 👤 Derniers membres inscrits */}
