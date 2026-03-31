@@ -1449,11 +1449,20 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser }) 
   );
 
   if (done === "club") return (
-    <div style={{ padding:32,textAlign:"center",background:C.shell,minHeight:"100%" }}>
-      <div style={{ fontSize:80 }}>🏖️</div>
-      <h2 style={{ color:C.green }}>À la plage ! 🎉</h2>
-      <p style={{ color:"#666",fontSize:14 }}>Ta réservation est enregistrée.</p>
-      <SunBtn color={C.ocean} onClick={() => { setDone(null); setSelectedRow(null); onNav("home"); }}>Retour à l'accueil</SunBtn>
+    <div style={{ padding:32, textAlign:"center", background:C.shell, minHeight:"100%" }}>
+      <div style={{ fontSize:80 }}>📨</div>
+      <h2 style={{ color:C.coral }}>Demande envoyée ! 🎉</h2>
+      <div style={{ background:"#fff", borderRadius:20, padding:20, margin:"16px 0", boxShadow:"0 4px 16px rgba(0,0,0,0.06)" }}>
+        <div style={{ fontSize:14, color:"#555", lineHeight:1.8 }}>
+          Votre demande de réservation a bien été enregistrée.<br/>
+          <strong>L'équipe FNCP va vous contacter</strong> pour finaliser le paiement par :<br/>
+          🏦 Virement · ✉️ Chèque · 🎫 Chèques vacances
+        </div>
+        <div style={{ marginTop:12, background:`${C.coral}10`, borderRadius:12, padding:"10px 14px", fontSize:13, color:C.coral, fontWeight:700 }}>
+          ⏳ Votre accès sera activé à réception du paiement
+        </div>
+      </div>
+      <SunBtn color={C.ocean} onClick={() => { setDone(null); setSelectedRow(null); setStep("choix"); onNav("home"); }}>Retour à l'accueil</SunBtn>
     </div>
   );
 
@@ -1700,13 +1709,40 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser }) 
                     );
                   })}
                 </div>
-                <div style={{ fontSize: 28, fontWeight: 900, color: tarifData.color, marginBottom: 16 }}>{selectedRow.price} €</div>
+                <div style={{ fontSize: 28, fontWeight: 900, color: tarifData.color, marginBottom: 8 }}>{selectedRow.price} €</div>
+
+                {/* Modes de paiement */}
+                <div style={{ background:"#F8FBFF", borderRadius:14, padding:"12px 14px", marginBottom:14, textAlign:"left" }}>
+                  <div style={{ fontWeight:900, color:C.dark, fontSize:13, marginBottom:8 }}>💳 Modes de paiement acceptés</div>
+                  {[["🏦","Virement bancaire"],["✉️","Chèque"],["🎫","Chèques vacances"]].map(([icon,label]) => (
+                    <div key={label} style={{ display:"flex", alignItems:"center", gap:8, marginBottom:5, fontSize:13, color:"#555" }}>
+                      <span style={{ fontSize:16 }}>{icon}</span>{label}
+                    </div>
+                  ))}
+                  <div style={{ fontSize:11, color:"#aaa", marginTop:8, fontStyle:"italic" }}>
+                    Votre réservation sera confirmée à réception du paiement par l'équipe FNCP.
+                  </div>
+                </div>
+
                 <div style={{ display:"flex", gap:8 }}>
                   <button onClick={() => setStep("dates")} style={{ flex:1, background:"#f0f0f0", border:"none", color:"#888", borderRadius:14, padding:"11px", cursor:"pointer", fontWeight:800, fontFamily:"inherit" }}>← Dates</button>
-                  <SunBtn color={tarifData.color} onClick={() => {
-                    if (setClubPlaces) setClubPlaces(prev => ({ ...prev, [formulType]: Math.max(0, (prev[formulType] || 45) - nbEnfants) }));
+                  <SunBtn color={tarifData.color} onClick={async () => {
+                    // Créer résas en statut "pending"
+                    try {
+                      for (const iso of selectedDates) {
+                        await creerReservationClub({
+                          membreId: user?.supabaseId || null,
+                          dateReservation: iso,
+                          session: formulType === "journee" ? "matin" : formulType,
+                          labelJour: new Date(iso).toLocaleDateString("fr-FR", {weekday:"long",day:"numeric",month:"long"}),
+                          rappelDate: null,
+                          enfants: (user?.enfants||[]).filter(e => e.activite==="club"||e.activite==="les deux").map(e=>e.prenom),
+                        });
+                      }
+                    } catch(e) { console.warn(e); }
+                    if (setClubPlaces) setClubPlaces(prev => ({ ...prev, [formulType]: Math.max(0, (prev[formulType]||45) - nbEnfants) }));
                     setDone("club");
-                  }}>Payer {selectedRow.price} € ✓</SunBtn>
+                  }}>📨 Envoyer la demande · {selectedRow.price} €</SunBtn>
                 </div>
               </Card>
             )}
@@ -5581,11 +5617,19 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
               <>
                 <div style={{ fontWeight:800, color:C.ocean, fontSize:12, marginBottom:-4 }}>🏊 NATATION ({dbResas.length})</div>
                 {dbResas.map(r => (
-                  <div key={r.id} style={{ background:"#fff", borderRadius:18, padding:"12px 14px", boxShadow:"0 2px 10px rgba(0,0,0,0.05)", borderLeft:`4px solid ${C.ocean}` }}>
+                  <div key={r.id} style={{ background:"#fff", borderRadius:18, padding:"12px 14px", boxShadow:"0 2px 10px rgba(0,0,0,0.05)", borderLeft:`4px solid ${r.statut==="pending"?C.sun:C.ocean}` }}>
                     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
-                      <div style={{ fontWeight:900, color:"#2C3E50", fontSize:13 }}>{r.membres ? `${r.membres.prenom} ${r.membres.nom}` : "—"}</div>
+                      <div style={{ fontWeight:900, color:"#2C3E50", fontSize:13 }}>{r.membres ? `${r.membres.prenom} ${NOM(r.membres.nom)}` : "—"}</div>
                       <div style={{ display:"flex", gap:6, alignItems:"center" }}>
-                        <Pill color={C.green}>✓ Confirmé</Pill>
+                        {r.statut === "pending" ? (
+                          <>
+                            <Pill color={C.sun}>⏳ En attente</Pill>
+                            <button onClick={async () => { await sb.from("reservations_natation").update({statut:"confirmed"}).eq("id",r.id); refreshResas(); }}
+                              style={{ background:`${C.green}15`, border:`1.5px solid ${C.green}40`, color:C.green, borderRadius:8, padding:"3px 10px", cursor:"pointer", fontWeight:900, fontSize:11, fontFamily:"inherit" }}>✅ Payé</button>
+                          </>
+                        ) : (
+                          <Pill color={C.green}>✓ Confirmé</Pill>
+                        )}
                         <button onClick={() => setModifierResa({ resa: r, type: "natation" })}
                           style={{ background:`${C.ocean}15`, border:"none", color:C.ocean, borderRadius:8, width:28, height:28, cursor:"pointer", fontWeight:900, fontSize:13, fontFamily:"inherit" }}>✏️</button>
                         <button onClick={() => { if(window.confirm("Supprimer cette réservation ?")) supprimerResaNatation(r.id); }}
@@ -5604,11 +5648,19 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
               <>
                 <div style={{ fontWeight:800, color:C.coral, fontSize:12, marginBottom:-4 }}>🏖️ CLUB DE PLAGE ({dbResasClub.length})</div>
                 {dbResasClub.map(r => (
-                  <div key={r.id} style={{ background:"#fff", borderRadius:18, padding:"12px 14px", boxShadow:"0 2px 10px rgba(0,0,0,0.05)", borderLeft:`4px solid ${C.coral}` }}>
+                  <div key={r.id} style={{ background:"#fff", borderRadius:18, padding:"12px 14px", boxShadow:"0 2px 10px rgba(0,0,0,0.05)", borderLeft:`4px solid ${r.statut==="pending"?C.sun:C.coral}` }}>
                     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
-                      <div style={{ fontWeight:900, color:"#2C3E50", fontSize:13 }}>{r.membres ? `${r.membres.prenom} ${r.membres.nom}` : "—"}</div>
+                      <div style={{ fontWeight:900, color:"#2C3E50", fontSize:13 }}>{r.membres ? `${r.membres.prenom} ${NOM(r.membres.nom)}` : "—"}</div>
                       <div style={{ display:"flex", gap:6, alignItems:"center" }}>
-                        <Pill color={C.green}>✓ Confirmé</Pill>
+                        {r.statut === "pending" ? (
+                          <>
+                            <Pill color={C.sun}>⏳ En attente</Pill>
+                            <button onClick={async () => { await sb.from("reservations_club").update({statut:"confirmed"}).eq("id",r.id); refreshResas(); }}
+                              style={{ background:`${C.green}15`, border:`1.5px solid ${C.green}40`, color:C.green, borderRadius:8, padding:"3px 10px", cursor:"pointer", fontWeight:900, fontSize:11, fontFamily:"inherit" }}>✅ Payé</button>
+                          </>
+                        ) : (
+                          <Pill color={C.green}>✓ Confirmé</Pill>
+                        )}
                         <button onClick={() => setModifierResa({ resa: r, type: "club" })}
                           style={{ background:`${C.coral}15`, border:"none", color:C.coral, borderRadius:8, width:28, height:28, cursor:"pointer", fontWeight:900, fontSize:13, fontFamily:"inherit" }}>✏️</button>
                         <button onClick={() => { if(window.confirm("Supprimer cette réservation ?")) supprimerResaClub(r.id); }}
