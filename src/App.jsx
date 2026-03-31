@@ -4436,10 +4436,13 @@ function AgeGroupCard({ dbMembres = [] }) {
     // membre_ids club toute saison
     const membreIdsClubSaison = new Set(dbResasClub.map(r => r.membre_id));
 
+    console.log("🏊 Prénoms natation:", [...prenomNatSaison]);
+    console.log("🏖️ Membres club IDs:", [...membreIdsClubSaison]);
+    console.log("👧 Tous enfants:", allEnfants.map(e => `${e.prenom} ${e.nom} (${e.activite})`));
+
     if (period === "saison") {
-      // Enfants ayant au moins une réservation sur la saison
       if (dbResasNat.length === 0 && dbResasClub.length === 0) return allEnfants;
-      return allEnfants.filter(e => {
+      const filtered = allEnfants.filter(e => {
         if (e.activite === "natation" || e.activite === "les deux") {
           if (prenomNatSaison.has(e.prenom)) return true;
         }
@@ -4449,6 +4452,8 @@ function AgeGroupCard({ dbMembres = [] }) {
         }
         return false;
       });
+      console.log("✅ Filtrés saison:", filtered.map(e => `${e.prenom} ${e.nom}`));
+      return filtered;
     }
 
     // Dates concernées
