@@ -1230,6 +1230,7 @@ function ReservationClubScreen({ onNav, user, setUser, clubPlaces, setClubPlaces
           session:          selectedSession,
           labelJour:        `${selectedDay?.label} ${selectedDay?.num} ${selectedDay?.month}`,
           rappelDate:       rappelDate,
+          enfants:          (user?.enfants || []).filter(e => e.activite === "club" || e.activite === "les deux").map(e => e.prenom),
         });
         const newBalance = Math.max(0, (user?.liberteBalance||0) - 1);
         if (user?.supabaseId) await updateLiberte(user.supabaseId, newBalance, user.liberteTotal || newBalance);
@@ -4421,12 +4422,7 @@ function AgeGroupCard({ dbMembres = [] }) {
       dbResasNat.flatMap(r => Array.isArray(r.enfants) ? r.enfants : [])
     );
     const prenomClubSaison = new Set(
-      dbResasClub.flatMap(r => {
-        const membre = dbMembres.find(m => m.id === r.membre_id);
-        return (membre?.enfants || [])
-          .filter(e => e.activite === "club" || e.activite === "les deux")
-          .map(e => e.prenom);
-      })
+      dbResasClub.flatMap(r => Array.isArray(r.enfants) ? r.enfants : [])
     );
     if (period === "saison") {
       if (dbResasNat.length === 0 && dbResasClub.length === 0) return allEnfants;
@@ -4485,12 +4481,7 @@ function AgeGroupCard({ dbMembres = [] }) {
   // Pour le club : charger les prénoms des enfants ayant réellement une résa club
   // En joignant avec la table enfants via membre_id
   const prenomClubAll = new Set(
-    dbResasClub.flatMap(r => {
-      const membre = dbMembres.find(m => m.id === r.membre_id);
-      return (membre?.enfants || [])
-        .filter(e => e.activite === "club" || e.activite === "les deux")
-        .map(e => e.prenom);
-    })
+    dbResasClub.flatMap(r => Array.isArray(r.enfants) ? r.enfants : [])
   );
 
   const hasNatResa  = (e) => prenomNatAll.has(e.prenom);
@@ -4840,6 +4831,7 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
                   session: sess,
                   labelJour: day.date.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }),
                   rappelDate: getRappelDate(dateStr),
+                  enfants: selectedEnfants,
                 });
                 if (setClubPlaces) setClubPlaces(prev => ({ ...prev, [sess]: Math.max(0, (prev[sess]||45) - 1) }));
               }
@@ -4858,6 +4850,7 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
               session: s.session,
               labelJour: new Date(s.date).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }),
               rappelDate: getRappelDate(s.date),
+              enfants: selectedEnfants,
             });
             if (setClubPlaces) setClubPlaces(prev => ({ ...prev, [s.session]: Math.max(0, (prev[s.session]||45) - 1) }));
           }
