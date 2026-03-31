@@ -4424,23 +4424,20 @@ function AgeGroupCard({ dbMembres = [] }) {
     // membre_ids club toute saison
     const membreIdsClubSaison = new Set(dbResasClub.map(r => r.membre_id));
 
-    console.log("🏊 Prénoms natation:", [...prenomNatSaison]);
-    console.log("🏖️ Membres club IDs:", [...membreIdsClubSaison]);
-    console.log("👧 Tous enfants:", allEnfants.map(e => `${e.prenom} ${e.nom} (${e.activite})`));
+
+
+
 
     if (period === "saison") {
       if (dbResasNat.length === 0 && dbResasClub.length === 0) return allEnfants;
       const filtered = allEnfants.filter(e => {
-        if (e.activite === "natation" || e.activite === "les deux") {
-          if (prenomNatSaison.has(e.prenom)) return true;
-        }
-        if (e.activite === "club" || e.activite === "les deux") {
-          const membre = dbMembres.find(m => (m.enfants||[]).some(me => me.prenom === e.prenom && me.nom === e.nom));
-          if (membre && membreIdsClubSaison.has(membre.id)) return true;
-        }
+        // Natation → prénom dans les résas natation
+        if (prenomNatSaison.has(e.prenom)) return true;
+        // Club → membre parent dans les résas club
+        const membre = dbMembres.find(m => (m.enfants||[]).some(me => me.prenom === e.prenom && me.nom === e.nom));
+        if (membre && membreIdsClubSaison.has(membre.id)) return true;
         return false;
       });
-      console.log("✅ Filtrés saison:", filtered.map(e => `${e.prenom} ${e.nom}`));
       return filtered;
     }
 
@@ -4490,15 +4487,24 @@ function AgeGroupCard({ dbMembres = [] }) {
   }));
   const baseTotal = baseList.length;
 
+  const prenomNatAll = new Set(dbResasNat.flatMap(r => Array.isArray(r.enfants) ? r.enfants : []));
+  const membreIdsClubAll = new Set(dbResasClub.map(r => r.membre_id));
+
+  const hasNatResa = (e) => prenomNatAll.has(e.prenom);
+  const hasClubResa = (e) => {
+    const membre = dbMembres.find(m => (m.enfants||[]).some(me => me.prenom === e.prenom && me.nom === e.nom));
+    return membre && membreIdsClubAll.has(membre.id);
+  };
+
   const filteredEnfants = baseList
     .filter(e => !selectedGroup || (e.age >= selectedGroup.min && e.age <= selectedGroup.max))
     .filter(e => {
       if (selectedActivity === "tous") return true;
-      if (selectedActivity === "natation") return e.activite === "natation" || e.activite === "les deux";
-      if (selectedActivity === "club") return e.activite === "club" || e.activite === "les deux";
+      if (selectedActivity === "natation") return hasNatResa(e);
+      if (selectedActivity === "club") return hasClubResa(e);
       return true;
     })
-    .sort((a, b) => a.age - b.age || a.nom.localeCompare(b.nom));
+    .sort((a, b) => a.age - b.age || (a.nom||"").localeCompare(b.nom||""));
 
   const actLabel = { natation: "🏊 Natation", club: "🏖️ Club", tous: "Toutes" };
   const actColor = { natation: C.ocean, club: C.coral, tous: C.dark };
