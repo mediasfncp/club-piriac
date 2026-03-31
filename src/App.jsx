@@ -1455,7 +1455,7 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser }) 
         </div>
         {/* Tab selector */}
         <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-          {[["club", "🏖️ Formule Club"], ["liberte", "🎟️ Formule Liberté"]].map(([k, l]) => (
+          {[["club", "Formule Club"], ["liberte", "Formule Liberté"]].map(([k, l]) => (
             <button key={k} onClick={() => setTab(k)} style={{ flex: 1, background: tab === k ? "#fff" : "rgba(255,255,255,0.25)", color: tab === k ? C.coral : "#fff", border: "none", borderRadius: 14, padding: "9px 8px", cursor: "pointer", fontWeight: 900, fontSize: 12, fontFamily: "inherit", transition: "all .15s" }}>{l}</button>
           ))}
         </div>
@@ -1676,7 +1676,7 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser }) 
 
             {selectedRow && step === "confirm" && (
               <Card style={{ background: `linear-gradient(135deg, ${tarifData.color}15, ${tarifData.color}05)`, border: `2px solid ${tarifData.color}40`, textAlign: "center" }}>
-                <div style={{ fontWeight: 900, color: C.dark, marginBottom: 2 }}>{tarifData.emoji} {tarifData.label} · {selectedRow.label}</div>
+                <div style={{ fontWeight: 900, color: C.dark, marginBottom: 2 }}>{tarifData.label} · {selectedRow.label}</div>
                 <div style={{ fontWeight: 900, color: C.dark, fontSize: 13, marginBottom: 4 }}>👧 {nbEnfants} enfant{nbEnfants > 1 ? "s" : ""}</div>
                 {/* Dates sélectionnées */}
                 <div style={{ display:"flex", flexWrap:"wrap", gap:6, justifyContent:"center", marginBottom:12 }}>
@@ -2278,6 +2278,8 @@ function InscriptionScreen({ onNav, setUser }) {
               <FInput label="Allergies / informations médicales" value={newEnfant.allergies} onChange={v => setNewEnfant(e => ({ ...e, allergies: v }))} placeholder="Aucune si vide" />
               <SunBtn small color={C.sea} full onClick={() => {
                 if (newEnfant.prenom && newEnfant.nom && newEnfant.naissance) {
+                  const age = calcAge(newEnfant.naissance);
+                  if (age < 3) { alert("L'enfant doit avoir au moins 3 ans pour s'inscrire."); return; }
                   setForm(p => ({ ...p, enfants: [...p.enfants, { ...newEnfant, id: Date.now() }] }));
                   setNewEnfant({ prenom: "", nom: "", naissance: "", activite: "club", niveau: "debutant", allergies: "" });
                 }
@@ -4394,7 +4396,7 @@ function AgeGroupCard({ dbMembres = [] }) {
   let wk = [];
   ALL_SEASON_DAYS.forEach((d, i) => {
     wk.push(d);
-    if (d.label === "Sam" || i === ALL_SEASON_DAYS.length - 1) { weeks.push(wk); wk = []; }
+    if (d.label === "Sam" || i === ALL_SEASON_DAYS.length - 1) { weeks.push([...wk]); wk = []; }
   });
   const currentWeek = weeks[Math.min(weekIdx, weeks.length - 1)] || [];
   const weekLabel = currentWeek.length > 0
@@ -4452,25 +4454,16 @@ function AgeGroupCard({ dbMembres = [] }) {
         .flatMap(r => Array.isArray(r.enfants) ? r.enfants : [])
     );
 
-    // membre_ids club sur ces dates
-    const membreIdsClubSet = new Set(
+    // Prénoms club sur ces dates (depuis colonne enfants)
+    const prenomClubSet = new Set(
       dbResasClub
         .filter(r => dates.includes(r.date_reservation?.slice(0,10)))
-        .map(r => r.membre_id)
+        .flatMap(r => Array.isArray(r.enfants) ? r.enfants : [])
     );
 
-    return allEnfants.filter(e => {
-      if (e.activite === "natation" || e.activite === "les deux") {
-        if (prenomNatSet.has(e.prenom)) return true;
-      }
-      if (e.activite === "club" || e.activite === "les deux") {
-        const membre = membresEffectifs.find(m =>
-          (m.enfants || []).some(me => me.prenom === e.prenom && me.nom === e.nom)
-        );
-        if (membre && membreIdsClubSet.has(membre.id)) return true;
-      }
-      return false;
-    });
+    return allEnfants.filter(e =>
+      prenomNatSet.has(e.prenom) || prenomClubSet.has(e.prenom)
+    );
   };
 
   const baseList = getEnfantsForPeriod();
@@ -5629,6 +5622,7 @@ function ProfilConnecte({ user, setUser, setScreen, reservations }) {
               {resasNat.slice(0,4).map((r,i) => (
                 <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", background:`${C.ocean}08`, borderRadius:12, padding:"8px 12px" }}>
                   <div style={{ fontSize:13, fontWeight:800, color:C.ocean }}>{r.heure}</div>
+                  {r.enfants?.length > 0 && <div style={{ fontSize:11, color:C.ocean, fontWeight:700 }}>{r.enfants.join(", ")}</div>}
                   <div style={{ fontSize:11, color:"#888" }}>{r.date_seance ? new Date(r.date_seance).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}) : "—"}</div>
                   <Pill color={C.green}>✓</Pill>
                 </div>
@@ -5650,6 +5644,7 @@ function ProfilConnecte({ user, setUser, setScreen, reservations }) {
               {resasClub.slice(0,4).map((r,i) => (
                 <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", background:`${C.coral}08`, borderRadius:12, padding:"8px 12px" }}>
                   <div style={{ fontSize:12, fontWeight:800, color:C.coral }}>{r.session==="matin"?"Matin":"Après-midi"}</div>
+                  {r.enfants?.length > 0 && <div style={{ fontSize:11, color:C.coral, fontWeight:700 }}>{r.enfants.join(", ")}</div>}
                   <div style={{ fontSize:11, color:"#888" }}>{r.date_reservation ? new Date(r.date_reservation).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}) : "—"}</div>
                   <Pill color={C.green}>✓</Pill>
                 </div>
