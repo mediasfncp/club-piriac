@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import React from "react";
 import {
   creerMembre, creerEnfants, getMembre,
   creerReservationNatation, getReservationsNatation,
@@ -4678,15 +4679,17 @@ th{background:#1A8FE3;color:#fff;padding:9px 12px;text-align:left}
               );
               const dayList = allEnfants.filter(e => prenomNatDay.has(e.prenom) || prenomClubDay.has(e.prenom));
               const dayCounts = AGE_GROUPS.map(g => dayList.filter(e => e.age >= g.min && e.age <= g.max).length);
-              return [
-                <div key={`d${di}`} style={{ fontSize: 11, fontWeight: 800, color: C.dark, padding:"6px 6px", background: di%2===0?"#fff":"#F0F4FF", borderRadius: di===0?"6px 0 0 0":di===currentWeek.length-1?"0 0 0 6px":"0" }}>
-                  {d.label} {d.num}
-                </div>,
-                ...dayCounts.map((c, gi) => (
-                  <div key={`${di}-${gi}`} style={{ textAlign:"center", fontSize:12, fontWeight:900, color:AGE_GROUPS[gi].color, padding:"6px 2px", background: di%2===0?"#fff":"#F0F4FF" }}>{c}</div>
-                )),
-                <div key={`t${di}`} style={{ textAlign:"center", fontSize:12, fontWeight:900, color:C.dark, padding:"6px 2px", background: di%2===0?"#fff":"#F0F4FF" }}>{dayList.length}</div>
-              ];
+              return (
+                <React.Fragment key={di}>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: C.dark, padding:"6px 6px", background: di%2===0?"#fff":"#F0F4FF", borderRadius: di===0?"6px 0 0 0":di===currentWeek.length-1?"0 0 0 6px":"0" }}>
+                    {d.label} {d.num}
+                  </div>
+                  {dayCounts.map((c, gi) => (
+                    <div key={gi} style={{ textAlign:"center", fontSize:12, fontWeight:900, color:AGE_GROUPS[gi].color, padding:"6px 2px", background: di%2===0?"#fff":"#F0F4FF" }}>{c}</div>
+                  ))}
+                  <div style={{ textAlign:"center", fontSize:12, fontWeight:900, color:C.dark, padding:"6px 2px", background: di%2===0?"#fff":"#F0F4FF" }}>{dayList.length}</div>
+                </React.Fragment>
+              );
             })}
           </div>
         </div>
