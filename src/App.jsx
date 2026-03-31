@@ -4379,7 +4379,7 @@ function AgeGroupCard({ dbMembres = [] }) {
   useEffect(() => {
     sb.from("reservations_natation").select("membre_id, date_seance, enfants")
       .then(({ data }) => setDbResasNat(data || [])).catch(() => {});
-    sb.from("reservations_club").select("membre_id, date_reservation, session")
+    sb.from("reservations_club").select("membre_id, date_reservation")
       .then(({ data }) => setDbResasClub(data || [])).catch(() => {});
   }, []);
 
@@ -4429,7 +4429,27 @@ function AgeGroupCard({ dbMembres = [] }) {
 
   // Trouver les enfants réellement inscrits selon la période
   const getEnfantsForPeriod = () => {
-    if (period === "saison") return allEnfants;
+    // Prénoms natation toute saison
+    const prenomNatSaison = new Set(
+      dbResasNat.flatMap(r => Array.isArray(r.enfants) ? r.enfants : [])
+    );
+    // membre_ids club toute saison
+    const membreIdsClubSaison = new Set(dbResasClub.map(r => r.membre_id));
+
+    if (period === "saison") {
+      // Enfants ayant au moins une réservation sur la saison
+      if (dbResasNat.length === 0 && dbResasClub.length === 0) return allEnfants;
+      return allEnfants.filter(e => {
+        if (e.activite === "natation" || e.activite === "les deux") {
+          if (prenomNatSaison.has(e.prenom)) return true;
+        }
+        if (e.activite === "club" || e.activite === "les deux") {
+          const membre = dbMembres.find(m => (m.enfants||[]).some(me => me.prenom === e.prenom && me.nom === e.nom));
+          if (membre && membreIdsClubSaison.has(membre.id)) return true;
+        }
+        return false;
+      });
+    }
 
     // Dates concernées
     let dates = [];
@@ -4439,35 +4459,31 @@ function AgeGroupCard({ dbMembres = [] }) {
     } else if (period === "semaine") {
       dates = currentWeek.map(d => getDayISO(d)).filter(Boolean);
     }
-
     if (!dates.length) return allEnfants;
 
-    // Trouver les membres_id ayant une résa sur ces dates
-    const membreIdsNat = new Set(
-      dbResasNat.filter(r => dates.includes(r.date_seance?.slice(0,10))).map(r => r.membre_id)
-    );
-    const membreIdsClub = new Set(
-      dbResasClub.filter(r => dates.includes(r.date_reservation?.slice(0,10))).map(r => r.membre_id)
-    );
-
-    // Trouver les prénoms d'enfants en natation depuis les résas
-    const prenomNat = new Set(
+    // Prénoms natation sur ces dates
+    const prenomNatSet = new Set(
       dbResasNat
         .filter(r => dates.includes(r.date_seance?.slice(0,10)))
-        .flatMap(r => r.enfants || [])
+        .flatMap(r => Array.isArray(r.enfants) ? r.enfants : [])
     );
 
-    // Filtrer les enfants qui ont une resa sur ces dates
+    // membre_ids club sur ces dates
+    const membreIdsClubSet = new Set(
+      dbResasClub
+        .filter(r => dates.includes(r.date_reservation?.slice(0,10)))
+        .map(r => r.membre_id)
+    );
+
     return allEnfants.filter(e => {
-      const membre = dbMembres.find(m => (m.enfants || []).some(me => me.prenom === e.prenom && me.nom === e.nom));
-      if (!membre) return false;
-      // Natation → vérifier prénom dans résas
       if (e.activite === "natation" || e.activite === "les deux") {
-        if (prenomNat.has(e.prenom) && membreIdsNat.has(membre.id)) return true;
+        if (prenomNatSet.has(e.prenom)) return true;
       }
-      // Club → vérifier membre_id dans résas club
       if (e.activite === "club" || e.activite === "les deux") {
-        if (membreIdsClub.has(membre.id)) return true;
+        const membre = dbMembres.find(m =>
+          (m.enfants || []).some(me => me.prenom === e.prenom && me.nom === e.nom)
+        );
+        if (membre && membreIdsClubSet.has(membre.id)) return true;
       }
       return false;
     });
