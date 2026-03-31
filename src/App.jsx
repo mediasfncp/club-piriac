@@ -4433,9 +4433,11 @@ function AgeGroupCard({ dbMembres = [] }) {
       const filtered = allEnfants.filter(e => {
         // Natation → prénom dans les résas natation
         if (prenomNatSaison.has(e.prenom)) return true;
-        // Club → membre parent dans les résas club
-        const membre = dbMembres.find(m => (m.enfants||[]).some(me => me.prenom === e.prenom && me.nom === e.nom));
-        if (membre && membreIdsClubSaison.has(membre.id)) return true;
+        // Club → enfant doit faire club ET parent a une résa club
+        if (e.activite === "club" || e.activite === "les deux") {
+          const membre = dbMembres.find(m => (m.enfants||[]).some(me => me.prenom === e.prenom && me.nom === e.nom));
+          if (membre && membreIdsClubSaison.has(membre.id)) return true;
+        }
         return false;
       });
       return filtered;
@@ -4492,6 +4494,9 @@ function AgeGroupCard({ dbMembres = [] }) {
 
   const hasNatResa = (e) => prenomNatAll.has(e.prenom);
   const hasClubResa = (e) => {
+    // L'enfant doit avoir activité club ou les deux
+    if (e.activite !== "club" && e.activite !== "les deux") return false;
+    // ET son parent doit avoir une résa club
     const membre = dbMembres.find(m => (m.enfants||[]).some(me => me.prenom === e.prenom && me.nom === e.nom));
     return membre && membreIdsClubAll.has(membre.id);
   };
