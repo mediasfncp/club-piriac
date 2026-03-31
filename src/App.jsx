@@ -1431,19 +1431,22 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser }) 
   const getDjCount = (label) => parseInt(label);
 
   if (done === "liberte" && selectedLiberte) return (
-    <div style={{ minHeight:"100%", background:`linear-gradient(160deg,${C.coral}cc,${C.sun})`, display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"40px 28px",textAlign:"center" }}>
-      <div style={{ width:90,height:90,borderRadius:"50%",background:"rgba(255,255,255,0.25)",border:"3px solid rgba(255,255,255,0.5)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 20px",fontSize:44 }}>🎟️</div>
-      <h1 style={{ color:"#fff",fontSize:28,fontWeight:900,margin:"0 0 8px" }}>Carte Liberté activée !</h1>
-      <p style={{ color:"rgba(255,255,255,0.9)",fontSize:15,margin:"0 0 8px" }}>
-        <strong>{getDjCount(selectedLiberte.label)} demi-journées</strong> créditées sur ton compte
-      </p>
-      <div style={{ background:"rgba(255,255,255,0.2)",borderRadius:16,padding:"10px 20px",marginBottom:8 }}>
-        <span style={{ color:"#fff",fontWeight:900,fontSize:13 }}>⚠️ Valable uniquement sur la saison 2026</span>
+    <div style={{ padding:32, textAlign:"center", background:C.shell, minHeight:"100%" }}>
+      <div style={{ fontSize:80 }}>📨</div>
+      <h2 style={{ color:C.coral }}>Demande envoyée ! 🎉</h2>
+      <div style={{ background:"#fff", borderRadius:20, padding:20, margin:"16px 0", boxShadow:"0 4px 16px rgba(0,0,0,0.06)" }}>
+        <div style={{ fontSize:14, color:"#555", lineHeight:1.8 }}>
+          Votre demande de <strong>Carte Liberté · {selectedLiberte.label}</strong> est enregistrée.<br/>
+          <strong>L'équipe FNCP va vous contacter</strong> pour le paiement :<br/>
+          🏦 Virement · ✉️ Chèque · 🎫 Chèques vacances
+        </div>
+        <div style={{ marginTop:12, background:`${C.coral}10`, borderRadius:12, padding:"10px 14px", fontSize:13, color:C.coral, fontWeight:700 }}>
+          ⏳ Vos demi-journées seront créditées à réception du paiement
+        </div>
       </div>
-      <p style={{ color:"rgba(255,255,255,0.75)",fontSize:13,margin:"0 0 28px" }}>Du 6 juillet au 22 août 2026</p>
       <button onClick={() => { setDone(null); setSelectedLiberte(null); onNav("home"); }}
-        style={{ background:"#fff",color:C.coral,border:"none",borderRadius:50,padding:"16px 40px",fontSize:16,fontWeight:900,cursor:"pointer",boxShadow:"0 8px 28px rgba(0,0,0,0.18)",fontFamily:"inherit" }}>
-        C'est parti ! 🏖️
+        style={{ background:`linear-gradient(135deg,${C.coral},${C.sun})`, color:"#fff", border:"none", borderRadius:50, padding:"16px 40px", fontSize:16, fontWeight:900, cursor:"pointer", boxShadow:"0 8px 28px rgba(0,0,0,0.18)", fontFamily:"inherit" }}>
+        Retour à l'accueil
       </button>
     </div>
   );
@@ -1782,31 +1785,38 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser }) 
               })}
             </div>
             {selectedLiberte && (
-              <Card style={{ background: `${C.sun}15`, border: `2px solid ${C.sun}40`, textAlign: "center" }}>
-                <div style={{ fontWeight: 900, color: C.dark, marginBottom: 4 }}>🎟️ {selectedLiberte.label}</div>
-                <div style={{ background: `${C.coral}15`, borderRadius: 12, padding: "8px 12px", marginBottom: 8, fontSize: 12, color: C.coral, fontWeight: 700 }}>
+              <Card style={{ background: `${C.sun}15`, border: `2px solid ${C.sun}40` }}>
+                <div style={{ fontWeight:900, color:C.dark, marginBottom:4 }}>🎟️ {selectedLiberte.label}</div>
+                <div style={{ background:`${C.coral}15`, borderRadius:12, padding:"8px 12px", marginBottom:10, fontSize:12, color:C.coral, fontWeight:700 }}>
                   ⚠️ Valable uniquement saison 2026 · 6 juil – 22 août
                 </div>
-                <div style={{ fontSize: 28, fontWeight: 900, color: C.coral, marginBottom: 16 }}>{selectedLiberte.price} €</div>
+                <div style={{ fontSize:28, fontWeight:900, color:C.coral, marginBottom:10, textAlign:"center" }}>{selectedLiberte.price} €</div>
+                {/* Modes de paiement */}
+                <div style={{ background:"#F8FBFF", borderRadius:12, padding:"10px 12px", marginBottom:14 }}>
+                  <div style={{ fontWeight:900, color:C.dark, fontSize:12, marginBottom:6 }}>💳 Modes de paiement acceptés</div>
+                  {[["🏦","Virement bancaire"],["✉️","Chèque"],["🎫","Chèques vacances"]].map(([icon,label]) => (
+                    <div key={label} style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4, fontSize:12, color:"#555" }}>
+                      <span>{icon}</span>{label}
+                    </div>
+                  ))}
+                  <div style={{ fontSize:11, color:"#aaa", marginTop:6, fontStyle:"italic" }}>Votre carte sera activée à réception du paiement.</div>
+                </div>
                 <SunBtn color={C.coral} full onClick={async () => {
-                  // Crédite les demi-journées sur le compte utilisateur
-                  if (setUser && user) {
-                    const djCount = getDjCount(selectedLiberte.label);
-                    const newBalance = (user.liberteBalance || 0) + djCount;
-                    const newTotal = (user.liberteTotal || 0) + djCount;
-                    setUser(prev => ({ ...prev, liberteBalance: newBalance, liberteTotal: newTotal }));
-                    try {
-                      if (user.supabaseId) await updateLiberte(user.supabaseId, newBalance, newTotal);
-                      await enregistrerPaiement({
-                        membreId: user.supabaseId || null,
-                        montant:  selectedLiberte.price,
-                        type:     'liberte',
-                        label:    `Carte Liberté · ${selectedLiberte.label}`,
-                      });
-                    } catch(e) { console.warn("Supabase:", e.message); }
-                  }
+                  try {
+                    // Créer une résa club en pending comme trace de la demande liberté
+                    if (user?.supabaseId) {
+                      await sb.from("reservations_club").insert([{
+                        membre_id: user.supabaseId,
+                        date_reservation: new Date().toISOString().slice(0,10),
+                        session: "liberte",
+                        label_jour: `Carte Liberté · ${selectedLiberte.label}`,
+                        statut: "pending",
+                        enfants: [],
+                      }]);
+                    }
+                  } catch(e) { console.warn(e); }
                   setDone("liberte");
-                }}>Activer ma Carte Liberté 🎟️</SunBtn>
+                }}>📨 Envoyer la demande · {selectedLiberte.price} €</SunBtn>
               </Card>
             )}
           </>
@@ -1879,21 +1889,17 @@ function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSession
     return `${day.date.getFullYear()}-${String(day.date.getMonth()+1).padStart(2,"0")}-${String(day.date.getDate()).padStart(2,"0")}`;
   };
 
-  const handleConfirm = () => setShowWero(true);
-  const onWeroSuccess = async () => {
-    setShowWero(false);
+  const handleConfirm = async () => {
     if (setAllSeasonSessions) setAllSeasonSessions(prev => prev.map(s => s.id === booking.id ? { ...s, spots: Math.max(0, s.spots-1) } : s));
-    const resa = { ...booking, parent: user?.prenom || "Invité", enfants: selectedEnfants, id: Date.now() };
-    setReservations(prev => [...prev, resa]);
     const resaDateISO = getDateISO(selectedDay);
-    const rappelDate = getRappelDate(resaDateISO);
+    const rappelDate  = getRappelDate(resaDateISO);
     scheduleRappel({ titre:"🏊 Rappel séance natation demain !", corps:`Ta séance à ${booking.time} est demain !`, dateStr:rappelDate });
-    resa.rappelDate = rappelDate;
     try {
       await creerReservationNatation({ membreId:user?.supabaseId||null, jour:booking.day, heure:booking.time, dateSeance:resaDateISO, enfants:selectedEnfants, rappelDate, montant:20 });
-      await enregistrerPaiement({ membreId:user?.supabaseId||null, montant:20, type:'natation', label:`Natation ${booking.time}`, transactionWero:null });
     } catch(e) { console.warn("Supabase:", e.message); }
-    setDone(resa); setBooking(null); setSelectedEnfants([]);
+    setDone({ ...booking, enfants: selectedEnfants, rappelDate });
+    setBooking(null);
+    setSelectedEnfants([]);
   };
 
   if (!user) return (
@@ -1915,19 +1921,26 @@ function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSession
 
   if (done) return (
     <div style={{ padding:32, textAlign:"center", background:C.shell, minHeight:"100%" }}>
-      <div style={{ fontSize:90 }}>🎊</div>
-      <h2 style={{ color:C.green, fontSize:24 }}>C'est réservé !</h2>
-      <Card style={{ margin:"16px 0", textAlign:"left" }}>
-        <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+      <div style={{ fontSize:80 }}>📨</div>
+      <h2 style={{ color:C.ocean }}>Demande envoyée ! 🎉</h2>
+      <div style={{ background:"#fff", borderRadius:20, padding:20, margin:"16px 0", boxShadow:"0 4px 16px rgba(0,0,0,0.06)", textAlign:"left" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:14 }}>
           <div style={{ fontSize:44 }}>🏊</div>
           <div>
-            <div style={{ fontWeight:900, fontSize:24, color:C.ocean }}>{done.time}</div>
+            <div style={{ fontWeight:900, fontSize:22, color:C.ocean }}>{done.time}</div>
             <div style={{ color:"#666" }}>{selectedDay?.label} {selectedDay?.num} {selectedDay?.month} 2026</div>
             {done.enfants?.length > 0 && <div style={{ marginTop:6, display:"flex", gap:4, flexWrap:"wrap" }}>{done.enfants.map(e => <Pill key={e} color={C.sea}>{e}</Pill>)}</div>}
           </div>
         </div>
-        {done.rappelDate && <RappelBanner rappels={[done]} />}
-      </Card>
+        <div style={{ fontSize:14, color:"#555", lineHeight:1.8, marginBottom:12 }}>
+          Votre demande est enregistrée.<br/>
+          <strong>L'équipe FNCP va vous contacter</strong> pour le paiement :<br/>
+          🏦 Virement · ✉️ Chèque · 🎫 Chèques vacances
+        </div>
+        <div style={{ background:`${C.ocean}10`, borderRadius:12, padding:"10px 14px", fontSize:13, color:C.ocean, fontWeight:700 }}>
+          ⏳ Votre accès sera activé à réception du paiement
+        </div>
+      </div>
       <SunBtn color={C.ocean} onClick={() => { setDone(null); onNav("home"); }}>🏠 Retour à l'accueil</SunBtn>
     </div>
   );
@@ -1965,8 +1978,16 @@ function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSession
             </div>
           </Card>
         )}
-        <SunBtn color={C.green} full onClick={handleConfirm}>🏊 Payer et confirmer · 20 €</SunBtn>
-        {showWero && <WeroModal amount={20} label={`Natation · ${booking?.time}`} onSuccess={onWeroSuccess} onCancel={() => setShowWero(false)} />}
+        <div style={{ background:"#F8FBFF", borderRadius:14, padding:"12px 14px", marginBottom:8, textAlign:"left" }}>
+          <div style={{ fontWeight:900, color:C.dark, fontSize:13, marginBottom:8 }}>💳 Modes de paiement acceptés</div>
+          {[["🏦","Virement bancaire"],["✉️","Chèque"],["🎫","Chèques vacances"]].map(([icon,label]) => (
+            <div key={label} style={{ display:"flex", alignItems:"center", gap:8, marginBottom:5, fontSize:13, color:"#555" }}>
+              <span style={{ fontSize:16 }}>{icon}</span>{label}
+            </div>
+          ))}
+          <div style={{ fontSize:11, color:"#aaa", marginTop:8, fontStyle:"italic" }}>Votre accès sera activé à réception du paiement.</div>
+        </div>
+        <SunBtn color={C.green} full onClick={handleConfirm}>📨 Envoyer la demande · 20 €</SunBtn>
       </div>
     </div>
   );
@@ -3545,180 +3566,102 @@ const ALL_PAYMENTS = [
 ];
 
 function PaiementsTab() {
-  const [period, setPeriod] = useState("semaine"); // jour | semaine | mois | saison
-  const [selectedDate, setSelectedDate] = useState("2026-07-06");
-  const [selectedWeek, setSelectedWeek] = useState(0);
-  const [selectedMonth, setSelectedMonth] = useState("2026-07");
+  const [resas, setResas]     = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter]   = useState("tous"); // tous | pending | confirmed
 
-  const CAT_COLOR = { natation: C.ocean, club: C.coral, eveil: "#9B59B6" };
-  const CAT_LABEL = { natation: "🏊 Natation", club: "🏖️ Club", eveil: "🌊 Éveil" };
+  useEffect(() => {
+    const loadAll = async () => {
+      const [{ data: nat }, { data: club }] = await Promise.all([
+        sb.from("reservations_natation").select("*, membres(prenom, nom, email)").order("date_seance"),
+        sb.from("reservations_club").select("*, membres(prenom, nom, email)").order("date_reservation"),
+      ]);
+      const natFmt  = (nat  || []).map(r => ({ ...r, _type: "natation", _date: r.date_seance,      _label: `🏊 ${r.heure}` }));
+      const clubFmt = (club || []).map(r => ({ ...r, _type: "club",     _date: r.date_reservation, _label: `🏖️ ${r.session === "matin" ? "Matin" : "Après-midi"}` }));
+      setResas([...natFmt, ...clubFmt].sort((a,b) => (a._date||"").localeCompare(b._date||"")));
+      setLoading(false);
+    };
+    loadAll().catch(() => setLoading(false));
+  }, []);
 
-  // Build season weeks for selector
-  const seasonWeeks = [];
-  let wk = [], prev = null;
-  ALL_PAYMENTS.forEach(p => {
-    const d = new Date(p.date);
-    const dow = d.getDay();
-    if (prev && (new Date(p.date) - new Date(prev)) > 1000*60*60*24*2) { if(wk.length) { seasonWeeks.push(wk); wk=[]; } }
-    wk.push(p);
-    prev = p.date;
-  });
-  if (wk.length) seasonWeeks.push(wk);
-
-  // Compute season weeks properly by date
-  const weekGroups = {};
-  ALL_PAYMENTS.forEach(p => {
-    const d = new Date(p.date);
-    const dow = d.getDay();
-    const mon = new Date(d);
-    mon.setDate(d.getDate() - (dow === 0 ? 6 : dow - 1));
-    const key = `${mon.getFullYear()}-${String(mon.getMonth()+1).padStart(2,"0")}-${String(mon.getDate()).padStart(2,"0")}`;
-    if (!weekGroups[key]) weekGroups[key] = [];
-    weekGroups[key].push(p);
-  });
-  const weekKeys = Object.keys(weekGroups).sort();
-
-  const monthGroups = {};
-  ALL_PAYMENTS.forEach(p => {
-    const key = p.date.slice(0,7);
-    if (!monthGroups[key]) monthGroups[key] = [];
-    monthGroups[key].push(p);
-  });
-
-  const allDates = [...new Set(ALL_PAYMENTS.map(p => p.date))].sort();
-
-  const getPayments = () => {
-    if (period === "jour")    return ALL_PAYMENTS.filter(p => p.date === selectedDate);
-    if (period === "semaine") return weekGroups[weekKeys[selectedWeek]] || [];
-    if (period === "mois")    return monthGroups[selectedMonth] || [];
-    return ALL_PAYMENTS; // saison
+  const validerPaiement = async (r) => {
+    const table = r._type === "natation" ? "reservations_natation" : "reservations_club";
+    await sb.from(table).update({ statut: "confirmed" }).eq("id", r.id);
+    setResas(prev => prev.map(x => x.id === r.id && x._type === r._type ? { ...x, statut: "confirmed" } : x));
   };
 
-  const payments = getPayments();
-  const total = payments.reduce((s, p) => s + p.montant, 0);
-  const byCategorie = { natation: 0, club: 0, eveil: 0 };
-  payments.forEach(p => { byCategorie[p.categorie] = (byCategorie[p.categorie] || 0) + p.montant; });
-
-  const formatDate = d => { const [y,m,day] = d.split("-"); return `${day}/${m}/${y}`; };
-  const months = { "2026-07": "Juillet 2026", "2026-08": "Août 2026" };
-  const weekLabel = (key) => {
-    const d = new Date(key);
-    const end = new Date(d); end.setDate(d.getDate() + 5);
-    return `${d.getDate()} – ${end.getDate()} ${["jan","fév","mar","avr","mai","jun","juil","août"][end.getMonth()]}`;
-  };
+  const filtered = filter === "tous" ? resas : resas.filter(r => r.statut === filter);
+  const pending   = resas.filter(r => r.statut === "pending").length;
+  const confirmed = resas.filter(r => r.statut === "confirmed").length;
+  const CAT_COLOR = { natation: C.ocean, club: C.coral };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+    <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
 
-      {/* Period selector */}
-      <div style={{ display: "flex", gap: 6, background: "#fff", borderRadius: 16, padding: 6, boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
-        {[["jour","📅 Jour"],["semaine","📆 Semaine"],["mois","🗓️ Mois"],["saison","🌊 Saison"]].map(([k,l]) => (
-          <button key={k} onClick={() => setPeriod(k)} style={{
-            flex: 1, background: period === k ? `linear-gradient(135deg, ${C.ocean}, ${C.sea})` : "transparent",
-            color: period === k ? "#fff" : "#888", border: "none", borderRadius: 12,
-            padding: "8px 4px", cursor: "pointer", fontWeight: 900, fontSize: 11, fontFamily: "inherit", transition: "all .15s",
+      {/* KPIs */}
+      <div style={{ display:"flex", gap:8 }}>
+        {[
+          { label:"En attente", value: pending,   color: C.sun   },
+          { label:"Confirmées", value: confirmed, color: C.green },
+          { label:"Total",      value: resas.length, color: C.ocean },
+        ].map(k => (
+          <div key={k.label} style={{ flex:1, background:"#fff", borderRadius:16, padding:"12px 8px", textAlign:"center", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
+            <div style={{ fontWeight:900, fontSize:20, color:k.color }}>{k.value}</div>
+            <div style={{ fontSize:10, color:"#aaa", fontWeight:700 }}>{k.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Filtres */}
+      <div style={{ display:"flex", gap:6, background:"#fff", borderRadius:14, padding:5, boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
+        {[["tous","Toutes"],["pending","⏳ En attente"],["confirmed","✓ Confirmées"]].map(([k,l]) => (
+          <button key={k} onClick={() => setFilter(k)} style={{
+            flex:1, background: filter===k ? `linear-gradient(135deg,${C.ocean},${C.sea})` : "transparent",
+            color: filter===k?"#fff":"#888", border:"none", borderRadius:10,
+            padding:"8px 4px", cursor:"pointer", fontWeight:900, fontSize:11, fontFamily:"inherit",
           }}>{l}</button>
         ))}
       </div>
 
-      {/* Sub-selector */}
-      {period === "jour" && (
-        <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 2 }}>
-          {allDates.map(d => (
-            <button key={d} onClick={() => setSelectedDate(d)} style={{
-              flexShrink: 0, background: selectedDate === d ? `linear-gradient(135deg, ${C.ocean}, ${C.sea})` : "#fff",
-              color: selectedDate === d ? "#fff" : C.dark, border: "none", borderRadius: 12,
-              padding: "7px 12px", cursor: "pointer", fontWeight: 800, fontSize: 12, fontFamily: "inherit",
-              boxShadow: selectedDate === d ? `0 4px 12px ${C.ocean}44` : "0 2px 6px rgba(0,0,0,0.05)",
-            }}>{formatDate(d)}</button>
-          ))}
-        </div>
-      )}
-      {period === "semaine" && (
-        <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#fff", borderRadius: 14, padding: "10px 14px", boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}>
-          <button onClick={() => setSelectedWeek(Math.max(0, selectedWeek-1))} disabled={selectedWeek === 0}
-            style={{ background: selectedWeek===0?"#f0f0f0":C.ocean, border:"none", color: selectedWeek===0?"#bbb":"#fff", borderRadius:"50%", width:28,height:28, cursor:selectedWeek===0?"not-allowed":"pointer", fontWeight:900, fontFamily:"inherit" }}>‹</button>
-          <div style={{ flex:1, textAlign:"center", fontWeight:900, color:C.dark, fontSize:13 }}>
-            Sem. {selectedWeek+1}/{weekKeys.length} · {weekLabel(weekKeys[selectedWeek])} 2026
-          </div>
-          <button onClick={() => setSelectedWeek(Math.min(weekKeys.length-1, selectedWeek+1))} disabled={selectedWeek>=weekKeys.length-1}
-            style={{ background: selectedWeek>=weekKeys.length-1?"#f0f0f0":C.ocean, border:"none", color: selectedWeek>=weekKeys.length-1?"#bbb":"#fff", borderRadius:"50%", width:28,height:28, cursor:selectedWeek>=weekKeys.length-1?"not-allowed":"pointer", fontWeight:900, fontFamily:"inherit" }}>›</button>
-        </div>
-      )}
-      {period === "mois" && (
-        <div style={{ display: "flex", gap: 8 }}>
-          {Object.keys(months).map(m => (
-            <button key={m} onClick={() => setSelectedMonth(m)} style={{
-              flex:1, background: selectedMonth===m ? `linear-gradient(135deg,${C.ocean},${C.sea})` : "#fff",
-              color: selectedMonth===m?"#fff":C.dark, border:"none", borderRadius:14,
-              padding:"10px", cursor:"pointer", fontWeight:900, fontSize:13, fontFamily:"inherit",
-              boxShadow: selectedMonth===m?`0 4px 14px ${C.ocean}44`:"0 2px 8px rgba(0,0,0,0.05)",
-            }}>{months[m]}</button>
-          ))}
-        </div>
-      )}
-
-      {/* KPI */}
-      <div style={{ background: "#fff", borderRadius: 20, padding: 18, boxShadow: "0 4px 16px rgba(0,0,0,0.06)" }}>
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom: 16 }}>
-          <div style={{ fontWeight:900, color:"#2C3E50", fontSize:15 }}>Total encaissé</div>
-          <div style={{ fontWeight:900, color:C.green, fontSize:26 }}>{total} €</div>
-        </div>
-        <div style={{ display:"flex", gap:8, marginBottom:12 }}>
-          {Object.entries(byCategorie).map(([cat, val]) => (
-            <div key={cat} style={{ flex:1, background:`${CAT_COLOR[cat]}12`, borderRadius:14, padding:"10px 8px", textAlign:"center" }}>
-              <div style={{ fontWeight:900, color:CAT_COLOR[cat], fontSize:16 }}>{val} €</div>
-              <div style={{ fontSize:10, color:"#aaa", marginTop:2 }}>{CAT_LABEL[cat]}</div>
-            </div>
-          ))}
-        </div>
-        {/* Stacked bar */}
-        {total > 0 && (
-          <div style={{ display:"flex", borderRadius:50, overflow:"hidden", height:8 }}>
-            {Object.entries(byCategorie).map(([cat, val]) => (
-              val > 0 && <div key={cat} style={{ width:`${(val/total)*100}%`, background:CAT_COLOR[cat], transition:"width .4s" }} />
-            ))}
-          </div>
-        )}
-        <div style={{ display:"flex", gap:12, marginTop:8 }}>
-          {Object.entries(byCategorie).map(([cat, val]) => (
-            val > 0 && <div key={cat} style={{ display:"flex", alignItems:"center", gap:4 }}>
-              <div style={{ width:8, height:8, borderRadius:"50%", background:CAT_COLOR[cat] }} />
-              <span style={{ fontSize:10, color:"#888" }}>{Math.round((val/total)*100)}%</span>
-            </div>
-          ))}
-        </div>
-        <div style={{ display:"flex", justifyContent:"space-between", marginTop:8, fontSize:11, color:"#bbb" }}>
-          <span>{payments.length} transaction{payments.length>1?"s":""}</span>
-          <span>Moy. {payments.length ? Math.round(total/payments.length) : 0} € / paiement</span>
-        </div>
-      </div>
-
-      {/* Transaction list */}
-      <div style={{ background:"#fff", borderRadius:20, padding:18, boxShadow:"0 4px 16px rgba(0,0,0,0.06)" }}>
-        <div style={{ fontWeight:800, color:"#2C3E50", fontSize:13, marginBottom:12 }}>
-          {payments.length} transaction{payments.length>1?"s":""}
-        </div>
-        {payments.length === 0 ? (
-          <div style={{ textAlign:"center", padding:"20px 0", color:"#bbb", fontSize:14 }}>Aucun paiement sur cette période</div>
-        ) : (
-          <div style={{ display:"flex", flexDirection:"column", gap:0 }}>
-            {payments.map((p, i) => (
-              <div key={p.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"9px 0", borderBottom: i < payments.length-1 ? "1px solid #F0F4F8" : "none" }}>
-                <div style={{ width:34, height:34, borderRadius:12, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, background:`${CAT_COLOR[p.categorie]}18`, color:CAT_COLOR[p.categorie], fontWeight:900 }}>✓</div>
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontWeight:800, fontSize:13, color:"#2C3E50", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{p.parent}</div>
-                  <div style={{ fontSize:11, color:"#aaa", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{p.type}</div>
-                  {period !== "jour" && <div style={{ fontSize:10, color:"#ccc" }}>{formatDate(p.date)} · Wero</div>}
+      {/* Liste */}
+      {loading ? (
+        <div style={{ textAlign:"center", padding:"32px 0", color:"#bbb" }}>Chargement…</div>
+      ) : filtered.length === 0 ? (
+        <div style={{ textAlign:"center", padding:"32px 0", color:"#bbb", fontSize:14 }}>Aucune réservation</div>
+      ) : (
+        <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+          {filtered.map((r, i) => (
+            <div key={`${r._type}-${r.id}`} style={{
+              background:"#fff", borderRadius:16, padding:"12px 14px",
+              boxShadow:"0 2px 8px rgba(0,0,0,0.05)",
+              borderLeft: `4px solid ${r.statut==="pending" ? C.sun : CAT_COLOR[r._type]}`,
+            }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
+                <div style={{ fontWeight:900, color:C.dark, fontSize:13 }}>
+                  {r.membres ? `${r.membres.prenom} ${NOM(r.membres.nom)}` : "—"}
                 </div>
-                <div style={{ textAlign:"right", flexShrink:0 }}>
-                  <div style={{ fontWeight:900, fontSize:14, color:CAT_COLOR[p.categorie] }}>{p.montant} €</div>
-                </div>
+                {r.statut === "pending" ? (
+                  <div style={{ display:"flex", gap:6, alignItems:"center" }}>
+                    <span style={{ background:`${C.sun}20`, color:"#b45309", borderRadius:50, padding:"2px 8px", fontSize:11, fontWeight:800 }}>⏳ En attente</span>
+                    <button onClick={() => validerPaiement(r)} style={{ background:`${C.green}15`, border:`1.5px solid ${C.green}40`, color:C.green, borderRadius:8, padding:"3px 10px", cursor:"pointer", fontWeight:900, fontSize:11, fontFamily:"inherit" }}>✅ Payé</button>
+                  </div>
+                ) : (
+                  <span style={{ background:`${C.green}15`, color:C.green, borderRadius:50, padding:"2px 8px", fontSize:11, fontWeight:800 }}>✓ Confirmé</span>
+                )}
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+              <div style={{ fontSize:12, color: CAT_COLOR[r._type], fontWeight:700 }}>
+                {r._label} · {r._date ? new Date(r._date).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}) : "—"}
+              </div>
+              {r.enfants?.length > 0 && (
+                <div style={{ display:"flex", gap:4, marginTop:5, flexWrap:"wrap" }}>
+                  {r.enfants.map((e,i) => <span key={i} style={{ background:`${CAT_COLOR[r._type]}15`, color:CAT_COLOR[r._type], borderRadius:50, padding:"2px 8px", fontSize:11, fontWeight:700 }}>{e}</span>)}
+                </div>
+              )}
+              {r.membres?.email && <div style={{ fontSize:11, color:"#bbb", marginTop:3 }}>{r.membres.email}</div>}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
