@@ -4380,8 +4380,11 @@ function AgeGroupCard({ dbMembres = [] }) {
   useEffect(() => {
     sb.from("reservations_natation").select("membre_id, date_seance, enfants")
       .then(({ data }) => setDbResasNat(data || [])).catch(() => {});
-    sb.from("reservations_club").select("membre_id, date_reservation")
-      .then(({ data }) => setDbResasClub(data || [])).catch(() => {});
+    sb.from("reservations_club").select("membre_id, date_reservation, enfants")
+      .then(({ data, error }) => {
+        console.log("Club résas:", data, "erreur:", error);
+        setDbResasClub(data || []);
+      }).catch(() => {});
   }, []);
 
   // Build season weeks
@@ -4422,7 +4425,15 @@ function AgeGroupCard({ dbMembres = [] }) {
       dbResasNat.flatMap(r => Array.isArray(r.enfants) ? r.enfants : [])
     );
     const prenomClubSaison = new Set(
-      dbResasClub.flatMap(r => Array.isArray(r.enfants) ? r.enfants : [])
+      dbResasClub.flatMap(r => {
+        // Si la colonne enfants est remplie, l'utiliser directement
+        if (Array.isArray(r.enfants) && r.enfants.length > 0) return r.enfants;
+        // Sinon fallback : enfants du membre avec activité club
+        const membre = dbMembres.find(m => m.id === r.membre_id);
+        return (membre?.enfants || [])
+          .filter(e => e.activite === "club" || e.activite === "les deux")
+          .map(e => e.prenom);
+      })
     );
     if (period === "saison") {
       if (dbResasNat.length === 0 && dbResasClub.length === 0) return allEnfants;
@@ -4481,7 +4492,13 @@ function AgeGroupCard({ dbMembres = [] }) {
   // Pour le club : charger les prénoms des enfants ayant réellement une résa club
   // En joignant avec la table enfants via membre_id
   const prenomClubAll = new Set(
-    dbResasClub.flatMap(r => Array.isArray(r.enfants) ? r.enfants : [])
+    dbResasClub.flatMap(r => {
+      if (Array.isArray(r.enfants) && r.enfants.length > 0) return r.enfants;
+      const membre = dbMembres.find(m => m.id === r.membre_id);
+      return (membre?.enfants || [])
+        .filter(e => e.activite === "club" || e.activite === "les deux")
+        .map(e => e.prenom);
+    })
   );
 
   const hasNatResa  = (e) => prenomNatAll.has(e.prenom);
