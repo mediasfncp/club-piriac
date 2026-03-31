@@ -696,59 +696,69 @@ function FormulesChoixScreen({ onNav }) {
         </div>
         <Wave fill={C.shell} />
       </div>
-      <div style={{ padding: "20px 18px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={{ padding: "16px 18px 24px", display: "flex", flexDirection: "column", gap: 12 }}>
         <div onClick={() => onNav("formules-natation")} style={{
           background: `linear-gradient(135deg, ${C.ocean}, ${C.sea})`,
-          borderRadius: 24, padding: "28px 24px", cursor: "pointer",
-          boxShadow: `0 8px 28px ${C.ocean}44`, textAlign: "center",
-          transition: "transform .18s",
+          borderRadius: 20, padding: "16px 20px", cursor: "pointer",
+          boxShadow: `0 6px 20px ${C.ocean}44`,
+          transition: "transform .18s", display: "flex", alignItems: "center", gap: 16,
         }}
-          onMouseEnter={e => e.currentTarget.style.transform = "translateY(-4px)"}
+          onMouseEnter={e => e.currentTarget.style.transform = "translateY(-2px)"}
           onMouseLeave={e => e.currentTarget.style.transform = ""}
         >
-          <div style={{ fontSize: 52, marginBottom: 10 }}>🏊</div>
-          <div style={{ color: "#fff", fontWeight: 900, fontSize: 20, marginBottom: 4 }}>Formules Natation</div>
-          <div style={{ color: "rgba(255,255,255,0.8)", fontSize: 14 }}>1, 5, 6 ou 10 leçons</div>
-          <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 12 }}>
-            {["20 €", "95 €", "113 €", "170 €"].map(p => (
-              <div key={p} style={{ background: "rgba(255,255,255,0.2)", borderRadius: 50, padding: "4px 12px", color: "#fff", fontSize: 12, fontWeight: 800 }}>{p}</div>
-            ))}
+          <div style={{ fontSize: 36, flexShrink: 0 }}>🏊</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ color: "#fff", fontWeight: 900, fontSize: 16, marginBottom: 2 }}>Formules Natation</div>
+            <div style={{ color: "rgba(255,255,255,0.8)", fontSize: 12 }}>1, 5, 6 ou 10 leçons</div>
+            <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+              {["20 €", "95 €", "113 €", "170 €"].map(p => (
+                <div key={p} style={{ background: "rgba(255,255,255,0.2)", borderRadius: 50, padding: "3px 10px", color: "#fff", fontSize: 11, fontWeight: 800 }}>{p}</div>
+              ))}
+            </div>
           </div>
+          <div style={{ color: "rgba(255,255,255,0.6)", fontSize: 20 }}>›</div>
         </div>
 
         <div onClick={() => onNav("prestations")} style={{
           background: `linear-gradient(135deg, ${C.coral}, ${C.sun})`,
-          borderRadius: 24, padding: "28px 24px", cursor: "pointer",
-          boxShadow: `0 8px 28px ${C.coral}44`, textAlign: "center",
-          transition: "transform .18s",
+          borderRadius: 20, padding: "16px 20px", cursor: "pointer",
+          boxShadow: `0 6px 20px ${C.coral}44`,
+          transition: "transform .18s", display: "flex", alignItems: "center", gap: 16,
         }}
-          onMouseEnter={e => e.currentTarget.style.transform = "translateY(-4px)"}
+          onMouseEnter={e => e.currentTarget.style.transform = "translateY(-2px)"}
           onMouseLeave={e => e.currentTarget.style.transform = ""}
         >
-          <div style={{ fontSize: 52, marginBottom: 10 }}>🏖️</div>
-          <div style={{ color: "#fff", fontWeight: 900, fontSize: 20, marginBottom: 4 }}>Formules Club de Plage</div>
-          <div style={{ color: "rgba(255,255,255,0.8)", fontSize: 14 }}>Matin · Après-midi · Journée</div>
-          <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 12 }}>
-            {["Formule Club", "Formule Liberté"].map(p => (
-              <div key={p} style={{ background: "rgba(255,255,255,0.2)", borderRadius: 50, padding: "4px 12px", color: "#fff", fontSize: 12, fontWeight: 800 }}>{p}</div>
-            ))}
+          <div style={{ fontSize: 36, flexShrink: 0 }}>🏖️</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ color: "#fff", fontWeight: 900, fontSize: 16, marginBottom: 2 }}>Formules Club de Plage</div>
+            <div style={{ color: "rgba(255,255,255,0.8)", fontSize: 12 }}>Matin · Après-midi · Journée</div>
+            <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+              {["Formule Club", "Formule Liberté"].map(p => (
+                <div key={p} style={{ background: "rgba(255,255,255,0.2)", borderRadius: 50, padding: "3px 10px", color: "#fff", fontSize: 11, fontWeight: 800 }}>{p}</div>
+              ))}
+            </div>
           </div>
+          <div style={{ color: "rgba(255,255,255,0.6)", fontSize: 20 }}>›</div>
         </div>
+
         <div onClick={() => onNav("formules-eveil")} style={{
           background: `linear-gradient(135deg, #9B59B6, #8E44AD)`,
-          borderRadius: 24, padding: "28px 24px", cursor: "pointer",
-          boxShadow: `0 8px 28px #9B59B644`, textAlign: "center",
-          transition: "transform .18s",
+          borderRadius: 20, padding: "16px 20px", cursor: "pointer",
+          boxShadow: `0 6px 20px #9B59B644`,
+          transition: "transform .18s", display: "flex", alignItems: "center", gap: 16,
         }}
-          onMouseEnter={e => e.currentTarget.style.transform = "translateY(-4px)"}
+          onMouseEnter={e => e.currentTarget.style.transform = "translateY(-2px)"}
           onMouseLeave={e => e.currentTarget.style.transform = ""}
         >
-          <div style={{ fontSize: 52, marginBottom: 10 }}>🌊</div>
-          <div style={{ color: "#fff", fontWeight: 900, fontSize: 20, marginBottom: 4 }}>Éveil Aquatique</div>
-          <div style={{ color: "rgba(255,255,255,0.8)", fontSize: 14 }}>Séances de 30 min · Chaque dimanche</div>
-          <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 12 }}>
-            <div style={{ background: "rgba(255,255,255,0.2)", borderRadius: 50, padding: "4px 16px", color: "#fff", fontSize: 13, fontWeight: 900 }}>20 € / séance</div>
+          <div style={{ fontSize: 36, flexShrink: 0 }}>🌊</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ color: "#fff", fontWeight: 900, fontSize: 16, marginBottom: 2 }}>Éveil Aquatique</div>
+            <div style={{ color: "rgba(255,255,255,0.8)", fontSize: 12 }}>Séances de 30 min · Chaque dimanche</div>
+            <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+              <div style={{ background: "rgba(255,255,255,0.2)", borderRadius: 50, padding: "3px 12px", color: "#fff", fontSize: 11, fontWeight: 900 }}>20 € / séance</div>
+            </div>
           </div>
+          <div style={{ color: "rgba(255,255,255,0.6)", fontSize: 20 }}>›</div>
         </div>
       </div>
     </div>
