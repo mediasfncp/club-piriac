@@ -4375,17 +4375,19 @@ function AgeGroupCard({ dbMembres = [] }) {
   const [selectedEnfant, setSelectedEnfant] = useState(null);
   const [dbResasNat, setDbResasNat] = useState([]);
   const [dbResasClub, setDbResasClub] = useState([]);
+  const [membresLocaux, setMembresLocaux] = useState([]);
 
-  // Charger vraies résas depuis Supabase
   useEffect(() => {
     sb.from("reservations_natation").select("membre_id, date_seance, enfants")
       .then(({ data }) => setDbResasNat(data || [])).catch(() => {});
     sb.from("reservations_club").select("membre_id, date_reservation, enfants")
-      .then(({ data, error }) => {
-        console.log("Club résas:", data, "erreur:", error);
-        setDbResasClub(data || []);
-      }).catch(() => {});
+      .then(({ data }) => setDbResasClub(data || [])).catch(() => {});
+    sb.from("membres").select("id, prenom, nom, enfants(*)")
+      .then(({ data }) => setMembresLocaux(data || [])).catch(() => {});
   }, []);
+
+  // Utiliser les membres locaux si dbMembres prop est vide
+  const membresEffectifs = dbMembres.length > 0 ? dbMembres : membresLocaux;
 
   // Build season weeks
   const weeks = [];
@@ -4402,7 +4404,7 @@ function AgeGroupCard({ dbMembres = [] }) {
   // Build all children list — Supabase uniquement, pas de données mock
   const allEnfants = [];
   const seenEnfants = new Set();
-  dbMembres.forEach(m => {
+  membresEffectifs.forEach(m => {
     (m.enfants || []).forEach(e => {
       const key = `${e.prenom}-${e.nom}-${e.naissance}`;
       if (!seenEnfants.has(key)) {
@@ -4429,7 +4431,7 @@ function AgeGroupCard({ dbMembres = [] }) {
         // Si la colonne enfants est remplie, l'utiliser directement
         if (Array.isArray(r.enfants) && r.enfants.length > 0) return r.enfants;
         // Sinon fallback : enfants du membre avec activité club
-        const membre = dbMembres.find(m => m.id === r.membre_id);
+        const membre = membresEffectifs.find(m => m.id === r.membre_id);
         return (membre?.enfants || [])
           .filter(e => e.activite === "club" || e.activite === "les deux")
           .map(e => e.prenom);
@@ -4470,7 +4472,7 @@ function AgeGroupCard({ dbMembres = [] }) {
         if (prenomNatSet.has(e.prenom)) return true;
       }
       if (e.activite === "club" || e.activite === "les deux") {
-        const membre = dbMembres.find(m =>
+        const membre = membresEffectifs.find(m =>
           (m.enfants || []).some(me => me.prenom === e.prenom && me.nom === e.nom)
         );
         if (membre && membreIdsClubSet.has(membre.id)) return true;
@@ -4494,7 +4496,7 @@ function AgeGroupCard({ dbMembres = [] }) {
   const prenomClubAll = new Set(
     dbResasClub.flatMap(r => {
       if (Array.isArray(r.enfants) && r.enfants.length > 0) return r.enfants;
-      const membre = dbMembres.find(m => m.id === r.membre_id);
+      const membre = membresEffectifs.find(m => m.id === r.membre_id);
       return (membre?.enfants || [])
         .filter(e => e.activite === "club" || e.activite === "les deux")
         .map(e => e.prenom);
