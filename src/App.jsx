@@ -733,7 +733,7 @@ function FormulesChoixScreen({ onNav }) {
             <div style={{ color: "#fff", fontWeight: 900, fontSize: 16, marginBottom: 2 }}>Formules Club de Plage</div>
             <div style={{ color: "rgba(255,255,255,0.8)", fontSize: 12 }}>Matin · Après-midi · Journée</div>
             <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
-              {["Formule Club", "Formule Liberté"].map(p => (
+              {["🏖️ Formule Club", "🎟️ Formule Liberté"].map(p => (
                 <div key={p} style={{ background: "rgba(255,255,255,0.2)", borderRadius: 50, padding: "3px 10px", color: "#fff", fontSize: 11, fontWeight: 800 }}>{p}</div>
               ))}
             </div>
