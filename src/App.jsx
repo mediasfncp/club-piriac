@@ -1465,7 +1465,7 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser }) 
         </div>
         {/* Tab selector */}
         <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-          {[["club", "Formule Club"], ["liberte", "Formule Liberté"]].map(([k, l]) => (
+          {[["club", "🏖️ Formule Club"], ["liberte", "🎟️ Formule Liberté"]].map(([k, l]) => (
             <button key={k} onClick={() => setTab(k)} style={{ flex: 1, background: tab === k ? "#fff" : "rgba(255,255,255,0.25)", color: tab === k ? C.coral : "#fff", border: "none", borderRadius: 14, padding: "9px 8px", cursor: "pointer", fontWeight: 900, fontSize: 12, fontFamily: "inherit", transition: "all .15s" }}>{l}</button>
           ))}
         </div>
