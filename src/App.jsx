@@ -4455,7 +4455,7 @@ function AgeGroupCard({ dbMembres = [] }) {
     } else if (period === "semaine") {
       dates = currentWeek.map(d => getDayISO(d)).filter(Boolean);
     }
-    if (!dates.length) return allEnfants;
+    if (!dates.length) return baseList.length > 0 ? baseList : allEnfants;
 
     // Prénoms natation sur ces dates
     const prenomNatSet = new Set(
@@ -4669,7 +4669,14 @@ th{background:#1A8FE3;color:#fff;padding:9px 12px;text-align:left}
             <div style={{ fontSize: 9, fontWeight: 900, color: "#888", textAlign:"center", padding:"4px 2px" }}>TOT.</div>
             {/* Rows */}
             {currentWeek.map((d, di) => {
-              const dayList = getAttendanceForDay(d.id);
+              const dayISO = getDayISO(d);
+              const prenomNatDay = new Set(
+                dbResasNat.filter(r => r.date_seance?.slice(0,10) === dayISO).flatMap(r => Array.isArray(r.enfants) ? r.enfants : [])
+              );
+              const prenomClubDay = new Set(
+                dbResasClub.filter(r => r.date_reservation?.slice(0,10) === dayISO).flatMap(r => Array.isArray(r.enfants) ? r.enfants : [])
+              );
+              const dayList = allEnfants.filter(e => prenomNatDay.has(e.prenom) || prenomClubDay.has(e.prenom));
               const dayCounts = AGE_GROUPS.map(g => dayList.filter(e => e.age >= g.min && e.age <= g.max).length);
               return [
                 <div key={`d${di}`} style={{ fontSize: 11, fontWeight: 800, color: C.dark, padding:"6px 6px", background: di%2===0?"#fff":"#F0F4FF", borderRadius: di===0?"6px 0 0 0":di===currentWeek.length-1?"0 0 0 6px":"0" }}>
