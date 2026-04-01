@@ -5706,16 +5706,26 @@ function CartesLiberteTab({ dbMembres }) {
 
   useEffect(() => {
     const load = async () => {
-      // Toutes les résas club confirmed avec infos membres et enfants
+      // Résas club confirmed
       const { data: toutesResas } = await sb.from("reservations_club")
-        .select("*, membres(id, prenom, nom, email, tel, liberte_balance, liberte_total, enfants(prenom, activite))")
+        .select("id, membre_id, date_reservation, session, statut, enfants, created_at, membres(id, prenom, nom, email, liberte_balance, liberte_total)")
         .eq("statut", "confirmed")
         .order("date_reservation", { ascending: true });
 
+      // Enfants séparément
+      const { data: tousEnfants } = await sb.from("enfants")
+        .select("membre_id, prenom, activite");
+
       if (!toutesResas) { setLoading(false); return; }
 
-      // Séparer cartes liberté (enfants[0] = nb >= 6) des résas normales
-      const isCarteLib = r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6;
+      // Séparer cartes liberté des résas normales
+      // Carte liberté = enfants est un array dont le premier élément est un nombre >= 6
+      const isCarteLib = r => {
+        const val = r.enfants;
+        if (!Array.isArray(val) || val.length === 0) return false;
+        const n = Number(val[0]);
+        return !isNaN(n) && n >= 6;
+      };
 
       // Grouper par membre
       const byMembre = {};
@@ -5725,13 +5735,20 @@ function CartesLiberteTab({ dbMembres }) {
           byMembre[r.membre_id] = { membre: r.membres, achats: [], utilisees: [] };
         }
         if (isCarteLib(r)) {
-          byMembre[r.membre_id].achats.push(r); // entrée d'achat carte
+          byMembre[r.membre_id].achats.push(r);
         } else if (r.date_reservation) {
-          byMembre[r.membre_id].utilisees.push(r); // demi-journée utilisée
+          byMembre[r.membre_id].utilisees.push(r);
         }
       });
 
-      // Ne garder que les membres avec une carte active
+      // Ajouter les enfants club à chaque membre
+      (tousEnfants || []).forEach(e => {
+        if (byMembre[e.membre_id] && (e.activite === "club" || e.activite === "les deux")) {
+          if (!byMembre[e.membre_id].enfantsClub) byMembre[e.membre_id].enfantsClub = [];
+          byMembre[e.membre_id].enfantsClub.push(e.prenom);
+        }
+      });
+
       const result = Object.values(byMembre).filter(c => c.achats.length > 0);
       setCartes(result);
       setLoading(false);
@@ -5786,12 +5803,9 @@ function CartesLiberteTab({ dbMembres }) {
         const total    = c.membre?.liberte_total   || 0;
         const used     = total - balance;
         const pct      = total > 0 ? Math.round((used / total) * 100) : 0;
-        const nbAchete = c.achats.reduce((s, r) => s + (Number(r.enfants?.[0])||0), 0);
+        const nbAchete = c.achats.reduce((s, r) => s + (Number(Array.isArray(r.enfants) ? r.enfants[0] : 0)||0), 0);
 
-        // Enfants inscrits club ou les deux
-        const enfantsClub = (c.membre?.enfants || [])
-          .filter(e => e.activite === "club" || e.activite === "les deux")
-          .map(e => e.prenom);
+        const enfantsClub = c.enfantsClub || [];
 
         const datesUtil = [...c.utilisees]
           .sort((a,b) => (a.date_reservation||"").localeCompare(b.date_reservation||""));
@@ -6852,4 +6866,4 @@ export default function App() {
     </div>
   );
 }
-// liberté tab fix Wed Apr  1 12:32:35 CEST 2026
+// fix liberté query Wed Apr  1 12:37:36 CEST 2026
