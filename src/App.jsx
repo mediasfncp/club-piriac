@@ -3975,6 +3975,9 @@ function PaiementsTab({ onValidate }) {
   const CAT_COLOR    = { natation: C.ocean, club: C.coral };
 
   // Label forfait selon nb séances natation
+  const LIBERTE_PRIX = { 6: 96, 12: 180, 18: 252, 24: 288, 30: 330 };
+  const isLiberte = (g) => g.type === "club" && g.resas.some(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6);
+
   const getForfaitLabel = (g) => {
     if (g.type === "natation") {
       const n = g.resas.length;
@@ -3984,15 +3987,13 @@ function PaiementsTab({ onValidate }) {
       if (n === 10) return "Formule 10 leçons";
       return `${n} séances`;
     }
-    // Carte Liberté
-    if (g.resas.some(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) > 0)) {
+    if (isLiberte(g)) {
       const nb = Number(g.resas[0]?.enfants?.[0]) || 0;
       return `🎟️ Carte Liberté · ${nb} demi-journées`;
     }
     return `${g.resas.length} demi-journée${g.resas.length>1?"s":""}`;
   };
 
-  // Montant total du groupe
   const getMontant = (g) => {
     if (g.type === "natation") {
       const n = g.resas.length;
@@ -4002,7 +4003,10 @@ function PaiementsTab({ onValidate }) {
       if (n === 10) return "170 €";
       return `${g.resas.reduce((s,r) => s + Number(r.montant||0), 0)} €`;
     }
-    if (g.resas.some(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) > 0)) return "—";
+    if (isLiberte(g)) {
+      const nb = Number(g.resas[0]?.enfants?.[0]) || 0;
+      return LIBERTE_PRIX[nb] ? `${LIBERTE_PRIX[nb]} €` : "—";
+    }
     return `${g.resas.reduce((s,r) => s + Number(r.montant||0), 0)} €`;
   };
 
@@ -6668,5 +6672,4 @@ export default function App() {
     </div>
   );
 }
-// fix liberté constraint
-// Wed Apr  1 10:57:34 CEST 2026
+// liberté fix Wed Apr  1 11:28:06 CEST 2026
