@@ -2234,13 +2234,230 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser, pa
 }
 
 // ── RESERVATION ───────────────────────────────────────────
-function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSessions, reservations, setReservations }) {
+function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSessions, reservations, setReservations, panier, setPanier }) {
   const [weekIdx, setWeekIdx]           = useState(0);
   const [selectedDayId, setSelectedDayId] = useState(null);
   const [booking, setBooking]           = useState(null);
   const [selectedEnfants, setSelectedEnfants] = useState([]);
   const [done, setDone]                 = useState(null);
-  const [showWero, setShowWero]         = useState(false);
+
+  const weeks = (() => {
+    const ws = []; let wk = [];
+    ALL_SEASON_DAYS.forEach((d, i) => {
+      wk.push(d);
+      if (d.label === "Sam" || i === ALL_SEASON_DAYS.length - 1) { ws.push([...wk]); wk = []; }
+    });
+    return ws;
+  })();
+  const currentWeek = weeks[Math.min(weekIdx, weeks.length-1)] || [];
+  const selectedDay = selectedDayId ? ALL_SEASON_DAYS.find(d => d.id === selectedDayId) : currentWeek[0];
+  const effectiveDayId = selectedDay?.id || currentWeek[0]?.id;
+
+  useEffect(() => {
+    if (currentWeek[0]) setSelectedDayId(currentWeek[0].id);
+  }, [weekIdx]);
+
+  useEffect(() => {
+    sb.from("reservations_natation").select("date_seance, heure, statut")
+      .eq("statut", "confirmed")
+      .then(({ data }) => {
+        if (setAllSeasonSessions) {
+          setAllSeasonSessions(() => {
+            const next = ALL_SEASON_SLOTS_INIT.map(s => ({ ...s, spots: 2 }));
+            data.forEach(r => {
+              if (!r.date_seance || !r.heure) return;
+              const dateResa = r.date_seance.slice(0, 10);
+              for (let i = 0; i < next.length; i++) {
+                if (next[i].time !== r.heure || next[i].spots <= 0) continue;
+                const dayObj = ALL_SEASON_DAYS.find(d => d.id === next[i].day);
+                if (dayObj?.date) {
+                  const iso = `${dayObj.date.getFullYear()}-${String(dayObj.date.getMonth()+1).padStart(2,"0")}-${String(dayObj.date.getDate()).padStart(2,"0")}`;
+                  if (iso === dateResa) { next[i] = { ...next[i], spots: next[i].spots - 1 }; break; }
+                }
+              }
+            });
+            return next;
+          });
+        }
+      }).catch(() => {});
+  }, []);
+
+  const allForDay = (allSeasonSessions || []).filter(s => s.day === effectiveDayId);
+  const morning   = allForDay.filter(s => { const [h] = s.time.split(":").map(Number); return h < 13; });
+  const afternoon = allForDay.filter(s => { const [h] = s.time.split(":").map(Number); return h >= 13; });
+
+  const getDateISO = (day) => {
+    if (!day?.date) return "";
+    return `${day.date.getFullYear()}-${String(day.date.getMonth()+1).padStart(2,"0")}-${String(day.date.getDate()).padStart(2,"0")}`;
+  };
+
+  // Prix unitaire × nb enfants sélectionnés
+  const nbEnf = Math.max(1, selectedEnfants.length);
+  const prixSeance = 20 * nbEnf;
+
+  const handleConfirm = async () => {
+    if (setAllSeasonSessions) setAllSeasonSessions(prev => prev.map(s => s.id === booking.id ? { ...s, spots: Math.max(0, s.spots-1) } : s));
+    const resaDateISO = getDateISO(selectedDay);
+    const rappelDate  = getRappelDate(resaDateISO);
+    scheduleRappel({ titre:"🏊 Rappel séance natation demain !", corps:`Ta séance à ${booking.time} est demain !`, dateStr:rappelDate });
+    try {
+      await sb.from("reservations_natation").insert([{
+        membre_id:   user?.supabaseId || null,
+        jour:        booking.day,
+        heure:       booking.time,
+        date_seance: resaDateISO,
+        enfants:     selectedEnfants,
+        statut:      "pending",
+        rappel_date: rappelDate || null,
+        montant:     prixSeance,
+      }]);
+    } catch(e) { console.warn("Supabase:", e.message); }
+    setDone({ ...booking, enfants: selectedEnfants, rappelDate });
+    setBooking(null);
+    setSelectedEnfants([]);
+  };
+
+  const handlePanier = () => {
+    const resaDateISO = getDateISO(selectedDay);
+    setPanier(prev => [...prev, {
+      id: `res-${Date.now()}`,
+      type: "natation",
+      label: `Séance ${booking.time} · ${selectedDay?.label} ${selectedDay?.num} ${selectedDay?.month}`,
+      emoji: "🏊",
+      color: C.ocean,
+      prix: prixSeance,
+      enfants: selectedEnfants,
+      creneaux: [{ key: `${resaDateISO}-${booking.time}`, dayISO: resaDateISO, time: booking.time, dayId: effectiveDayId }],
+      details: `${nbEnf} enfant${nbEnf>1?"s":""}`,
+    }]);
+    setBooking(null);
+    setSelectedEnfants([]);
+  };
+
+  if (!user) return (
+    <div style={{ background:C.shell, minHeight:"100%", display:"flex", flexDirection:"column" }}>
+      <div style={{ background:`linear-gradient(135deg, #00C9FF, ${C.sea})`, padding:"20px 20px 0" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:8 }}>
+          <BackBtn onNav={onNav} /><h2 style={{ color:"#fff", margin:0, fontWeight:900, fontSize:20 }}>🏊 Réservations Natation</h2>
+        </div>
+        <Wave fill={C.shell} />
+      </div>
+      <div style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:"32px 24px", textAlign:"center" }}>
+        <div style={{ fontSize:72, marginBottom:16 }}>🔒</div>
+        <h2 style={{ color:C.dark, fontSize:22, margin:"0 0 10px" }}>Inscription requise</h2>
+        <SunBtn color={C.coral} onClick={() => onNav("inscription")}>📋 S'inscrire maintenant</SunBtn>
+        <button onClick={() => onNav("home")} style={{ background:"none", border:"none", color:"#aaa", fontSize:14, cursor:"pointer", fontFamily:"inherit", fontWeight:700, marginTop:12 }}>← Retour</button>
+      </div>
+    </div>
+  );
+
+  if (done) return (
+    <div style={{ padding:32, textAlign:"center", background:C.shell, minHeight:"100%" }}>
+      <div style={{ fontSize:80 }}>📨</div>
+      <h2 style={{ color:C.ocean }}>Demande envoyée ! 🎉</h2>
+      <div style={{ background:"#fff", borderRadius:20, padding:20, margin:"16px 0", boxShadow:"0 4px 16px rgba(0,0,0,0.06)", textAlign:"left" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:14 }}>
+          <div style={{ fontSize:44 }}>🏊</div>
+          <div>
+            <div style={{ fontWeight:900, fontSize:22, color:C.ocean }}>{done.time}</div>
+            <div style={{ color:"#666" }}>{selectedDay?.label} {selectedDay?.num} {selectedDay?.month} 2026</div>
+            {done.enfants?.length > 0 && <div style={{ marginTop:6, display:"flex", gap:4, flexWrap:"wrap" }}>{done.enfants.map(e => <Pill key={e} color={C.sea}>{e}</Pill>)}</div>}
+          </div>
+        </div>
+        <div style={{ fontSize:14, color:"#555", lineHeight:1.8, marginBottom:12 }}>
+          Votre demande est enregistrée.<br/>
+          <strong>L'équipe FNCP va vous contacter</strong> pour le paiement :<br/>
+          🏦 Virement · ✉️ Chèque · 💶 Espèces · 🎫 Chèques vacances
+        </div>
+        <div style={{ background:`${C.ocean}10`, borderRadius:12, padding:"10px 14px", fontSize:13, color:C.ocean, fontWeight:700 }}>
+          ⏳ Votre accès sera activé à réception du paiement
+        </div>
+      </div>
+      <SunBtn color={C.ocean} onClick={() => { setDone(null); onNav("home"); }}>🏠 Retour à l'accueil</SunBtn>
+    </div>
+  );
+
+  if (booking) return (
+    <div style={{ background:C.shell, minHeight:"100%" }}>
+      <div style={{ background:`linear-gradient(135deg, #00C9FF, ${C.sea})`, padding:"20px 20px 0", textAlign:"center" }}>
+        <div style={{ display:"flex", alignItems:"center", marginBottom:6 }}><BackBtn onNav={() => { setBooking(null); setSelectedEnfants([]); }} /><div style={{ flex:1, color:"rgba(255,255,255,0.9)", fontSize:13, fontWeight:700 }}>🏊 Réserver la séance</div></div>
+        <div style={{ fontSize:56, fontWeight:900, color:"#fff", letterSpacing:-2 }}>{booking.time}</div>
+        <div style={{ color:C.sun, fontWeight:800, fontSize:15, marginBottom:4 }}>{selectedDay?.label} {selectedDay?.num} {selectedDay?.month} 2026 ☀️</div>
+        <Wave fill={C.shell} />
+      </div>
+      <div style={{ padding:"10px 18px 24px", display:"flex", flexDirection:"column", gap:14 }}>
+        <Card>
+          <h3 style={{ color:C.dark, margin:"0 0 10px", fontSize:15 }}>👤 Parent / Responsable</h3>
+          <div style={{ display:"grid", gridTemplateColumns:"auto 1fr", gap:"6px 12px", fontSize:14 }}>
+            <span style={{ color:"#aaa" }}>Nom</span><strong>{user?.prenom} {NOM(user?.nom)}</strong>
+            <span style={{ color:"#aaa" }}>Email</span><span>{user?.email||"—"}</span>
+            <span style={{ color:"#aaa" }}>Tél.</span><span>{user?.tel||"—"}</span>
+          </div>
+        </Card>
+
+        {/* Enfants — sélection multi avec filtre places */}
+        {user?.enfants?.length > 0 && (
+          <Card>
+            <h3 style={{ color:C.dark, margin:"0 0 6px", fontSize:15 }}>🧒 Enfants participants</h3>
+            <div style={{ fontSize:12, color:"#888", marginBottom:10 }}>
+              {booking.spots === 1 ? "⚠️ 1 seule place disponible — 1 enfant maximum" : "2 places disponibles sur ce créneau"}
+            </div>
+            <div style={{ display:"flex", flexWrap:"wrap", gap:10 }}>
+              {user.enfants.map(e => {
+                const sel = selectedEnfants.includes(e.prenom);
+                const disabledBySpots = !sel && selectedEnfants.length >= booking.spots;
+                return (
+                  <div key={e.id||e.prenom} onClick={() => {
+                    if (disabledBySpots) return;
+                    setSelectedEnfants(s => sel ? s.filter(x=>x!==e.prenom) : [...s, e.prenom]);
+                  }} style={{
+                    display:"flex", alignItems:"center", gap:8,
+                    background: sel ? `${C.sea}30` : disabledBySpots ? "#f0f0f0" : "#f5f5f5",
+                    border:`2.5px solid ${sel ? C.sea : "#e0e0e0"}`,
+                    borderRadius:50, padding:"8px 16px", cursor:disabledBySpots?"not-allowed":"pointer",
+                    fontWeight:700, color:sel?C.deep:disabledBySpots?"#ccc":"#888",
+                    opacity:disabledBySpots?0.5:1,
+                  }}>
+                    <span>{sel?"✓":"○"}</span><span>{e.prenom}</span>
+                  </div>
+                );
+              })}
+            </div>
+            {/* Prix dynamique */}
+            <div style={{ marginTop:12, display:"flex", justifyContent:"space-between", alignItems:"center", background:`${C.ocean}08`, borderRadius:10, padding:"8px 12px" }}>
+              <span style={{ fontSize:13, color:"#888", fontWeight:700 }}>
+                20 € × {nbEnf} enfant{nbEnf>1?"s":""}
+              </span>
+              <span style={{ fontSize:18, fontWeight:900, color:C.coral }}>{prixSeance} €</span>
+            </div>
+          </Card>
+        )}
+
+        <div style={{ background:"#F8FBFF", borderRadius:14, padding:"12px 14px", textAlign:"left" }}>
+          <div style={{ fontWeight:900, color:C.dark, fontSize:13, marginBottom:8 }}>💳 Modes de paiement acceptés</div>
+          {[["🏦","Virement bancaire"],["✉️","Chèque"],["💶","Espèces"],["🎫","Chèques vacances"]].map(([icon,label]) => (
+            <div key={label} style={{ display:"flex", alignItems:"center", gap:8, marginBottom:5, fontSize:13, color:"#555" }}>
+              <span style={{ fontSize:16 }}>{icon}</span>{label}
+            </div>
+          ))}
+          <div style={{ fontSize:11, color:"#aaa", marginTop:8, fontStyle:"italic" }}>Votre accès sera activé à réception du paiement.</div>
+        </div>
+
+        <div style={{ display:"flex", gap:8 }}>
+          {setPanier && (
+            <button onClick={handlePanier} style={{
+              flex:1, background:`linear-gradient(135deg,${C.sun},${C.coral})`,
+              border:"none", color:"#fff", borderRadius:14, padding:"12px",
+              cursor:"pointer", fontWeight:900, fontSize:13, fontFamily:"inherit",
+            }}>
+              🛒 Panier · {prixSeance} €
+            </button>
+          )}
+          <SunBtn color={C.green} full onClick={handleConfirm}>📨 Envoyer · {prixSeance} €</SunBtn>
+        </div>
+      </div>
+    </div>
+  );
 
   // Construire les semaines depuis ALL_SEASON_DAYS
   const weeks = (() => {
@@ -7293,4 +7510,4 @@ export default function App() {
     </div>
   );
 }
-// prix nat multi Wed Apr  1 17:17:17 CEST 2026
+// resa screen panier Wed Apr  1 17:25:18 CEST 2026
