@@ -4797,6 +4797,7 @@ function PlanningTab({ allSeasonSessions, clubPlaces, reservations = [] }) {
   // Charger résas natation + club + enfants depuis Supabase
   useEffect(() => {
     sb.from("reservations_natation").select("*, membres(id, prenom, nom, tel)")
+      .eq("statut", "confirmed")
       .then(async ({ data: resasData }) => {
         if (!resasData?.length) { setDbResasNat([]); return; }
         const membreIds = [...new Set(resasData.map(r => r.membre_id).filter(Boolean))];
@@ -4815,6 +4816,7 @@ function PlanningTab({ allSeasonSessions, clubPlaces, reservations = [] }) {
       .catch(() => {});
     // Charger résas club + enfants séparément
     sb.from("reservations_club").select("*, membres(id, prenom, nom, tel)")
+      .eq("statut", "confirmed")
       .then(async ({ data: resasData }) => {
         if (!resasData?.length) { setDbResasClub([]); return; }
         // Charger enfants pour chaque membre
@@ -7492,4 +7494,4 @@ export default function App() {
     </div>
   );
 }
-// nat nom famille Wed Apr  1 21:53:05 CEST 2026
+// planning confirmed only Wed Apr  1 21:57:08 CEST 2026
