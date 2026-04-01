@@ -4527,17 +4527,24 @@ function DayDetailModal({ day, activity, session, onClose, dbResasNat = [], dbRe
       const enfants = [];
       resasJour.forEach(r => {
         (r.enfants || []).forEach(prenom => {
+          // Chercher la fiche complète de l'enfant
+          const ficheEnfant = (r.membres?.enfants || []).find(e => e.prenom === prenom);
           enfants.push({
-            prenom, nom: "", naissance: "",
-            activite: "natation", niveau: r.niveau || "debutant", allergies: "",
+            prenom,
+            nom: ficheEnfant?.nom || "",
+            naissance: ficheEnfant?.naissance || "",
+            activite: "natation",
+            niveau: ficheEnfant?.niveau || r.niveau || "debutant",
+            allergies: ficheEnfant?.allergies || "",
             parent: r.membres ? `${r.membres.prenom} ${r.membres.nom}` : "—",
             parentColor: C.ocean, parentAv: "👤",
             phone: r.membres?.tel || "—",
             heure: r.heure,
+            _ficheEnfant: ficheEnfant || null,
           });
         });
       });
-      return enfants.sort((a, b) => a.prenom.localeCompare(b.prenom));
+      return enfants.sort((a, b) => (a.nom||a.prenom).localeCompare(b.nom||b.prenom));
     }
 
     if (activity === "club" && dbResasClub.length > 0) {
@@ -4789,8 +4796,22 @@ function PlanningTab({ allSeasonSessions, clubPlaces, reservations = [] }) {
 
   // Charger résas natation + club + enfants depuis Supabase
   useEffect(() => {
-    sb.from("reservations_natation").select("*, membres(prenom, nom, tel)")
-      .then(({ data }) => setDbResasNat(data || []))
+    sb.from("reservations_natation").select("*, membres(id, prenom, nom, tel)")
+      .then(async ({ data: resasData }) => {
+        if (!resasData?.length) { setDbResasNat([]); return; }
+        const membreIds = [...new Set(resasData.map(r => r.membre_id).filter(Boolean))];
+        const { data: enfantsData } = await sb.from("enfants")
+          .select("membre_id, prenom, nom, activite, allergies, naissance, niveau")
+          .in("membre_id", membreIds);
+        const enriched = resasData.map(r => ({
+          ...r,
+          membres: r.membres ? {
+            ...r.membres,
+            enfants: (enfantsData || []).filter(e => e.membre_id === r.membre_id)
+          } : null
+        }));
+        setDbResasNat(enriched);
+      })
       .catch(() => {});
     // Charger résas club + enfants séparément
     sb.from("reservations_club").select("*, membres(id, prenom, nom, tel)")
@@ -7471,4 +7492,4 @@ export default function App() {
     </div>
   );
 }
-// fiche enfant scope fix Wed Apr  1 21:48:37 CEST 2026
+// nat nom famille Wed Apr  1 21:53:05 CEST 2026
