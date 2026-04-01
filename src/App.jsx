@@ -4709,7 +4709,21 @@ function DayDetailModal({ day, activity, session, onClose, dbResasNat = [], dbRe
                 <div style={{ fontSize: 10, fontWeight: 900, color: actColor, textAlign: "center" }}>ÂGE</div>
               </div>
               {allEnfants.map((e, i) => (
-                <div key={i} onClick={() => e._ficheEnfant && setSelectedEnfant(e._ficheEnfant)}
+                <div key={i} onClick={() => {
+                  if (!e._ficheEnfant && !e.prenom) return;
+                  // Construire objet enrichi pour FicheEnfantModal
+                  setSelectedEnfant({
+                    prenom: e.prenom,
+                    nom: e.nom || "",
+                    naissance: e.naissance || (e._ficheEnfant?.naissance) || "",
+                    activite: e.activite || "club",
+                    niveau: e.niveau || (e._ficheEnfant?.niveau) || "",
+                    allergies: e.allergies || (e._ficheEnfant?.allergies) || "",
+                    parent: e.parent || "",
+                    parentPhone: e.phone || "",
+                    ...(e._ficheEnfant || {}),
+                  });
+                }}
                   style={{
                     display: "grid", gridTemplateColumns: "28px 1fr 1fr 44px",
                     background: i % 2 === 0 ? "#fff" : "#F8FBFF",
@@ -4717,10 +4731,10 @@ function DayDetailModal({ day, activity, session, onClose, dbResasNat = [], dbRe
                     borderBottom: "1px solid #F0F4F8",
                     borderRadius: i === allEnfants.length - 1 ? "0 0 12px 12px" : 0,
                     alignItems: "center",
-                    cursor: e._ficheEnfant ? "pointer" : "default",
+                    cursor: "pointer",
                     transition: "background .1s",
                   }}
-                  onMouseEnter={ev => { if (e._ficheEnfant) ev.currentTarget.style.background = `${actColor}10`; }}
+                  onMouseEnter={ev => { ev.currentTarget.style.background = `${actColor}10`; }}
                   onMouseLeave={ev => ev.currentTarget.style.background = i % 2 === 0 ? "#fff" : "#F8FBFF"}
                 >
                   <div style={{ fontSize: 11, color: "#bbb", fontWeight: 700 }}>{i + 1}</div>
@@ -7457,4 +7471,4 @@ export default function App() {
     </div>
   );
 }
-// planning fiche enfant Wed Apr  1 21:38:23 CEST 2026
+// fiche enfant planning Wed Apr  1 21:44:06 CEST 2026
