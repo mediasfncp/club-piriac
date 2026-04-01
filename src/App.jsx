@@ -2459,19 +2459,6 @@ function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSession
     </div>
   );
 
-  // Construire les semaines depuis ALL_SEASON_DAYS
-          <BackBtn onNav={onNav} /><h2 style={{ color:"#fff", margin:0, fontWeight:900, fontSize:20 }}>🏊 Réservations Natation</h2>
-        </div>
-        <Wave fill={C.shell} />
-      </div>
-      <div style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:"32px 24px", textAlign:"center" }}>
-        <div style={{ fontSize:72, marginBottom:16 }}>🔒</div>
-        <h2 style={{ color:C.dark, fontSize:22, margin:"0 0 10px" }}>Inscription requise</h2>
-        <SunBtn color={C.coral} onClick={() => onNav("inscription")}>📋 S'inscrire maintenant</SunBtn>
-        <button onClick={() => onNav("home")} style={{ background:"none", border:"none", color:"#aaa", fontSize:14, cursor:"pointer", fontFamily:"inherit", fontWeight:700, marginTop:12 }}>← Retour</button>
-      </div>
-    </div>
-  );
 
   if (done) return (
     <div style={{ padding:32, textAlign:"center", background:C.shell, minHeight:"100%" }}>
@@ -7431,4 +7418,4 @@ export default function App() {
     </div>
   );
 }
-// fix dups Wed Apr  1 17:35:01 CEST 2026
+// fix jsx orphan Wed Apr  1 17:37:41 CEST 2026
