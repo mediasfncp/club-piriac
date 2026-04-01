@@ -6040,35 +6040,133 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
       </div>
 
       <div style={{ padding: "16px 16px 24px" }}>
-        {tab === "dashboard" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        {tab === "dashboard" && (() => {
 
-            {/* KPI principaux — données réelles Supabase */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              {[
-                { label: "Membres inscrits",  value: dbMembres.length,               emoji: "👤", bg: `linear-gradient(135deg, ${C.ocean}, #0052A3)`, sh: C.ocean },
-                { label: "Résas natation",    value: dbResas.length,                  emoji: "🏊", bg: `linear-gradient(135deg, ${C.green}, #1E8449)`, sh: C.green },
-                { label: "Résas club",        value: dbResasClub.length,              emoji: "🏖️", bg: `linear-gradient(135deg, ${C.coral}, #C0392B)`, sh: C.coral },
-                { label: "Encaissé aujourd'hui", value: `${realTotal} €`, emoji: "💳", bg: `linear-gradient(135deg, #9B59B6, #6C3483)`, sh: "#9B59B6" },
-              ].map(s => (
-                <div key={s.label} style={{ background: s.bg, borderRadius: 20, padding: "16px 14px", boxShadow: `0 6px 20px ${s.sh}44` }}>
-                  <div style={{ fontSize: 28, marginBottom: 8 }}>{s.emoji}</div>
-                  <div style={{ fontSize: 28, fontWeight: 900, color: "#fff", lineHeight: 1 }}>{s.value}</div>
-                  <div style={{ fontSize: 11, color: "rgba(255,255,255,0.75)", fontWeight: 700, marginTop: 4 }}>{s.label}</div>
+          const pendingNat  = dbResas.filter(r => r.statut === "pending");
+          const pendingClub = dbResasClub.filter(r => r.statut === "pending");
+          const allPending  = [
+            ...pendingNat.map(r => ({ ...r, _type:"natation", _date: r.date_seance, _label: `🏊 ${r.heure}` })),
+            ...pendingClub.map(r => ({ ...r, _type:"club", _date: r.date_reservation, _label: (!isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6) ? "🎟️ Carte Liberté" : `🏖️ ${r.session==="matin"?"Matin":"Après-midi"}` })),
+          ].sort((a,b) => (a.created_at||"").localeCompare(b.created_at||""));
+
+          const pendingGroups = (() => {
+            const groups = {};
+            allPending.forEach(r => {
+              const key = `${r.membre_id}-${r._type}`;
+              if (!groups[key]) groups[key] = { membre: r.membres, type: r._type, resas: [] };
+              groups[key].resas.push(r);
+            });
+            return Object.values(groups);
+          })();
+
+          return (
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(340px, 1fr))", gap:14 }}>
+
+            {/* Colonne 1 */}
+            <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+
+              {/* KPIs */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                {[
+                  { label: "Membres",  value: dbMembres.length, emoji: "👤", bg: `linear-gradient(135deg, ${C.ocean}, #0052A3)`, sh: C.ocean },
+                  { label: "Résas nat.", value: dbResas.length, emoji: "🏊", bg: `linear-gradient(135deg, ${C.green}, #1E8449)`, sh: C.green },
+                  { label: "Résas club", value: dbResasClub.length, emoji: "🏖️", bg: `linear-gradient(135deg, ${C.coral}, #C0392B)`, sh: C.coral },
+                  { label: "Encaissé aujourd'hui", value: `${realTotal} €`, emoji: "💳", bg: `linear-gradient(135deg, #9B59B6, #6C3483)`, sh: "#9B59B6" },
+                ].map(s => (
+                  <div key={s.label} style={{ background: s.bg, borderRadius: 20, padding: "16px 14px", boxShadow: `0 6px 20px ${s.sh}44` }}>
+                    <div style={{ fontSize: 28, marginBottom: 8 }}>{s.emoji}</div>
+                    <div style={{ fontSize: 28, fontWeight: 900, color: "#fff", lineHeight: 1 }}>{s.value}</div>
+                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.75)", fontWeight: 700, marginTop: 4 }}>{s.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Taux remplissage */}
+              <div style={{ background:"#fff", borderRadius:20, padding:18, boxShadow:"0 4px 16px rgba(0,0,0,0.06)" }}>
+                <div style={{ fontWeight:800, color:"#2C3E50", fontSize:14, marginBottom:14 }}>📈 Taux de remplissage — Saison 2026</div>
+                <div style={{ marginBottom:14 }}>
+                  <div style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
+                    <span style={{ fontSize:13, fontWeight:700, color:"#555" }}>🏊 Natation</span>
+                    <span style={{ fontWeight:900, color:C.ocean, fontSize:13 }}>{fillRateNat}%</span>
+                  </div>
+                  <div style={{ background:"#EEF5FF", borderRadius:50, height:10, overflow:"hidden" }}>
+                    <div style={{ height:"100%", width:`${fillRateNat}%`, background:`linear-gradient(90deg,${C.ocean},${C.sea})`, borderRadius:50 }} />
+                  </div>
+                  <div style={{ display:"flex", justifyContent:"space-between", marginTop:4, fontSize:11, color:"#aaa" }}>
+                    <span>{takenNat} places prises</span><span>{freeNat} libres</span>
+                  </div>
                 </div>
-              ))}
+                <div>
+                  <div style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
+                    <span style={{ fontSize:13, fontWeight:700, color:"#555" }}>🏖️ Club de Plage</span>
+                    <span style={{ fontWeight:900, color:C.coral, fontSize:13 }}>{fillRateClub}%</span>
+                  </div>
+                  <div style={{ background:"#FFF0EE", borderRadius:50, height:10, overflow:"hidden" }}>
+                    <div style={{ height:"100%", width:`${fillRateClub}%`, background:`linear-gradient(90deg,${C.coral},${C.sun})`, borderRadius:50 }} />
+                  </div>
+                  <div style={{ display:"flex", justifyContent:"space-between", marginTop:4, fontSize:11, color:"#aaa" }}>
+                    <span>{takenClub} réservations</span><span>{totalJoursClub} jours · 45 pl./session</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Paiements du jour */}
+              <div style={{ background:"#fff", borderRadius:20, padding:18, boxShadow:"0 4px 16px rgba(0,0,0,0.06)" }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
+                  <div style={{ fontWeight:800, color:"#2C3E50", fontSize:14 }}>💳 Paiements du jour</div>
+                  <div style={{ background:`${C.green}18`, color:C.green, borderRadius:50, padding:"4px 14px", fontWeight:900, fontSize:13 }}>{realTotal} €</div>
+                </div>
+                {confirmedNatToday.length + confirmedClubToday.length === 0 ? (
+                  <div style={{ textAlign:"center", padding:"16px 0", color:"#bbb", fontSize:13 }}>Aucun paiement aujourd'hui</div>
+                ) : (
+                  <div style={{ display:"flex", flexDirection:"column", gap:0 }}>
+                    {[...confirmedNatToday, ...confirmedClubToday]
+                      .sort((a,b) => (b.updated_at||b.created_at||"").localeCompare(a.updated_at||a.created_at||""))
+                      .map((r, i, arr) => {
+                        const isNat = !!r.date_seance;
+                        const isLib = !isNat && Array.isArray(r.enfants) && Number(r.enfants[0]) >= 6;
+                        const color = isNat ? C.ocean : C.coral;
+                        const label = isNat ? `🏊 ${r.heure}` : isLib ? `🎟️ Carte Liberté · ${r.enfants[0]} demi-j.` : `🏖️ ${r.session==="matin"?"Matin":"Après-midi"}`;
+                        const LIBP = {6:96,12:180,18:252,24:288,30:330};
+                        const montant = isNat ? `${r.montant||20} €` : isLib ? `${LIBP[Number(r.enfants[0])]||"—"} €` : "";
+                        return (
+                          <div key={`${isNat?"n":"c"}-${r.id}`} style={{ display:"flex", alignItems:"center", gap:10, padding:"9px 0", borderBottom:i<arr.length-1?"1px solid #F0F4F8":"none" }}>
+                            <div style={{ width:32, height:32, borderRadius:10, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, background:`${color}18`, color, fontWeight:900 }}>✓</div>
+                            <div style={{ flex:1, minWidth:0 }}>
+                              <div style={{ fontWeight:800, fontSize:13, color:"#2C3E50", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{r.membres ? `${r.membres.prenom} ${NOM(r.membres.nom)}` : "—"}</div>
+                              <div style={{ fontSize:11, color:"#aaa" }}>{label}</div>
+                            </div>
+                            <div style={{ fontWeight:900, fontSize:13, color:C.green, flexShrink:0 }}>{montant}</div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
+              </div>
+
+              {/* Membres inscrits */}
+              <div style={{ background:"#fff", borderRadius:20, padding:18, boxShadow:"0 4px 16px rgba(0,0,0,0.06)" }}>
+                <div style={{ fontWeight:800, color:"#2C3E50", fontSize:14, marginBottom:14 }}>👤 Derniers membres</div>
+                {dbMembres.length === 0 ? (
+                  <div style={{ textAlign:"center", padding:"12px 0", color:"#bbb", fontSize:13 }}>Aucun membre</div>
+                ) : dbMembres.slice(0,5).map((m, i) => (
+                  <div key={m.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"9px 0", borderBottom:i<Math.min(dbMembres.length,5)-1?"1px solid #F0F4F8":"none" }}>
+                    <div style={{ width:36, height:36, borderRadius:12, background:`linear-gradient(135deg,${C.ocean},${C.sea})`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, flexShrink:0 }}>👤</div>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontWeight:800, color:"#2C3E50", fontSize:13 }}>{m.prenom} {NOM(m.nom)}</div>
+                      <div style={{ fontSize:11, color:"#aaa" }}>{m.email}</div>
+                    </div>
+                    <Pill color={C.green}>✓</Pill>
+                  </div>
+                ))}
+              </div>
             </div>
 
-            {/* ⏳ Réservations en attente de validation */}
-            {(() => {
-              const pendingNat  = dbResas.filter(r => r.statut === "pending");
-              const pendingClub = dbResasClub.filter(r => r.statut === "pending");
-              const allPending  = [
-                ...pendingNat.map(r => ({ ...r, _type:"natation", _date: r.date_seance, _label: `🏊 ${r.heure}` })),
-                ...pendingClub.map(r => ({ ...r, _type:"club", _date: r.date_reservation, _label: (!isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6) ? "🎟️ Carte Liberté" : `🏖️ ${r.session==="matin"?"Matin":"Après-midi"}` })),
-              ].sort((a,b) => (a.created_at||"").localeCompare(b.created_at||""));
-              if (allPending.length === 0) return null;
-              return (
+            {/* Colonne 2 */}
+            <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+
+              {/* En attente de validation */}
+              {pendingGroups.length > 0 && (
                 <div style={{ background:"#fff", borderRadius:20, padding:18, boxShadow:`0 4px 20px ${C.sun}44`, border:`2px solid ${C.sun}60` }}>
                   <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
                     <div style={{ fontWeight:800, color:"#2C3E50", fontSize:14 }}>⏳ En attente de validation</div>
@@ -6076,52 +6174,39 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                       {allPending.length} demande{allPending.length>1?"s":""}
                     </div>
                   </div>
-                  {(() => {
-                    const groups = {};
-                    allPending.forEach(r => {
-                      const key = `${r.membre_id}-${r._type}`;
-                      if (!groups[key]) groups[key] = { membre: r.membres, type: r._type, resas: [] };
-                      groups[key].resas.push(r);
-                    });
-                    return Object.entries(groups).map(([key, g]) => {
+                  <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                    {pendingGroups.map((g, gi) => {
                       const color = g.type === "natation" ? C.ocean : C.coral;
                       return (
-                        <div key={key} style={{ background:`${C.sun}08`, borderRadius:14, padding:"12px 14px", borderLeft:`4px solid ${C.sun}` }}>
+                        <div key={gi} style={{ background:`${C.sun}08`, borderRadius:14, padding:"12px 14px", borderLeft:`4px solid ${C.sun}` }}>
                           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:6 }}>
                             <div>
                               <div style={{ fontWeight:900, color:"#2C3E50", fontSize:13 }}>
                                 {g.membre ? `${g.membre.prenom} ${NOM(g.membre.nom)}` : "—"}
                               </div>
                               <div style={{ fontSize:11, color, fontWeight:700 }}>
-                                {g.type==="natation" ? `🏊 ${g.resas.length} séance${g.resas.length>1?"s":""}` : g.resas.some(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6) ? `🎟️ Carte Liberté · ${Number(g.resas[0]?.enfants?.[0])} demi-journées` : `🏖️ ${g.resas.length} séance${g.resas.length>1?"s":""}`}
+                                {g.type==="natation" ? `🏊 Natation · ${g.resas.length} séance${g.resas.length>1?"s":""}` : g.resas.some(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6) ? `🎟️ Carte Liberté · ${Number(g.resas[0]?.enfants?.[0])} demi-journées` : `🏖️ Club · ${g.resas.length} séance${g.resas.length>1?"s":""}`}
                               </div>
-                              {g.membre?.email && <div style={{ fontSize:10, color:"#bbb", marginTop:2 }}>{g.membre.email}</div>}
                             </div>
                             <button onClick={async () => {
                               const table = g.type === "natation" ? "reservations_natation" : "reservations_club";
                               await Promise.all(g.resas.map(r => sb.from(table).update({ statut:"confirmed" }).eq("id", r.id)));
-                              // Carte Liberté : créditer le solde
-                              if (g.type === "club" && g.resas.some(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) > 0)) {
+                              if (g.type === "club" && g.resas.some(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6)) {
                                 const r0 = g.resas[0];
-                                const credit = Number(r0.enfants?.[0]) || 0; // nb demi-j stocké dans enfants[0]
+                                const credit = Number(r0.enfants?.[0]) || 0;
                                 if (credit > 0 && r0.membre_id) {
                                   const { data: m } = await sb.from("membres").select("liberte_balance, liberte_total").eq("id", r0.membre_id).single();
-                                  if (m) await sb.from("membres").update({ liberte_balance: (m.liberte_balance||0)+credit, liberte_total: (m.liberte_total||0)+credit }).eq("id", r0.membre_id);
+                                  if (m) await sb.from("membres").update({ liberte_balance:(m.liberte_balance||0)+credit, liberte_total:(m.liberte_total||0)+credit }).eq("id", r0.membre_id);
                                 }
                               }
                               refreshResas();
-                            }} style={{
-                              background:`linear-gradient(135deg,${C.green},#1E8449)`, border:"none",
-                              color:"#fff", borderRadius:50, padding:"5px 14px",
-                              cursor:"pointer", fontWeight:900, fontSize:12, fontFamily:"inherit",
-                              boxShadow:`0 3px 10px ${C.green}44`, flexShrink:0, marginLeft:8,
-                            }}>✅ Valider tout</button>
+                            }} style={{ background:`linear-gradient(135deg,${C.green},#1E8449)`, border:"none", color:"#fff", borderRadius:50, padding:"5px 14px", cursor:"pointer", fontWeight:900, fontSize:12, fontFamily:"inherit", boxShadow:`0 3px 10px ${C.green}44`, flexShrink:0, marginLeft:8 }}>✅ Valider</button>
                           </div>
-                          <div style={{ display:"flex", flexWrap:"wrap", gap:5 }}>
-                            {g.resas.map((r,i) => {
+                          <div style={{ display:"flex", flexWrap:"wrap", gap:4 }}>
+                            {g.resas.map((r,ri) => {
                               const date = r._date?.slice(0,10);
                               return (
-                                <div key={i} style={{ background:`${color}15`, color, borderRadius:8, padding:"2px 8px", fontSize:10, fontWeight:700 }}>
+                                <div key={ri} style={{ background:`${color}15`, color, borderRadius:8, padding:"2px 8px", fontSize:10, fontWeight:700 }}>
                                   {r._label} · {date ? new Date(date).toLocaleDateString("fr-FR",{day:"numeric",month:"short"}) : "—"}
                                 </div>
                               );
@@ -6129,113 +6214,17 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                           </div>
                         </div>
                       );
-                    });
-                  })()}
-                </div>
-              );
-            })()}
-
-            {/* Taux de remplissage */}
-            <div style={{ background: "#fff", borderRadius: 20, padding: 18, boxShadow: "0 4px 16px rgba(0,0,0,0.06)" }}>
-              <div style={{ fontWeight: 800, color: "#2C3E50", fontSize: 14, marginBottom: 14 }}>📈 Taux de remplissage — Saison 2026</div>
-
-              {/* Natation */}
-              <div style={{ marginBottom: 14 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: "#555" }}>🏊 Natation</span>
-                  <span style={{ fontWeight: 900, color: C.ocean, fontSize: 13 }}>{fillRateNat}%</span>
-                </div>
-                <div style={{ background: "#EEF5FF", borderRadius: 50, height: 10, overflow: "hidden" }}>
-                  <div style={{ height: "100%", width: `${fillRateNat}%`, background: `linear-gradient(90deg, ${C.ocean}, ${C.sea})`, borderRadius: 50 }} />
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, fontSize: 11, color: "#aaa" }}>
-                  <span>{takenNat} places prises</span>
-                  <span>{freeNat} places libres</span>
-                </div>
-              </div>
-
-              {/* Club */}
-              <div>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: "#555" }}>🏖️ Club de Plage</span>
-                  <span style={{ fontWeight: 900, color: C.coral, fontSize: 13 }}>{fillRateClub}%</span>
-                </div>
-                <div style={{ background: "#FFF0EE", borderRadius: 50, height: 10, overflow: "hidden" }}>
-                  <div style={{ height: "100%", width: `${fillRateClub}%`, background: `linear-gradient(90deg, ${C.coral}, ${C.sun})`, borderRadius: 50 }} />
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, fontSize: 11, color: "#aaa" }}>
-                  <span>{takenClub} réservations club</span>
-                  <span>{totalJoursClub} jours · 45 places/session</span>
-                </div>
-              </div>
-            </div>
-
-            {/* 💳 Paiements du jour */}
-            <div style={{ background: "#fff", borderRadius: 20, padding: 18, boxShadow: "0 4px 16px rgba(0,0,0,0.06)" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-                <div style={{ fontWeight: 800, color: "#2C3E50", fontSize: 14 }}>💳 Paiements du jour</div>
-                <div style={{ background: `${C.green}18`, color: C.green, borderRadius: 50, padding: "4px 14px", fontWeight: 900, fontSize: 13 }}>
-                  {realTotal} €
-                </div>
-              </div>
-
-              {confirmedNatToday.length + confirmedClubToday.length === 0 ? (
-                <div style={{ textAlign:"center", padding:"16px 0", color:"#bbb", fontSize:13 }}>Aucun paiement encaissé aujourd'hui</div>
-              ) : (
-                <div style={{ display:"flex", flexDirection:"column", gap:0 }}>
-                  {[...confirmedNatToday, ...confirmedClubToday]
-                    .sort((a,b) => (b.updated_at||b.created_at||"").localeCompare(a.updated_at||a.created_at||""))
-                    .map((r, i, arr) => {
-                      const isNat = !!r.date_seance;
-                      const isLib = !isNat && Array.isArray(r.enfants) && Number(r.enfants[0]) >= 6;
-                      const color = isNat ? C.ocean : C.coral;
-                      const label = isNat ? `🏊 ${r.heure}` : isLib ? `🎟️ Carte Liberté · ${r.enfants[0]} demi-j.` : `🏖️ ${r.session==="matin"?"Matin":"Après-midi"}`;
-                      const date  = (r.date_seance || r.date_reservation)?.slice(0,10);
-                      // Montant
-                      let montant = "";
-                      if (isNat) montant = `${r.montant || 20} €`;
-                      else if (isLib) { const LIBP = {6:96,12:180,18:252,24:288,30:330}; montant = `${LIBP[Number(r.enfants[0])]||"—"} €`; }
-                      return (
-                        <div key={`${isNat?"n":"c"}-${r.id}`} style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 0", borderBottom: i < arr.length-1 ? "1px solid #F0F4F8" : "none" }}>
-                          <div style={{ width:34, height:34, borderRadius:12, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, background:`${color}18`, color, fontWeight:900 }}>✓</div>
-                          <div style={{ flex:1, minWidth:0 }}>
-                            <div style={{ fontWeight:800, fontSize:13, color:"#2C3E50", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-                              {r.membres ? `${r.membres.prenom} ${NOM(r.membres.nom)}` : "—"}
-                            </div>
-                            <div style={{ fontSize:11, color:"#aaa" }}>{label}{date && !isLib ? ` · ${new Date(date).toLocaleDateString("fr-FR")}` : ""}</div>
-                          </div>
-                          <div style={{ fontWeight:900, fontSize:13, color:C.green, flexShrink:0 }}>{montant}</div>
-                        </div>
-                      );
                     })}
+                  </div>
                 </div>
               )}
-            </div>
 
-            {/* 👤 Derniers membres inscrits */}
-            <div style={{ background: "#fff", borderRadius: 20, padding: 18, boxShadow: "0 4px 16px rgba(0,0,0,0.06)" }}>
-              <div style={{ fontWeight: 800, color: "#2C3E50", fontSize: 14, marginBottom: 14 }}>👤 Derniers membres inscrits</div>
-              {dbMembres.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "12px 0", color: "#bbb", fontSize: 13 }}>Aucun membre inscrit</div>
-              ) : dbMembres.slice(0, 5).map((m, i) => (
-                <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: i < Math.min(dbMembres.length,5)-1 ? "1px solid #F0F4F8" : "none" }}>
-                  <div style={{ width: 38, height: 38, borderRadius: 12, background: `linear-gradient(135deg, ${C.ocean}, ${C.sea})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>👤</div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 800, color: "#2C3E50", fontSize: 13 }}>{m.prenom} {NOM(m.nom)}</div>
-                    <div style={{ fontSize: 11, color: "#aaa" }}>{m.email}</div>
-                    <div style={{ fontSize: 10, color: "#bbb" }}>
-                      {m.enfants?.length || 0} enfant{(m.enfants?.length||0)>1?"s":""} · {new Date(m.created_at).toLocaleDateString("fr-FR")}
-                    </div>
-                  </div>
-                  <Pill color={C.green}>✓</Pill>
-                </div>
-              ))}
+              {/* Fréquentation par âge */}
+              <AgeGroupCard dbMembres={dbMembres} />
             </div>
-
-            {/* Tri par groupe d'âge */}
-            <AgeGroupCard dbMembres={dbMembres} />
           </div>
-        )}
+          );
+        })()}
 
         {tab === "seances" && (
           <SeancesTab sessions={allSeasonSessions} setSessions={setAllSeasonSessions} />
@@ -6883,4 +6872,4 @@ export default function App() {
     </div>
   );
 }
-// dashboard paiements jour Wed Apr  1 12:56:24 CEST 2026
+// dashboard desktop Wed Apr  1 13:01:09 CEST 2026
