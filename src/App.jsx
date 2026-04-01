@@ -5616,6 +5616,61 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
               ))}
             </div>
 
+            {/* ⏳ Réservations en attente de validation */}
+            {(() => {
+              const pendingNat  = dbResas.filter(r => r.statut === "pending");
+              const pendingClub = dbResasClub.filter(r => r.statut === "pending");
+              const allPending  = [
+                ...pendingNat.map(r => ({ ...r, _type:"natation", _date: r.date_seance, _label: `🏊 ${r.heure}` })),
+                ...pendingClub.map(r => ({ ...r, _type:"club", _date: r.date_reservation, _label: `🏖️ ${r.session==="matin"?"Matin":"Après-midi"}` })),
+              ].sort((a,b) => (a.created_at||"").localeCompare(b.created_at||""));
+              if (allPending.length === 0) return null;
+              return (
+                <div style={{ background:"#fff", borderRadius:20, padding:18, boxShadow:`0 4px 20px ${C.sun}44`, border:`2px solid ${C.sun}60` }}>
+                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
+                    <div style={{ fontWeight:800, color:"#2C3E50", fontSize:14 }}>⏳ En attente de validation</div>
+                    <div style={{ background:`${C.sun}20`, color:"#b45309", borderRadius:50, padding:"3px 12px", fontWeight:900, fontSize:12 }}>
+                      {allPending.length} demande{allPending.length>1?"s":""}
+                    </div>
+                  </div>
+                  <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                    {allPending.map(r => {
+                      const color = r._type === "natation" ? C.ocean : C.coral;
+                      const date  = r._date?.slice(0,10);
+                      return (
+                        <div key={`${r._type}-${r.id}`} style={{ background:`${C.sun}08`, borderRadius:14, padding:"12px 14px", borderLeft:`4px solid ${C.sun}` }}>
+                          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
+                            <div style={{ fontWeight:900, color:"#2C3E50", fontSize:13 }}>
+                              {r.membres ? `${r.membres.prenom} ${NOM(r.membres.nom)}` : "—"}
+                            </div>
+                            <button onClick={async () => {
+                              const table = r._type === "natation" ? "reservations_natation" : "reservations_club";
+                              await sb.from(table).update({ statut:"confirmed" }).eq("id", r.id);
+                              refreshResas();
+                            }} style={{
+                              background:`linear-gradient(135deg,${C.green},#1E8449)`, border:"none",
+                              color:"#fff", borderRadius:50, padding:"5px 14px",
+                              cursor:"pointer", fontWeight:900, fontSize:12, fontFamily:"inherit",
+                              boxShadow:`0 3px 10px ${C.green}44`,
+                            }}>✅ Valider</button>
+                          </div>
+                          <div style={{ fontSize:12, color, fontWeight:700 }}>
+                            {r._label} · {date ? new Date(date).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}) : "—"}
+                          </div>
+                          {r.enfants?.length > 0 && (
+                            <div style={{ display:"flex", gap:4, marginTop:5, flexWrap:"wrap" }}>
+                              {r.enfants.map((e,i) => <span key={i} style={{ background:`${color}15`, color, borderRadius:50, padding:"2px 8px", fontSize:11, fontWeight:700 }}>{e}</span>)}
+                            </div>
+                          )}
+                          {r.membres?.email && <div style={{ fontSize:11, color:"#bbb", marginTop:3 }}>{r.membres.email}</div>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Taux de remplissage */}
             <div style={{ background: "#fff", borderRadius: 20, padding: 18, boxShadow: "0 4px 16px rgba(0,0,0,0.06)" }}>
               <div style={{ fontWeight: 800, color: "#2C3E50", fontSize: 14, marginBottom: 14 }}>📈 Taux de remplissage — Saison 2026</div>
@@ -5809,6 +5864,61 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
               </button>
             </div>
 
+            {/* ⏳ Bloc En attente de validation */}
+            {(() => {
+              const pendingNat  = dbResas.filter(r => r.statut === "pending");
+              const pendingClub = dbResasClub.filter(r => r.statut === "pending");
+              const allPending  = [
+                ...pendingNat.map(r => ({ ...r, _type:"natation", _date: r.date_seance,      _label:`🏊 ${r.heure}` })),
+                ...pendingClub.map(r => ({ ...r, _type:"club",    _date: r.date_reservation, _label:`🏖️ ${r.session==="matin"?"Matin":"Après-midi"}` })),
+              ].sort((a,b) => (a.created_at||"").localeCompare(b.created_at||""));
+              if (allPending.length === 0) return null;
+              return (
+                <div style={{ background:"#fff", borderRadius:18, padding:16, border:`2px solid ${C.sun}60`, boxShadow:`0 4px 16px ${C.sun}30` }}>
+                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
+                    <div style={{ fontWeight:900, color:"#b45309", fontSize:13 }}>⏳ En attente de validation</div>
+                    <span style={{ background:`${C.sun}20`, color:"#b45309", borderRadius:50, padding:"2px 10px", fontWeight:900, fontSize:11 }}>{allPending.length}</span>
+                  </div>
+                  <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                    {allPending.map(r => {
+                      const color = r._type === "natation" ? C.ocean : C.coral;
+                      const date  = r._date?.slice(0,10);
+                      return (
+                        <div key={`${r._type}-${r.id}`} style={{ background:`${C.sun}08`, borderRadius:12, padding:"10px 12px", borderLeft:`3px solid ${C.sun}` }}>
+                          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
+                            <div>
+                              <div style={{ fontWeight:900, color:"#2C3E50", fontSize:13 }}>
+                                {r.membres ? `${r.membres.prenom} ${NOM(r.membres.nom)}` : "—"}
+                              </div>
+                              <div style={{ fontSize:11, color, fontWeight:700 }}>
+                                {r._label} · {date ? new Date(date).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}) : "—"}
+                              </div>
+                              {r.enfants?.length > 0 && (
+                                <div style={{ display:"flex", gap:4, marginTop:4, flexWrap:"wrap" }}>
+                                  {r.enfants.map((e,i) => <span key={i} style={{ background:`${color}15`, color, borderRadius:50, padding:"1px 8px", fontSize:10, fontWeight:700 }}>{e}</span>)}
+                                </div>
+                              )}
+                              {r.membres?.email && <div style={{ fontSize:10, color:"#bbb", marginTop:2 }}>{r.membres.email}</div>}
+                            </div>
+                            <button onClick={async () => {
+                              const table = r._type === "natation" ? "reservations_natation" : "reservations_club";
+                              await sb.from(table).update({ statut:"confirmed" }).eq("id", r.id);
+                              refreshResas();
+                            }} style={{
+                              background:`linear-gradient(135deg,${C.green},#1E8449)`, border:"none",
+                              color:"#fff", borderRadius:50, padding:"7px 14px",
+                              cursor:"pointer", fontWeight:900, fontSize:12, fontFamily:"inherit",
+                              boxShadow:`0 3px 10px ${C.green}44`, flexShrink:0, marginLeft:8,
+                            }}>✅ Valider</button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Natation */}
             {dbResas.length > 0 && (
               <>
@@ -5928,21 +6038,24 @@ function BottomNav({ current, onNav }) {
 const ADMIN_CODE = "club2026";
 
 function ProfilConnecte({ user, setUser, setScreen, reservations }) {
-  const [resasNat, setResasNat] = useState([]);
+  const [resasNat, setResasNat]   = useState([]);
   const [resasClub, setResasClub] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading]     = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
+  const loadResas = async () => {
     if (!user?.supabaseId) { setLoading(false); return; }
-    Promise.all([
+    const [{ data: nat }, { data: club }] = await Promise.all([
       sb.from("reservations_natation").select("*").eq("membre_id", user.supabaseId).order("date_seance"),
       sb.from("reservations_club").select("*").eq("membre_id", user.supabaseId).order("date_reservation"),
-    ]).then(([{data: nat}, {data: club}]) => {
-      setResasNat(nat || []);
-      setResasClub(club || []);
-      setLoading(false);
-    }).catch(() => setLoading(false));
-  }, [user?.supabaseId]);
+    ]);
+    setResasNat(nat || []);
+    setResasClub(club || []);
+    setLoading(false);
+    setRefreshing(false);
+  };
+
+  useEffect(() => { loadResas().catch(() => setLoading(false)); }, [user?.supabaseId]);
 
   return (
     <>
@@ -6004,20 +6117,29 @@ function ProfilConnecte({ user, setUser, setScreen, reservations }) {
         <div style={{ background:"#fff", borderRadius:18, padding:16, marginBottom:12, boxShadow:"0 2px 10px rgba(0,0,0,0.06)" }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
             <div style={{ fontWeight:800, color:C.dark, fontSize:15 }}>🏊 Natation</div>
-            <Pill color={C.ocean}>{resasNat.length} séance{resasNat.length>1?"s":""}</Pill>
+            <div style={{ display:"flex", gap:6, alignItems:"center" }}>
+              <button onClick={() => { setRefreshing(true); loadResas(); }} style={{ background:"#f0f0f0", border:"none", color:"#888", borderRadius:50, padding:"4px 10px", cursor:"pointer", fontWeight:800, fontSize:11, fontFamily:"inherit" }}>
+                {refreshing ? "…" : "↻ Actualiser"}
+              </button>
+              <Pill color={C.ocean}>{resasNat.length} séance{resasNat.length>1?"s":""}</Pill>
+            </div>
           </div>
           {loading ? <div style={{ fontSize:12, color:"#bbb", textAlign:"center" }}>Chargement…</div>
           : resasNat.length === 0 ? <div style={{ fontSize:12, color:"#bbb", textAlign:"center", padding:"8px 0" }}>Aucune séance réservée</div>
           : <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
-              {resasNat.slice(0,4).map((r,i) => (
-                <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", background:`${C.ocean}08`, borderRadius:12, padding:"8px 12px" }}>
-                  <div style={{ fontSize:13, fontWeight:800, color:C.ocean }}>{r.heure}</div>
-                  {r.enfants?.length > 0 && <div style={{ fontSize:11, color:C.ocean, fontWeight:700 }}>{r.enfants.join(", ")}</div>}
+              {resasNat.slice(0,5).map((r,i) => (
+                <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", background: r.statut==="pending" ? `${C.sun}15` : `${C.ocean}08`, borderRadius:12, padding:"8px 12px", borderLeft:`3px solid ${r.statut==="pending" ? C.sun : C.ocean}` }}>
+                  <div>
+                    <div style={{ fontSize:13, fontWeight:800, color: r.statut==="pending" ? "#b45309" : C.ocean }}>{r.heure}</div>
+                    {r.enfants?.length > 0 && <div style={{ fontSize:11, color:"#888", fontWeight:700 }}>{r.enfants.join(", ")}</div>}
+                  </div>
                   <div style={{ fontSize:11, color:"#888" }}>{r.date_seance ? new Date(r.date_seance).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}) : "—"}</div>
-                  <Pill color={C.green}>✓</Pill>
+                  {r.statut === "pending"
+                    ? <span style={{ background:`${C.sun}20`, color:"#b45309", borderRadius:50, padding:"2px 8px", fontSize:10, fontWeight:800 }}>⏳ En attente</span>
+                    : <Pill color={C.green}>✓ Confirmé</Pill>}
                 </div>
               ))}
-              {resasNat.length > 4 && <div style={{ fontSize:11, color:"#aaa", textAlign:"center" }}>+{resasNat.length-4} séances</div>}
+              {resasNat.length > 5 && <div style={{ fontSize:11, color:"#aaa", textAlign:"center" }}>+{resasNat.length-5} séances</div>}
             </div>
           }
         </div>
@@ -6031,15 +6153,19 @@ function ProfilConnecte({ user, setUser, setScreen, reservations }) {
           {loading ? <div style={{ fontSize:12, color:"#bbb", textAlign:"center" }}>Chargement…</div>
           : resasClub.length === 0 ? <div style={{ fontSize:12, color:"#bbb", textAlign:"center", padding:"8px 0" }}>Aucune réservation club</div>
           : <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
-              {resasClub.slice(0,4).map((r,i) => (
-                <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", background:`${C.coral}08`, borderRadius:12, padding:"8px 12px" }}>
-                  <div style={{ fontSize:12, fontWeight:800, color:C.coral }}>{r.session==="matin"?"Matin":"Après-midi"}</div>
-                  {r.enfants?.length > 0 && <div style={{ fontSize:11, color:C.coral, fontWeight:700 }}>{r.enfants.join(", ")}</div>}
+              {resasClub.slice(0,5).map((r,i) => (
+                <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", background: r.statut==="pending" ? `${C.sun}15` : `${C.coral}08`, borderRadius:12, padding:"8px 12px", borderLeft:`3px solid ${r.statut==="pending" ? C.sun : C.coral}` }}>
+                  <div>
+                    <div style={{ fontSize:12, fontWeight:800, color: r.statut==="pending" ? "#b45309" : C.coral }}>{r.session==="matin"?"☀️ Matin":"🌊 Après-midi"}</div>
+                    {r.enfants?.length > 0 && <div style={{ fontSize:11, color:"#888", fontWeight:700 }}>{r.enfants.join(", ")}</div>}
+                  </div>
                   <div style={{ fontSize:11, color:"#888" }}>{r.date_reservation ? new Date(r.date_reservation).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}) : "—"}</div>
-                  <Pill color={C.green}>✓</Pill>
+                  {r.statut === "pending"
+                    ? <span style={{ background:`${C.sun}20`, color:"#b45309", borderRadius:50, padding:"2px 8px", fontSize:10, fontWeight:800 }}>⏳ En attente</span>
+                    : <Pill color={C.green}>✓ Confirmé</Pill>}
                 </div>
               ))}
-              {resasClub.length > 4 && <div style={{ fontSize:11, color:"#aaa", textAlign:"center" }}>+{resasClub.length-4} demi-journées</div>}
+              {resasClub.length > 5 && <div style={{ fontSize:11, color:"#aaa", textAlign:"center" }}>+{resasClub.length-5} demi-journées</div>}
             </div>
           }
         </div>
