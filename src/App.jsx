@@ -1142,13 +1142,22 @@ function ReservationClubScreen({ onNav, user, setUser, clubPlaces, setClubPlaces
   const [weekIdx, setWeekIdx]                 = useState(0);
   const [resasClubDB, setResasClubDB]         = useState([]);
   const [selectedEnfants, setSelectedEnfants] = useState([]);
+  const [enfantsDB, setEnfantsDB]             = useState([]);
 
   useEffect(() => {
     sb.from("reservations_club").select("date_reservation, session")
       .then(({ data }) => setResasClubDB(data || [])).catch(() => {});
-  }, []);
+    // Charger les enfants directement depuis Supabase
+    if (user?.supabaseId) {
+      sb.from("enfants").select("*").eq("membre_id", user.supabaseId)
+        .then(({ data }) => setEnfantsDB(data || [])).catch(() => {});
+    }
+  }, [user?.supabaseId]);
 
-  const enfantsClub = (user?.enfants || []).filter(e => e.activite === "club" || e.activite === "les deux");
+  const enfantsClub = enfantsDB.length > 0
+    ? enfantsDB.filter(e => e.activite === "club" || e.activite === "les deux")
+    : (user?.enfants || []).filter(e => e.activite === "club" || e.activite === "les deux");
+
   const toggleEnfant = (prenom) => setSelectedEnfants(prev => prev.includes(prenom) ? prev.filter(x => x !== prenom) : [...prev, prenom]);
 
   // Calculer places restantes pour la date et session sélectionnées
@@ -1312,6 +1321,29 @@ function ReservationClubScreen({ onNav, user, setUser, clubPlaces, setClubPlaces
             );
           })}
         </div>
+
+        {/* Sélection enfants — toujours visible */}
+        {enfantsClub.length > 0 && (
+          <div style={{ background:"#fff", borderRadius:18, padding:16, marginBottom:12, boxShadow:"0 2px 10px rgba(0,0,0,0.05)" }}>
+            <div style={{ fontWeight:800, color:C.dark, fontSize:14, marginBottom:10 }}>👧 Enfant(s) participants</div>
+            <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
+              {enfantsClub.map(e => {
+                const sel = selectedEnfants.includes(e.prenom);
+                return (
+                  <div key={e.prenom} onClick={() => toggleEnfant(e.prenom)} style={{
+                    background: sel ? `linear-gradient(135deg,${C.coral},${C.sun})` : "#F0F4F8",
+                    color: sel ? "#fff" : "#888",
+                    borderRadius:50, padding:"9px 18px", cursor:"pointer",
+                    fontWeight:800, fontSize:14, transition:"all .15s",
+                    boxShadow: sel ? `0 4px 12px ${C.coral}44` : "none",
+                  }}>
+                    {sel ? "✓ " : ""}{e.prenom}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Session choice */}
         <div style={{ display:"flex",flexDirection:"column",gap:12, marginBottom:14 }}>
@@ -3668,12 +3700,14 @@ function PaiementsTab() {
                   {r.membres ? `${r.membres.prenom} ${NOM(r.membres.nom)}` : "—"}
                 </div>
                 {r.statut === "pending" ? (
-                  <div style={{ display:"flex", gap:6, alignItems:"center" }}>
-                    <span style={{ background:`${C.sun}20`, color:"#b45309", borderRadius:50, padding:"2px 8px", fontSize:11, fontWeight:800 }}>⏳ En attente</span>
-                    <button onClick={() => validerPaiement(r)} style={{ background:`${C.green}15`, border:`1.5px solid ${C.green}40`, color:C.green, borderRadius:8, padding:"3px 10px", cursor:"pointer", fontWeight:900, fontSize:11, fontFamily:"inherit" }}>✅ Payé</button>
-                  </div>
+                  <button onClick={() => validerPaiement(r)} style={{
+                    background:`linear-gradient(135deg,${C.sun},${C.coral})`, border:"none",
+                    color:"#fff", borderRadius:50, padding:"5px 14px",
+                    cursor:"pointer", fontWeight:900, fontSize:12, fontFamily:"inherit",
+                    boxShadow:`0 3px 10px ${C.sun}44`,
+                  }}>⏳ En attente → Payé</button>
                 ) : (
-                  <span style={{ background:`${C.green}15`, color:C.green, borderRadius:50, padding:"2px 8px", fontSize:11, fontWeight:800 }}>✓ Confirmé</span>
+                  <span style={{ background:`${C.green}15`, color:C.green, borderRadius:50, padding:"4px 12px", fontSize:11, fontWeight:800 }}>✓ Payé</span>
                 )}
               </div>
               <div style={{ fontSize:12, color: CAT_COLOR[r._type], fontWeight:700 }}>
@@ -5410,7 +5444,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                 { label: "Membres inscrits",  value: dbMembres.length,               emoji: "👤", bg: `linear-gradient(135deg, ${C.ocean}, #0052A3)`, sh: C.ocean },
                 { label: "Résas natation",    value: dbResas.length,                  emoji: "🏊", bg: `linear-gradient(135deg, ${C.green}, #1E8449)`, sh: C.green },
                 { label: "Résas club",        value: dbResasClub.length,              emoji: "🏖️", bg: `linear-gradient(135deg, ${C.coral}, #C0392B)`, sh: C.coral },
-                { label: "Total encaissé",    value: `${realTotal} €`,               emoji: "💳", bg: `linear-gradient(135deg, #9B59B6, #6C3483)`,   sh: "#9B59B6" },
+                { label: "Encaissé aujourd'hui", value: `${realTotal} €`, emoji: "💳", bg: `linear-gradient(135deg, #9B59B6, #6C3483)`, sh: "#9B59B6" },
               ].map(s => (
                 <div key={s.label} style={{ background: s.bg, borderRadius: 20, padding: "16px 14px", boxShadow: `0 6px 20px ${s.sh}44` }}>
                   <div style={{ fontSize: 28, marginBottom: 8 }}>{s.emoji}</div>
