@@ -1428,6 +1428,23 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser }) 
   const [step, setStep]             = useState("choix");
   const [selectedDates, setSelectedDates] = useState([]);
   const [moisFilter, setMoisFilter] = useState("juil");
+  const [selectedEnfantsClub, setSelectedEnfantsClub] = useState([]);
+  const [enfantsDB, setEnfantsDB]   = useState([]);
+
+  useEffect(() => {
+    if (user?.supabaseId) {
+      sb.from("enfants").select("*").eq("membre_id", user.supabaseId)
+        .then(({ data }) => setEnfantsDB(data || [])).catch(() => {});
+    }
+  }, [user?.supabaseId]);
+
+  const enfantsClub = enfantsDB.length > 0
+    ? enfantsDB.filter(e => e.activite === "club" || e.activite === "les deux")
+    : (user?.enfants || []).filter(e => e.activite === "club" || e.activite === "les deux");
+
+  const toggleEnfantClub = (prenom) => setSelectedEnfantsClub(prev =>
+    prev.includes(prenom) ? prev.filter(x => x !== prenom) : [...prev, prenom]
+  );
 
   const tarifData = formulType === "matin" ? TARIFS_MATIN : formulType === "apmidi" ? TARIFS_APMIDI : TARIFS_JOURNEE;
 
@@ -1597,6 +1614,37 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser }) 
               </div>
               {nbEnfants > 3 && <div style={{ fontSize: 12, color: "#888", marginTop: 6 }}>3 enfants + {nbEnfants-3} enfant(s) supplémentaire(s)</div>}
             </Card>
+
+            {/* Sélection des enfants concernés */}
+            {enfantsClub.length > 0 && (
+              <div style={{ background:"#fff", borderRadius:18, padding:16, marginBottom:14, boxShadow:"0 2px 10px rgba(0,0,0,0.05)" }}>
+                <div style={{ fontWeight:800, color:C.dark, fontSize:14, marginBottom:10 }}>
+                  👧 Enfant(s) concernés
+                  {selectedEnfantsClub.length > 0 && <span style={{ fontSize:12, color:tarifData.color, fontWeight:700 }}> · {selectedEnfantsClub.join(", ")}</span>}
+                </div>
+                <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
+                  {enfantsClub.map(e => {
+                    const sel = selectedEnfantsClub.includes(e.prenom);
+                    return (
+                      <div key={e.prenom} onClick={() => toggleEnfantClub(e.prenom)} style={{
+                        background: sel ? `linear-gradient(135deg,${tarifData.color},${tarifData.color}cc)` : "#F0F4F8",
+                        color: sel ? "#fff" : "#888",
+                        borderRadius:50, padding:"9px 18px", cursor:"pointer",
+                        fontWeight:800, fontSize:13, transition:"all .15s",
+                        boxShadow: sel ? `0 4px 12px ${tarifData.color}44` : "none",
+                      }}>
+                        {sel ? "✓ " : ""}{e.prenom}
+                      </div>
+                    );
+                  })}
+                </div>
+                {selectedEnfantsClub.length > 0 && selectedEnfantsClub.length !== nbEnfants && (
+                  <div style={{ fontSize:11, color:C.coral, marginTop:8, fontWeight:700 }}>
+                    ⚠️ {selectedEnfantsClub.length} enfant{selectedEnfantsClub.length>1?"s":""} sélectionné{selectedEnfantsClub.length>1?"s":""} · {nbEnfants} dans le forfait
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Tarif rows */}
             <div style={{ marginBottom: 16 }}>
@@ -1798,7 +1846,7 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser }) 
                           session: formulType === "journee" ? "matin" : formulType,
                           labelJour: new Date(iso).toLocaleDateString("fr-FR", {weekday:"long",day:"numeric",month:"long"}),
                           rappelDate: null,
-                          enfants: (user?.enfants||[]).filter(e => e.activite==="club"||e.activite==="les deux").map(e=>e.prenom),
+                          enfants: selectedEnfantsClub.length > 0 ? selectedEnfantsClub : (user?.enfants||[]).filter(e => e.activite==="club"||e.activite==="les deux").map(e=>e.prenom),
                         });
                       }
                     } catch(e) { console.warn(e); }
