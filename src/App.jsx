@@ -3933,8 +3933,25 @@ function PaiementsTab({ onValidate }) {
     const table     = groupe.type === "natation" ? "reservations_natation" : "reservations_club";
     const newStatut = groupe.statut === "pending" ? "confirmed" : "pending";
     await Promise.all(groupe.resas.map(r => sb.from(table).update({ statut: newStatut }).eq("id", r.id)));
+
+    // Si c'est une Carte Liberté → créditer ou décréditer le solde
+    if (groupe.type === "club" && groupe.resas.some(r => r.session === "liberte")) {
+      const r = groupe.resas[0];
+      const credit = r.liberte_credit || 0;
+      if (credit > 0 && r.membre_id) {
+        const { data: m } = await sb.from("membres").select("liberte_balance, liberte_total").eq("id", r.membre_id).single();
+        if (m) {
+          const delta = newStatut === "confirmed" ? credit : -credit;
+          await sb.from("membres").update({
+            liberte_balance: Math.max(0, (m.liberte_balance||0) + delta),
+            liberte_total:   Math.max(0, (m.liberte_total||0)   + (newStatut === "confirmed" ? credit : 0)),
+          }).eq("id", r.membre_id);
+        }
+      }
+    }
+
     await loadAll();
-    onValidate?.(); // Rafraîchir aussi l'onglet Résas
+    onValidate?.();
   };
 
   // Grouper par membre + type + bloc temporel (créés le même jour)
@@ -5362,10 +5379,23 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
             }
           }
         } else if (forfaitClub === "liberte") {
-          const seancesValides = seancesClub.filter(s => s.date).slice(0, nbLiberte);
-          if (!seancesValides.length) { setError("Ajoutez au moins une séance."); setSaving(false); return; }
-          for (const s of seancesValides) {
-            await creerReservationClub({ membreId:membreId||null, dateReservation:s.date, session:s.session, labelJour:new Date(s.date).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"}), rappelDate:getRappelDate(s.date), enfants:selectedEnfants, statut:statutResa });
+          // Créer une entrée unique en base — pas de dates, juste le crédit
+          const montantLib = nbLiberte === 6 ? 0 : nbLiberte === 12 ? 0 : nbLiberte === 18 ? 0 : nbLiberte === 24 ? 0 : 0;
+          await sb.from("reservations_club").insert([{
+            membre_id: membreId || null,
+            date_reservation: new Date().toISOString().slice(0,10),
+            session: "liberte",
+            label_jour: `Carte Liberté · ${nbLiberte} demi-journées`,
+            statut: statutResa,
+            enfants: [],
+            liberte_credit: nbLiberte, // colonnes pour traçabilité
+          }]);
+          // Si directement confirmé (payé), créditer le solde immédiatement
+          if (statutResa === "confirmed" && membreId) {
+            const membre = dbMembres.find(m => m.id === membreId);
+            const newBalance = (membre?.liberte_balance || 0) + nbLiberte;
+            const newTotal   = (membre?.liberte_total   || 0) + nbLiberte;
+            await sb.from("membres").update({ liberte_balance: newBalance, liberte_total: newTotal }).eq("id", membreId);
           }
         } else {
           const seancesValides = seancesClub.filter(s => s.date);
@@ -5607,35 +5637,27 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
                 </div>
               )}
 
-              {/* Carte Liberté — nb demi-journées */}
+              {/* Carte Liberté — nb demi-journées, pas de dates */}
               {forfaitClub === "liberte" && (
                 <div style={{ background:"#fff", borderRadius:16, padding:14, boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
-                  <div style={{ fontWeight:800, color:C.dark, fontSize:13, marginBottom:10 }}>🎟️ Nombre de demi-journées</div>
-                  <div style={{ display:"flex", gap:8, marginBottom:12 }}>
-                    {[["6","6 demi-j."],["10","10 demi-j."],["15","15 demi-j."],["20","20 demi-j."]].map(([n,l]) => (
-                      <button key={n} onClick={() => { setNbLiberte(Number(n)); setSeancesClub(Array.from({length:Number(n)},()=>({date:"",session:"matin"}))); }} style={{ flex:1, background: nbLiberte===Number(n) ? C.coral : "#f0f0f0", color: nbLiberte===Number(n)?"#fff":"#888", border:"none", borderRadius:10, padding:"7px 4px", cursor:"pointer", fontWeight:800, fontSize:10, fontFamily:"inherit" }}>{l}</button>
+                  <div style={{ fontWeight:800, color:C.dark, fontSize:13, marginBottom:6 }}>🎟️ Carte Liberté</div>
+                  <div style={{ fontSize:12, color:"#888", marginBottom:12 }}>
+                    Le solde sera crédité sur le compte du client à réception du paiement.
+                    {membreId && <><br/>Solde actuel : <strong>{liberteBalance}</strong> demi-j.</>}
+                  </div>
+                  <label style={{ fontSize:11, fontWeight:900, color:C.coral, display:"block", marginBottom:8, textTransform:"uppercase" }}>Nombre de demi-journées</label>
+                  <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+                    {[[6,"6"],[12,"12"],[18,"18"],[24,"24"],[30,"30"]].map(([n,l]) => (
+                      <button key={n} onClick={() => setNbLiberte(n)} style={{
+                        flex:1, background: nbLiberte===n ? `linear-gradient(135deg,${C.coral},${C.sun})` : "#f0f0f0",
+                        color: nbLiberte===n?"#fff":"#888", border:"none", borderRadius:12,
+                        padding:"12px 4px", cursor:"pointer", fontWeight:900, fontSize:14, fontFamily:"inherit",
+                        boxShadow: nbLiberte===n ? `0 4px 12px ${C.coral}44` : "none",
+                      }}>{l}</button>
                     ))}
                   </div>
-                  {membreId && <div style={{ fontSize:12, color:"#888", marginBottom:10 }}>Solde actuel : <strong>{liberteBalance}</strong> demi-j.</div>}
-                  <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-                    {seancesClub.map((s, i) => (
-                      <div key={i} style={{ background:"#f8f8f8", borderRadius:12, padding:"10px 12px", display:"flex", gap:8, alignItems:"center" }}>
-                        <div style={{ width:22, height:22, borderRadius:6, background:`${C.coral}20`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, fontWeight:900, color:C.coral, flexShrink:0 }}>{i+1}</div>
-                        <input type="date" value={s.date} onChange={e => updateSeanceClub(i,"date",e.target.value)} min="2026-07-06" max="2026-08-22"
-                          style={{ flex:1, border:"1.5px solid #e0e8f0", borderRadius:10, padding:"8px", fontSize:12, fontFamily:"inherit", outline:"none" }} />
-                        <select value={s.session} onChange={e => updateSeanceClub(i,"session",e.target.value)}
-                          style={{ flex:1, border:"1.5px solid #e0e8f0", borderRadius:10, padding:"8px", fontSize:12, fontFamily:"inherit", outline:"none", background:"#fff" }}>
-                          <option value="matin">☀️ Matin</option>
-                          <option value="apmidi">🌊 Après-midi</option>
-                        </select>
-                        <button onClick={() => removeSeanceClub(i)} style={{ background:"#FFF0F0", border:"none", color:C.sunset, borderRadius:8, width:26, height:26, cursor:"pointer", fontWeight:900, fontFamily:"inherit" }}>✕</button>
-                      </div>
-                    ))}
-                    {seancesClub.length < nbLiberte && (
-                      <button onClick={addSeanceClub} style={{ background:`${C.coral}10`, border:`1.5px dashed ${C.coral}40`, color:C.coral, borderRadius:12, padding:"8px", cursor:"pointer", fontWeight:800, fontSize:12, fontFamily:"inherit" }}>
-                        ➕ Ajouter une séance ({seancesClub.length}/{nbLiberte})
-                      </button>
-                    )}
+                  <div style={{ marginTop:12, background:`${C.coral}10`, borderRadius:10, padding:"10px 12px", fontSize:13, color:C.coral, fontWeight:700 }}>
+                    🎟️ {nbLiberte} demi-journées · valable saison 2026
                   </div>
                 </div>
               )}
@@ -5876,6 +5898,15 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                             <button onClick={async () => {
                               const table = g.type === "natation" ? "reservations_natation" : "reservations_club";
                               await Promise.all(g.resas.map(r => sb.from(table).update({ statut:"confirmed" }).eq("id", r.id)));
+                              // Carte Liberté : créditer le solde
+                              if (g.type === "club" && g.resas.some(r => r.session === "liberte")) {
+                                const r0 = g.resas[0];
+                                const credit = r0.liberte_credit || 0;
+                                if (credit > 0 && r0.membre_id) {
+                                  const { data: m } = await sb.from("membres").select("liberte_balance, liberte_total").eq("id", r0.membre_id).single();
+                                  if (m) await sb.from("membres").update({ liberte_balance: (m.liberte_balance||0)+credit, liberte_total: (m.liberte_total||0)+credit }).eq("id", r0.membre_id);
+                                }
+                              }
                               refreshResas();
                             }} style={{
                               background:`linear-gradient(135deg,${C.green},#1E8449)`, border:"none",
@@ -6099,6 +6130,15 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                             <button onClick={async () => {
                               const table = g.type === "natation" ? "reservations_natation" : "reservations_club";
                               await Promise.all(g.resas.map(r => sb.from(table).update({ statut:"confirmed" }).eq("id", r.id)));
+                              // Carte Liberté : créditer le solde
+                              if (g.type === "club" && g.resas.some(r => r.session === "liberte")) {
+                                const r0 = g.resas[0];
+                                const credit = r0.liberte_credit || 0;
+                                if (credit > 0 && r0.membre_id) {
+                                  const { data: m } = await sb.from("membres").select("liberte_balance, liberte_total").eq("id", r0.membre_id).single();
+                                  if (m) await sb.from("membres").update({ liberte_balance: (m.liberte_balance||0)+credit, liberte_total: (m.liberte_total||0)+credit }).eq("id", r0.membre_id);
+                                }
+                              }
                               refreshResas();
                             }} style={{
                               background:`linear-gradient(135deg,${C.green},#1E8449)`, border:"none",
