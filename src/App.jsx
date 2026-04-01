@@ -5729,32 +5729,32 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
     session: `${r.time} - ${DAYS.find(d=>d.id===r.day)?.label} ${DAYS.find(d=>d.id===r.day)?.num}`, status: "confirmed"
   }))];
 
-  // Total encaissé = résas confirmées aujourd'hui
+  // Total encaissé = résas confirmées aujourd'hui (basé sur updated_at ou created_at)
   const todayISO = new Date().toISOString().slice(0,10);
   const confirmedNat  = dbResas.filter(r => r.statut === "confirmed");
   const confirmedClub = dbResasClub.filter(r => r.statut === "confirmed");
-  const confirmedNatToday  = dbResas.filter(r => r.statut === "confirmed" && (r.created_at||"").slice(0,10) === todayISO);
-  const confirmedClubToday = dbResasClub.filter(r => r.statut === "confirmed" && (r.created_at||"").slice(0,10) === todayISO);
+  const confirmedNatToday  = dbResas.filter(r => r.statut === "confirmed" && ((r.updated_at||r.created_at||"").slice(0,10) === todayISO));
+  const confirmedClubToday = dbResasClub.filter(r => r.statut === "confirmed" && ((r.updated_at||r.created_at||"").slice(0,10) === todayISO));
   const realTotal = confirmedNatToday.reduce((s, r) => s + Number(r.montant || 20), 0)
                   + confirmedClubToday.reduce((s, r) => s + Number(r.montant || 0), 0);
   const pendingCount = dbResas.filter(r => r.statut === "pending").length + dbResasClub.filter(r => r.statut === "pending").length;
 
   // Taux de remplissage natation — toute la saison
   const totalSlotsNat  = ALL_SEASON_SLOTS_INIT.length * 2; // total places saison
-  const takenNat       = dbResas.length; // chaque resa = 1 place prise
+  const takenNat       = confirmedNat.length; // uniquement résas validées
   const fillRateNat    = totalSlotsNat > 0 ? Math.round((takenNat / totalSlotsNat) * 100) : 0;
   const freeNat        = Math.max(0, totalSlotsNat - takenNat);
 
   // Taux de remplissage club — toute la saison
-  const totalJoursClub  = CLUB_SEASON_DAYS.length; // nb jours saison
-  const totalPlacesClub = totalJoursClub * 45; // 45 places/jour/session × 2 sessions
-  const takenClub       = dbResasClub.length;
+  const totalJoursClub  = CLUB_SEASON_DAYS.length;
+  const totalPlacesClub = totalJoursClub * 45;
+  const takenClub       = confirmedClub.length; // uniquement résas validées
   const fillRateClub    = totalPlacesClub > 0 ? Math.round((takenClub / (totalPlacesClub * 2)) * 100) : 0;
 
   // Pour l'affichage en header (semaine courante)
   const takenSpots = sessions.reduce((s,x) => s + (2 - x.spots), 0);
   const totalSpots = sessions.reduce((s,x) => s + x.spots, 0);
-  const fillRate   = fillRateNat; // utiliser le taux saison
+  const fillRate   = fillRateNat;
 
   const tabs = [
     { id: "dashboard",    emoji: "📊", label: "Dashboard"  },
@@ -5979,42 +5979,6 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                   <Pill color={C.green}>✓</Pill>
                 </div>
               ))}
-            </div>
-
-            {/* 🔔 Dernières réservations */}
-            <div style={{ background: "#fff", borderRadius: 20, padding: 18, boxShadow: "0 4px 16px rgba(0,0,0,0.06)" }}>
-              <div style={{ fontWeight: 800, color: "#2C3E50", fontSize: 14, marginBottom: 14 }}>🔔 Dernières réservations</div>
-              {(() => {
-                // Fusionner natation + club, trier par date
-                const resasNat = dbResas.map(r => ({
-                  id: r.id, type: "natation",
-                  parent: r.membres ? `${r.membres.prenom} ${r.membres.nom}` : "—",
-                  detail: `🏊 ${r.heure} · ${r.date_seance ? new Date(r.date_seance).toLocaleDateString("fr-FR") : "—"}`,
-                  date: r.date_seance || r.created_at || "",
-                }));
-                const resasClub = dbResasClub.map(r => ({
-                  id: r.id, type: "club",
-                  parent: r.membres ? `${r.membres.prenom} ${r.membres.nom}` : "—",
-                  detail: `🏖️ ${r.session === "matin" ? "Matin" : "Après-midi"} · ${r.date_reservation ? new Date(r.date_reservation).toLocaleDateString("fr-FR") : "—"}`,
-                  date: r.date_reservation || r.created_at || "",
-                }));
-                const toutes = [...resasNat, ...resasClub]
-                  .sort((a, b) => new Date(b.date) - new Date(a.date))
-                  .slice(0, 6);
-                if (toutes.length === 0) return <div style={{ color:"#bbb", fontSize:13, textAlign:"center", padding:"12px 0" }}>Aucune réservation</div>;
-                return toutes.map((r, i) => (
-                  <div key={r.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"9px 0", borderBottom: i < toutes.length-1 ? "1px solid #F0F4F8" : "none" }}>
-                    <div style={{ width:36, height:36, borderRadius:12, background: r.type==="natation" ? `linear-gradient(135deg,${C.ocean},${C.sea})` : `linear-gradient(135deg,${C.coral},${C.sun})`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, flexShrink:0 }}>
-                      {r.type === "natation" ? "🏊" : "🏖️"}
-                    </div>
-                    <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ fontWeight:800, color:"#2C3E50", fontSize:13, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{r.parent}</div>
-                      <div style={{ fontSize:11, color:"#aaa" }}>{r.detail}</div>
-                    </div>
-                    <Pill color={C.green}>✓</Pill>
-                  </div>
-                ));
-              })()}
             </div>
 
             {/* Tri par groupe d'âge */}
