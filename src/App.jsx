@@ -1442,9 +1442,11 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser }) 
     ? enfantsDB.filter(e => e.activite === "club" || e.activite === "les deux")
     : (user?.enfants || []).filter(e => e.activite === "club" || e.activite === "les deux");
 
-  const toggleEnfantClub = (prenom) => setSelectedEnfantsClub(prev =>
-    prev.includes(prenom) ? prev.filter(x => x !== prenom) : [...prev, prenom]
-  );
+  const toggleEnfantClub = (prenom) => setSelectedEnfantsClub(prev => {
+    if (prev.includes(prenom)) return prev.filter(x => x !== prenom);
+    if (prev.length >= nbEnfants) return prev; // bloquer si déjà au max
+    return [...prev, prenom];
+  });
 
   const tarifData = formulType === "matin" ? TARIFS_MATIN : formulType === "apmidi" ? TARIFS_APMIDI : TARIFS_JOURNEE;
 
@@ -1603,11 +1605,11 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser }) 
                   )}
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <button onClick={() => { setNbEnfants(Math.max(1, nbEnfants-1)); setSelectedRow(null); }} style={{ width: 32, height: 32, borderRadius: "50%", border: "none", background: C.coral, color: "#fff", fontWeight: 900, fontSize: 18, cursor: "pointer" }}>−</button>
+                  <button onClick={() => { setNbEnfants(Math.max(1, nbEnfants-1)); setSelectedRow(null); setSelectedEnfantsClub([]); }} style={{ width: 32, height: 32, borderRadius: "50%", border: "none", background: C.coral, color: "#fff", fontWeight: 900, fontSize: 18, cursor: "pointer" }}>−</button>
                   <span style={{ fontWeight: 900, fontSize: 20, color: C.dark, minWidth: 24, textAlign: "center" }}>{nbEnfants}</span>
                   <button onClick={() => {
                     const max = clubPlaces ? (clubPlaces[formulType] || 45) : 45;
-                    if (nbEnfants < max) { setNbEnfants(nbEnfants+1); setSelectedRow(null); }
+                    if (nbEnfants < max) { setNbEnfants(nbEnfants+1); setSelectedRow(null); setSelectedEnfantsClub([]); }
                   }} disabled={clubPlaces && nbEnfants >= (clubPlaces[formulType] || 45)}
                     style={{ width: 32, height: 32, borderRadius: "50%", border: "none", background: (clubPlaces && nbEnfants >= (clubPlaces[formulType] || 45)) ? "#ddd" : C.coral, color: "#fff", fontWeight: 900, fontSize: 18, cursor: (clubPlaces && nbEnfants >= (clubPlaces[formulType] || 45)) ? "not-allowed" : "pointer" }}>+</button>
                 </div>
@@ -1638,9 +1640,14 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser }) 
                     );
                   })}
                 </div>
-                {selectedEnfantsClub.length > 0 && selectedEnfantsClub.length !== nbEnfants && (
-                  <div style={{ fontSize:11, color:C.coral, marginTop:8, fontWeight:700 }}>
-                    ⚠️ {selectedEnfantsClub.length} enfant{selectedEnfantsClub.length>1?"s":""} sélectionné{selectedEnfantsClub.length>1?"s":""} · {nbEnfants} dans le forfait
+                {selectedEnfantsClub.length < nbEnfants && (
+                  <div style={{ fontSize:11, color:"#aaa", marginTop:8, fontStyle:"italic" }}>
+                    Sélectionnez encore {nbEnfants - selectedEnfantsClub.length} enfant{nbEnfants - selectedEnfantsClub.length > 1 ? "s" : ""}
+                  </div>
+                )}
+                {selectedEnfantsClub.length === nbEnfants && (
+                  <div style={{ fontSize:11, color:C.green, marginTop:8, fontWeight:700 }}>
+                    ✓ Sélection complète
                   </div>
                 )}
               </div>
