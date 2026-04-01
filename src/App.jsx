@@ -2460,53 +2460,6 @@ function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSession
   );
 
   // Construire les semaines depuis ALL_SEASON_DAYS
-  const weeks = (() => {
-    const ws = []; let wk = [];
-    ALL_SEASON_DAYS.forEach((d, i) => {
-      wk.push(d);
-      if (d.label === "Sam" || i === ALL_SEASON_DAYS.length - 1) { ws.push([...wk]); wk = []; }
-    });
-    return ws;
-  })();
-  const currentWeek = weeks[Math.min(weekIdx, weeks.length-1)] || [];
-  const selectedDay = selectedDayId ? ALL_SEASON_DAYS.find(d => d.id === selectedDayId) : currentWeek[0];
-  const effectiveDayId = selectedDay?.id || currentWeek[0]?.id;
-
-  // Init selectedDayId quand semaine change
-  useEffect(() => {
-    if (currentWeek[0]) setSelectedDayId(currentWeek[0].id);
-  }, [weekIdx]);
-
-  // Synchroniser les places depuis Supabase au chargement
-  useEffect(() => {
-    sb.from("reservations_natation").select("date_seance, heure, statut")
-      .eq("statut", "confirmed")
-      .then(({ data }) => {
-        if (setAllSeasonSessions) {
-          setAllSeasonSessions(() => {
-            const next = ALL_SEASON_SLOTS_INIT.map(s => ({ ...s, spots: 2 }));
-            data.forEach(r => {
-              if (!r.date_seance || !r.heure) return;
-              const dateResa = r.date_seance.slice(0, 10);
-              for (let i = 0; i < next.length; i++) {
-                if (next[i].time !== r.heure || next[i].spots <= 0) continue;
-                const dayObj = ALL_SEASON_DAYS.find(d => d.id === next[i].day);
-                if (dayObj?.date) {
-                  const iso = `${dayObj.date.getFullYear()}-${String(dayObj.date.getMonth()+1).padStart(2,"0")}-${String(dayObj.date.getDate()).padStart(2,"0")}`;
-                  if (iso === dateResa) { next[i] = { ...next[i], spots: next[i].spots - 1 }; break; }
-                }
-              }
-            });
-            return next;
-          });
-        }
-      }).catch(() => {});
-  }, []);
-
-  if (!user) return (
-    <div style={{ background:C.shell, minHeight:"100%", display:"flex", flexDirection:"column" }}>
-      <div style={{ background:`linear-gradient(135deg, #00C9FF, ${C.sea})`, padding:"20px 20px 0" }}>
-        <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:8 }}>
           <BackBtn onNav={onNav} /><h2 style={{ color:"#fff", margin:0, fontWeight:900, fontSize:20 }}>🏊 Réservations Natation</h2>
         </div>
         <Wave fill={C.shell} />
@@ -7478,4 +7431,4 @@ export default function App() {
     </div>
   );
 }
-// fix dup2 Wed Apr  1 17:32:41 CEST 2026
+// fix dups Wed Apr  1 17:35:01 CEST 2026
