@@ -991,17 +991,30 @@ function FormulesEveilScreen({ onNav, user }) {
 }
 
 // ── FORMULES NATATION ─────────────────────────────────────
-function FormulesNatationScreen({ onNav }) {
-  const [selected, setSelected] = useState(null);
-  const [done, setDone] = useState(false);
-  const [showWero, setShowWero] = useState(false);
+function FormulesNatationScreen({ onNav, user }) {
+  const [selected, setSelected]       = useState(null);
+  const [selectedEnfant, setSelectedEnfant] = useState(null);
+  const [done, setDone]               = useState(false);
+  const [enfantsDB, setEnfantsDB]     = useState([]);
+
+  useEffect(() => {
+    if (user?.supabaseId) {
+      sb.from("enfants").select("*").eq("membre_id", user.supabaseId)
+        .then(({ data }) => setEnfantsDB(data || [])).catch(() => {});
+    }
+  }, [user?.supabaseId]);
+
+  const enfantsNat = enfantsDB.length > 0
+    ? enfantsDB.filter(e => e.activite === "natation" || e.activite === "les deux")
+    : (user?.enfants || []).filter(e => e.activite === "natation" || e.activite === "les deux");
+
   if (done) return (
     <div style={{ padding:32, textAlign:"center", background:C.shell, minHeight:"100%" }}>
       <div style={{ fontSize:80 }}>📨</div>
       <h2 style={{ color:C.ocean }}>Demande envoyée ! 🎉</h2>
       <div style={{ background:"#fff", borderRadius:20, padding:20, margin:"16px 0", boxShadow:"0 4px 16px rgba(0,0,0,0.06)" }}>
         <p style={{ color:"#666", fontSize:14, lineHeight:1.8 }}>
-          Formule <strong>{selected?.label}</strong> ({selected?.price} €) enregistrée.<br/>
+          Formule <strong>{selected?.label}</strong> ({selected?.price} €){selectedEnfant ? ` pour ${selectedEnfant}` : ""} enregistrée.<br/>
           L'équipe FNCP vous contactera pour le paiement.<br/>
           🏦 Virement · ✉️ Chèque · 🎫 Chèques vacances
         </p>
@@ -1009,24 +1022,64 @@ function FormulesNatationScreen({ onNav }) {
           ⏳ Votre accès sera activé à réception du paiement
         </div>
       </div>
-      <SunBtn color={C.ocean} onClick={() => { setDone(false); setSelected(null); onNav("home"); }}>Retour à l'accueil</SunBtn>
+      <SunBtn color={C.ocean} onClick={() => { setDone(false); setSelected(null); setSelectedEnfant(null); onNav("home"); }}>Retour à l'accueil</SunBtn>
     </div>
   );
+
   return (
     <div style={{ background: C.shell, minHeight: "100%" }}>
       <div style={{ background: `linear-gradient(135deg, ${C.ocean}, ${C.sea})`, padding: "20px 20px 0" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
           <BackBtn onNav={onNav} to="formules" />
-          <div><h2 style={{ color: "#fff", margin: 0, fontWeight: 900, fontSize: 22 }}>🎫 Formules Natation</h2><p style={{ color: "rgba(255,255,255,0.8)", fontSize: 12, margin: 0 }}>Choisis ta formule et plonge ! 🏊‍♀️</p></div>
+          <div><h2 style={{ color: "#fff", margin: 0, fontWeight: 900, fontSize: 22 }}>🎫 Formules Natation</h2><p style={{ color: "rgba(255,255,255,0.8)", fontSize: 12, margin: 0 }}>Chaque forfait est nominatif 🏊‍♀️</p></div>
         </div>
         <Wave fill={C.shell} />
       </div>
       <div style={{ padding: "10px 18px 24px" }}>
+
+        {/* Sélection de l'enfant — en premier */}
+        {enfantsNat.length > 0 && (
+          <div style={{ background:"#fff", borderRadius:18, padding:16, marginBottom:16, boxShadow:"0 2px 10px rgba(0,0,0,0.05)" }}>
+            <div style={{ fontWeight:800, color:C.dark, fontSize:14, marginBottom:10 }}>🏊 Pour quel enfant ?</div>
+            <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
+              {enfantsNat.map(e => {
+                const sel = selectedEnfant === e.prenom;
+                return (
+                  <div key={e.prenom} onClick={() => setSelectedEnfant(sel ? null : e.prenom)} style={{
+                    background: sel ? `linear-gradient(135deg,${C.ocean},${C.sea})` : "#F0F4F8",
+                    color: sel ? "#fff" : "#888",
+                    borderRadius:50, padding:"9px 20px", cursor:"pointer",
+                    fontWeight:800, fontSize:14, transition:"all .15s",
+                    boxShadow: sel ? `0 4px 12px ${C.ocean}44` : "none",
+                  }}>
+                    {sel ? "✓ " : ""}{e.prenom}
+                  </div>
+                );
+              })}
+            </div>
+            {selectedEnfant && (
+              <div style={{ fontSize:12, color:C.ocean, marginTop:8, fontWeight:700 }}>
+                ✓ Forfait nominatif pour {selectedEnfant}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Formules */}
         <div style={{ display: "flex", flexDirection: "column", gap: 13, marginBottom: 18 }}>
           {FORMULES_NAT.map(f => {
             const sel = selected?.id === f.id;
+            const disabled = enfantsNat.length > 0 && !selectedEnfant;
             return (
-              <div key={f.id} onClick={() => setSelected(f)} style={{ background: sel ? `linear-gradient(135deg, ${f.color}18, ${f.color}08)` : "#fff", border: `3px solid ${sel ? f.color : "#f0f0f0"}`, borderRadius: 22, padding: "16px 18px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", boxShadow: sel ? `0 8px 28px ${f.color}33` : "0 4px 14px rgba(0,0,0,0.06)", transform: sel ? "scale(1.02)" : "scale(1)", transition: "all .2s" }}>
+              <div key={f.id} onClick={() => !disabled && setSelected(sel ? null : f)} style={{
+                background: disabled ? "#fafafa" : sel ? `linear-gradient(135deg, ${f.color}18, ${f.color}08)` : "#fff",
+                border: `3px solid ${sel ? f.color : "#f0f0f0"}`,
+                borderRadius: 22, padding: "16px 18px", cursor: disabled ? "not-allowed" : "pointer",
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                boxShadow: sel ? `0 8px 28px ${f.color}33` : "0 4px 14px rgba(0,0,0,0.06)",
+                opacity: disabled ? 0.5 : 1,
+                transform: sel ? "scale(1.02)" : "scale(1)", transition: "all .2s",
+              }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                   <div style={{ width: 58, height: 58, borderRadius: 18, background: `linear-gradient(135deg, ${f.color}, ${f.color}aa)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, flexShrink: 0 }}>{f.emoji}</div>
                   <div>
@@ -1044,10 +1097,20 @@ function FormulesNatationScreen({ onNav }) {
             );
           })}
         </div>
-        {selected && (
+
+        {enfantsNat.length > 0 && !selectedEnfant && (
+          <div style={{ background:`${C.ocean}10`, borderRadius:14, padding:"12px 16px", marginBottom:14, fontSize:13, color:C.ocean, fontWeight:700, textAlign:"center" }}>
+            👆 Sélectionnez d'abord un enfant pour choisir une formule
+          </div>
+        )}
+
+        {selected && selectedEnfant && (
           <Card style={{ background: `linear-gradient(135deg, ${selected.color}15, ${selected.color}05)`, border: `2px solid ${selected.color}40` }}>
             <div style={{ fontSize:30, marginBottom:6, textAlign:"center" }}>{selected.emoji}</div>
             <div style={{ fontWeight:900, color:C.dark, marginBottom:2, textAlign:"center" }}>Formule : {selected.label}</div>
+            <div style={{ background:`${C.ocean}15`, borderRadius:10, padding:"6px 12px", marginBottom:8, textAlign:"center", fontSize:13, color:C.ocean, fontWeight:800 }}>
+              🏊 Pour {selectedEnfant}
+            </div>
             <div style={{ fontSize:26, fontWeight:900, color:selected.color, marginBottom:10, textAlign:"center" }}>{selected.price} €</div>
             <div style={{ background:"#F8FBFF", borderRadius:12, padding:"10px 12px", marginBottom:14 }}>
               <div style={{ fontWeight:900, color:C.dark, fontSize:12, marginBottom:6 }}>💳 Modes de paiement acceptés</div>
