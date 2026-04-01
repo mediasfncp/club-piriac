@@ -1163,7 +1163,23 @@ function FormulesNatationScreen({ onNav, user }) {
               <div style={{ fontSize:11, color:"#aaa", marginTop:6, fontStyle:"italic" }}>Votre accès sera activé à réception du paiement.</div>
             </div>
             <SunBtn color={enfantsNat.length > 0 && !selectedEnfant ? "#bbb" : selected.color} full
-              onClick={() => { if (enfantsNat.length > 0 && !selectedEnfant) return; setDone(true); }}>
+              onClick={async () => {
+                if (enfantsNat.length > 0 && !selectedEnfant) return;
+                try {
+                  if (user?.supabaseId) {
+                    await sb.from("reservations_natation").insert([{
+                      membre_id:   user.supabaseId,
+                      heure:       "—",
+                      date_seance: new Date().toISOString().slice(0,10),
+                      enfants:     selectedEnfant ? [selectedEnfant] : [],
+                      statut:      "pending",
+                      montant:     selected.price,
+                      jour:        `Formule ${selected.label}`,
+                    }]);
+                  }
+                } catch(e) { console.warn(e); }
+                setDone(true);
+              }}>
               {enfantsNat.length > 0 && !selectedEnfant ? "👆 Sélectionnez un enfant" : `📨 Envoyer la demande · ${selected?.price} €`}
             </SunBtn>
           </Card>
@@ -1364,6 +1380,7 @@ function ReservationClubScreen({ onNav, user, setUser, clubPlaces, setClubPlaces
           labelJour:        `${selectedDay?.label} ${selectedDay?.num} ${selectedDay?.month}`,
           rappelDate:       rappelDate,
           enfants:          selectedEnfants.length > 0 ? selectedEnfants : (user?.enfants || []).filter(e => e.activite === "club" || e.activite === "les deux").map(e => e.prenom),
+          statut:           "pending",
         });
         const newBalance = Math.max(0, (user?.liberteBalance||0) - 1);
         if (user?.supabaseId) await updateLiberte(user.supabaseId, newBalance, user.liberteTotal || newBalance);
@@ -1961,6 +1978,7 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser }) 
                           labelJour: new Date(iso).toLocaleDateString("fr-FR", {weekday:"long",day:"numeric",month:"long"}),
                           rappelDate: null,
                           enfants: selectedEnfantsClub.length > 0 ? selectedEnfantsClub : (user?.enfants||[]).filter(e => e.activite==="club"||e.activite==="les deux").map(e=>e.prenom),
+                          statut: "pending",
                         });
                       }
                     } catch(e) { console.warn(e); }
