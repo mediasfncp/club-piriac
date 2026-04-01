@@ -4517,7 +4517,7 @@ function calcAge(naissance) {
   return age;
 }
 
-function DayDetailModal({ day, activity, session, onClose, dbResasNat = [], dbResasClub = [] }) {
+function DayDetailModal({ day, activity, session, onClose, dbResasNat = [], dbResasClub = [], onSelectEnfant }) {
   const allEnfants = (() => {
     if (!day?.date) return [];
     const dateISO = `${day.date.getFullYear()}-${String(day.date.getMonth()+1).padStart(2,"0")}-${String(day.date.getDate()).padStart(2,"0")}`;
@@ -4710,9 +4710,8 @@ function DayDetailModal({ day, activity, session, onClose, dbResasNat = [], dbRe
               </div>
               {allEnfants.map((e, i) => (
                 <div key={i} onClick={() => {
-                  if (!e._ficheEnfant && !e.prenom) return;
-                  // Construire objet enrichi pour FicheEnfantModal
-                  setSelectedEnfant({
+                  if (!e.prenom) return;
+                  onSelectEnfant?.({
                     prenom: e.prenom,
                     nom: e.nom || "",
                     naissance: e.naissance || (e._ficheEnfant?.naissance) || "",
@@ -4889,6 +4888,7 @@ function PlanningTab({ allSeasonSessions, clubPlaces, reservations = [] }) {
           dbResasNat={dbResasNat}
           dbResasClub={dbResasClub}
           onClose={() => { setModalDay(null); setModalSession(null); }}
+          onSelectEnfant={(enfant) => setSelectedEnfant(enfant)}
         />
       )}
 
@@ -7471,4 +7471,4 @@ export default function App() {
     </div>
   );
 }
-// fiche enfant planning Wed Apr  1 21:44:06 CEST 2026
+// fiche enfant scope fix Wed Apr  1 21:48:37 CEST 2026
