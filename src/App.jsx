@@ -4194,7 +4194,11 @@ function PaiementsTab({ onValidate }) {
       const nb = Number(g.resas[0]?.enfants?.[0]) || 0;
       return LIBERTE_PRIX[nb] ? `${LIBERTE_PRIX[nb]} €` : "—";
     }
-    return `${g.resas.reduce((s,r) => s + Number(r.montant||0), 0)} €`;
+    // Club normal : chercher montant dans label_jour si stocké
+    const label = g.resas[0]?.label_jour || "";
+    const montantMatch = label.match(/\[MONTANT:(\d+)\]/);
+    if (montantMatch) return `${montantMatch[1]} €`;
+    return "—"; // montant à renseigner
   };
 
   const filtered = filter === "tous" ? allGroups : allGroups.filter(g => g.statut === filter);
@@ -4254,8 +4258,30 @@ function PaiementsTab({ onValidate }) {
                       <div style={{ fontSize:12, color:"#888", marginTop:1 }}>{enfants.join(", ")}</div>
                     )}
                   </div>
-                  <div style={{ fontWeight:900, fontSize:16, color: isPaid ? C.green : "#b45309", marginLeft:8 }}>
-                    {getMontant(g)}
+                  <div style={{ fontWeight:900, fontSize:16, color: isPaid ? C.green : "#b45309", marginLeft:8, display:"flex", alignItems:"center", gap:4 }}>
+                    {getMontant(g) === "—" ? (
+                      <div style={{ display:"flex", alignItems:"center", gap:4 }}>
+                        <input
+                          type="number"
+                          placeholder="Prix €"
+                          defaultValue=""
+                          onBlur={async (e) => {
+                            const val = Number(e.target.value);
+                            if (!val) return;
+                            // Stocker dans label_jour de la première résa
+                            const r0 = g.resas[0];
+                            if (r0?.id) {
+                              await sb.from("reservations_club").update({
+                                label_jour: `[MONTANT:${val}] ${r0.label_jour||""}`
+                              }).eq("id", r0.id);
+                              await loadAll();
+                            }
+                          }}
+                          style={{ width:70, border:`1.5px solid ${C.coral}`, borderRadius:8, padding:"4px 8px", fontSize:13, fontFamily:"inherit", outline:"none", textAlign:"right" }}
+                        />
+                        <span style={{ color:"#888", fontSize:13 }}>€</span>
+                      </div>
+                    ) : getMontant(g)}
                   </div>
                 </div>
 
@@ -6733,7 +6759,7 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
                 session:          sess,
                 statut:           "pending",
                 enfants:          item.enfants || [],
-                label_jour:       new Date(iso).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"}),
+                label_jour:       `[MONTANT:${item.prix}] ${new Date(iso).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}`,
               }]);
               if (e) throw e;
             }
@@ -7195,4 +7221,4 @@ export default function App() {
     </div>
   );
 }
-// fix groupement minute Wed Apr  1 16:36:53 CEST 2026
+// montant club Wed Apr  1 16:42:02 CEST 2026
