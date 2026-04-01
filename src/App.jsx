@@ -5172,21 +5172,23 @@ th{background:#1A8FE3;color:#fff;padding:9px 12px;text-align:left}
 
 // ── NOUVELLE RÉSERVATION ADMIN ────────────────────────────
 // ── MODIFIER RÉSERVATION ──────────────────────────────────
+// ── MODIFIER RÉSERVATION ──────────────────────────────────
 function ModifierResaModal({ resa, type, onClose, onSaved, dbMembres }) {
-  const isNat   = type === "natation";
-  const color   = isNat ? C.ocean : C.coral;
-  const [date, setDate]     = useState(isNat ? (resa.date_seance?.slice(0,10) || "") : (resa.date_reservation?.slice(0,10) || ""));
-  const [heure, setHeure]   = useState(resa.heure || "09:00");
-  const [session, setSession] = useState(resa.session || "matin");
-  const [enfants, setEnfants] = useState(isNat ? (resa.enfants || []) : (resa.enfants || []));
-  const [saving, setSaving] = useState(false);
-  const [error, setError]   = useState("");
+  const isNat  = type === "natation";
+  const color  = isNat ? C.ocean : C.coral;
 
-  const membre = dbMembres.find(m => m.id === resa.membre_id);
-  const enfantsDuMembre = membre?.enfants || [];
+  const [membreId, setMembreId]   = useState(resa.membre_id || "");
+  const [date, setDate]           = useState(isNat ? (resa.date_seance?.slice(0,10) || "") : (resa.date_reservation?.slice(0,10) || ""));
+  const [heure, setHeure]         = useState(resa.heure || "09:00");
+  const [session, setSession]     = useState(resa.session || "matin");
+  const [statut, setStatut]       = useState(resa.statut || "pending");
+  const [enfants, setEnfants]     = useState(resa.enfants || []);
+  const [saving, setSaving]       = useState(false);
+  const [error, setError]         = useState("");
 
+  const membre = dbMembres.find(m => m.id === membreId);
+  const enfantsDuMembre = (membre?.enfants || []);
   const heures = ["09:00","09:30","10:00","10:30","11:00","11:30","12:00","12:30","13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00","18:30","19:00"];
-
   const toggleEnfant = (prenom) => setEnfants(prev => prev.includes(prenom) ? prev.filter(e => e !== prenom) : [...prev, prenom]);
 
   const handleSave = async () => {
@@ -5194,64 +5196,72 @@ function ModifierResaModal({ resa, type, onClose, onSaved, dbMembres }) {
     setSaving(true);
     try {
       if (isNat) {
-        await sb.from("reservations_natation").update({ date_seance: date, heure, enfants }).eq("id", resa.id);
+        await sb.from("reservations_natation").update({ membre_id: membreId||null, date_seance: date, heure, enfants, statut }).eq("id", resa.id);
       } else {
-        await sb.from("reservations_club").update({ date_reservation: date, session, enfants }).eq("id", resa.id);
+        await sb.from("reservations_club").update({ membre_id: membreId||null, date_reservation: date, session, enfants, statut }).eq("id", resa.id);
       }
-      onSaved();
-      onClose();
+      onSaved(); onClose();
     } catch(e) { setError("Erreur : " + e.message); setSaving(false); }
   };
 
+  const Field = ({ label, children }) => (
+    <div>
+      <label style={{ fontSize:11, fontWeight:900, color, display:"block", marginBottom:6, textTransform:"uppercase" }}>{label}</label>
+      {children}
+    </div>
+  );
+
   return (
-    <div style={{ position:"fixed", inset:0, zIndex:1100, display:"flex", flexDirection:"column" }}>
+    <div style={{ position:"fixed", inset:0, zIndex:1100, display:"flex", alignItems:"center", justifyContent:"center" }}>
       <div onClick={onClose} style={{ position:"absolute", inset:0, background:"rgba(0,20,50,0.65)", backdropFilter:"blur(5px)" }} />
-      <div style={{ position:"relative", marginTop:"auto", background:"#F0F4F8", borderRadius:"28px 28px 0 0", maxHeight:"90vh", display:"flex", flexDirection:"column", boxShadow:"0 -12px 48px rgba(0,0,0,0.3)" }}>
-        <div style={{ display:"flex", justifyContent:"center", padding:"12px 0 4px" }}>
-          <div style={{ width:40, height:5, borderRadius:10, background:"#ddd" }} />
-        </div>
-        <div style={{ background:`linear-gradient(135deg,${color},${color}cc)`, margin:"0 16px", borderRadius:20, padding:"14px 18px", position:"relative" }}>
-          <button onClick={onClose} style={{ position:"absolute", top:10, right:12, background:"rgba(255,255,255,0.25)", border:"none", color:"#fff", borderRadius:"50%", width:30, height:30, cursor:"pointer", fontWeight:900, fontSize:16, fontFamily:"inherit" }}>✕</button>
+      <div style={{ position:"relative", background:"#F0F4F8", borderRadius:24, width:"100%", maxWidth:520, maxHeight:"90vh", display:"flex", flexDirection:"column", boxShadow:"0 24px 64px rgba(0,0,0,0.3)", margin:"0 16px" }}>
+        <div style={{ background:`linear-gradient(135deg,${color},${color}cc)`, borderRadius:"24px 24px 0 0", padding:"18px 20px", position:"relative", flexShrink:0 }}>
+          <button onClick={onClose} style={{ position:"absolute", top:12, right:14, background:"rgba(255,255,255,0.25)", border:"none", color:"#fff", borderRadius:"50%", width:30, height:30, cursor:"pointer", fontWeight:900, fontSize:16, fontFamily:"inherit" }}>✕</button>
           <div style={{ color:"#fff", fontWeight:900, fontSize:17 }}>✏️ Modifier la réservation</div>
-          <div style={{ color:"rgba(255,255,255,0.85)", fontSize:13, marginTop:2 }}>
-            {isNat ? "🏊 Natation" : "🏖️ Club de Plage"} · {membre ? `${membre.prenom} ${NOM(membre.nom)}` : "—"}
-          </div>
+          <div style={{ color:"rgba(255,255,255,0.85)", fontSize:13, marginTop:2 }}>{isNat ? "🏊 Natation" : "🏖️ Club de Plage"}</div>
         </div>
-        <div style={{ overflowY:"auto", padding:"16px 16px 28px", display:"flex", flexDirection:"column", gap:12 }}>
+        <div style={{ overflowY:"auto", padding:"20px 20px 24px", display:"flex", flexDirection:"column", gap:14 }}>
 
-          {/* Date */}
-          <div>
-            <label style={{ fontSize:11, fontWeight:900, color:color, display:"block", marginBottom:6, textTransform:"uppercase" }}>Date</label>
+          <Field label="Famille">
+            <select value={membreId} onChange={e => { setMembreId(e.target.value); setEnfants([]); }}
+              style={{ width:"100%", border:"2px solid #e0e8f0", borderRadius:12, padding:"11px 12px", fontSize:14, fontFamily:"inherit", outline:"none", background:"#fff" }}>
+              <option value="">— Sélectionner —</option>
+              {dbMembres.map(m => <option key={m.id} value={m.id}>{m.prenom} {NOM(m.nom)}</option>)}
+            </select>
+          </Field>
+
+          <Field label="Statut">
+            <div style={{ display:"flex", gap:8 }}>
+              {[["pending","⏳ En attente"],["confirmed","✅ Confirmé"]].map(([k,l]) => (
+                <button key={k} onClick={() => setStatut(k)} style={{ flex:1, background: statut===k ? (k==="confirmed" ? C.green : C.sun) : "#f0f0f0", color: statut===k ? "#fff" : "#888", border:"none", borderRadius:12, padding:"10px", cursor:"pointer", fontWeight:900, fontSize:13, fontFamily:"inherit" }}>{l}</button>
+              ))}
+            </div>
+          </Field>
+
+          <Field label="Date">
             <input type="date" value={date} onChange={e => setDate(e.target.value)} min="2026-07-06" max="2026-08-22"
-              style={{ width:"100%", border:"2px solid #e0e8f0", borderRadius:14, padding:"12px", fontSize:15, fontFamily:"inherit", outline:"none", background:"#fff", boxSizing:"border-box" }} />
-          </div>
+              style={{ width:"100%", border:"2px solid #e0e8f0", borderRadius:12, padding:"11px", fontSize:15, fontFamily:"inherit", outline:"none", background:"#fff", boxSizing:"border-box" }} />
+          </Field>
 
-          {/* Heure (natation) ou Session (club) */}
           {isNat ? (
-            <div>
-              <label style={{ fontSize:11, fontWeight:900, color:color, display:"block", marginBottom:6, textTransform:"uppercase" }}>Heure</label>
+            <Field label="Heure">
               <select value={heure} onChange={e => setHeure(e.target.value)}
-                style={{ width:"100%", border:"2px solid #e0e8f0", borderRadius:14, padding:"12px", fontSize:15, fontFamily:"inherit", outline:"none", background:"#fff" }}>
+                style={{ width:"100%", border:"2px solid #e0e8f0", borderRadius:12, padding:"11px", fontSize:15, fontFamily:"inherit", outline:"none", background:"#fff" }}>
                 {heures.map(h => <option key={h} value={h}>{h}</option>)}
               </select>
-            </div>
+            </Field>
           ) : (
-            <div>
-              <label style={{ fontSize:11, fontWeight:900, color:color, display:"block", marginBottom:6, textTransform:"uppercase" }}>Session</label>
+            <Field label="Session">
               <div style={{ display:"flex", gap:8 }}>
                 {[["matin","☀️ Matin"],["apmidi","🌊 Après-midi"]].map(([k,l]) => (
                   <button key={k} onClick={() => setSession(k)} style={{ flex:1, background: session===k ? color : "#f0f0f0", color: session===k ? "#fff" : "#888", border:"none", borderRadius:12, padding:"10px", cursor:"pointer", fontWeight:800, fontSize:13, fontFamily:"inherit" }}>{l}</button>
                 ))}
               </div>
-            </div>
+            </Field>
           )}
 
-          {/* Enfants */}
           {enfantsDuMembre.length > 0 && (
-            <div>
-              <label style={{ fontSize:11, fontWeight:900, color:color, display:"block", marginBottom:8, textTransform:"uppercase" }}>
-                Enfants {enfants.length > 0 && `· ${enfants.join(", ")}`}
-              </label>
+            <Field label={}>
               <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
                 {enfantsDuMembre
                   .filter(e => isNat ? (e.activite === "natation" || e.activite === "les deux") : (e.activite === "club" || e.activite === "les deux"))
@@ -5264,7 +5274,7 @@ function ModifierResaModal({ resa, type, onClose, onSaved, dbMembres }) {
                     );
                   })}
               </div>
-            </div>
+            </Field>
           )}
 
           {error && <div style={{ background:"#fff0f0", border:"1.5px solid #fca5a5", borderRadius:10, padding:"9px 14px", fontSize:13, color:"#e74c3c", fontWeight:700 }}>⚠️ {error}</div>}
@@ -5276,6 +5286,7 @@ function ModifierResaModal({ resa, type, onClose, onSaved, dbMembres }) {
     </div>
   );
 }
+
 
 function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, setAllSeasonSessions, clubPlaces, setClubPlaces }) {
   const [type, setType]                 = useState("natation");
@@ -6887,4 +6898,4 @@ export default function App() {
     </div>
   );
 }
-// 3col fix Wed Apr  1 13:48:36 CEST 2026
+// modifier resa full Wed Apr  1 13:57:02 CEST 2026
