@@ -6485,11 +6485,13 @@ function ProfilConnecte({ user, setUser, setScreen, reservations }) {
     const total   = membre?.liberte_total   || 0;
     setLiberteBalance(balance);
     setLiberteTotal(total);
-    // Carte active = résas liberté confirmées
+    // Carte active = résas liberté confirmées ET solde > 0
     const carteConfirmee = (club || []).some(r =>
-      r.statut === "confirmed" && !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6
+      r.statut === "confirmed" &&
+      !isNaN(Number(r.enfants?.[0])) &&
+      Number(r.enfants?.[0]) >= 6
     );
-    setHasCarteActive(carteConfirmee || balance > 0);
+    setHasCarteActive(carteConfirmee && balance > 0);
     setLoading(false);
     setRefreshing(false);
   };
@@ -6857,4 +6859,4 @@ export default function App() {
     </div>
   );
 }
-// liberté tab Wed Apr  1 12:00:45 CEST 2026
+// fix carte liberté Wed Apr  1 12:26:43 CEST 2026
