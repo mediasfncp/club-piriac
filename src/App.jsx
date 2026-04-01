@@ -6864,7 +6864,7 @@ export default function App() {
   }, [isAdmin]);
 
   return (
-    <div style={{ maxWidth: isAdmin ? "none" : 430, margin:"0 auto", minHeight:"100vh", display:"flex", flexDirection:"column", fontFamily:"'Nunito','Segoe UI',sans-serif", background: isAdmin ? "#F0F4F8" : C.shell }}>
+    <div style={{ ...(isAdmin ? {} : { maxWidth: 430 }), margin:"0 auto", minHeight:"100vh", display:"flex", flexDirection:"column", fontFamily:"'Nunito','Segoe UI',sans-serif", background: isAdmin ? "#F0F4F8" : C.shell }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
         * { box-sizing: border-box; }
@@ -6880,4 +6880,4 @@ export default function App() {
     </div>
   );
 }
-// admin fullwidth fix Wed Apr  1 13:10:33 CEST 2026
+// fix Wed Apr  1 13:13:10 CEST 2026
