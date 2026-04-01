@@ -4551,26 +4551,36 @@ function DayDetailModal({ day, activity, session, onClose, dbResasNat = [], dbRe
         // Exclure les achats carte
         if (Array.isArray(r.enfants) && Number(r.enfants[0]) >= 6) return;
         const parentNom = r.membres ? `${r.membres.prenom} ${r.membres.nom}` : "—";
-        // Prendre les prénoms stockés dans la résa
         const prenoms = (r.enfants || []).filter(e => isNaN(Number(e)));
         if (prenoms.length > 0) {
-          prenoms.forEach(prenom => liste.push({
-            prenom, nom: "",
-            naissance: "", activite: "club",
-            niveau: "", allergies: "",
-            parent: parentNom, parentColor: C.coral, parentAv: "👤",
-            phone: r.membres?.tel || "—",
-            session: r.session,
-          }));
+          prenoms.forEach(prenom => {
+            // Chercher la fiche complète de l'enfant dans le profil membre
+            const ficheEnfant = (r.membres?.enfants || []).find(e => e.prenom === prenom);
+            liste.push({
+              prenom,
+              nom: ficheEnfant?.nom || "",
+              naissance: ficheEnfant?.naissance || "",
+              activite: "club",
+              niveau: ficheEnfant?.niveau || "",
+              allergies: ficheEnfant?.allergies || "",
+              parent: parentNom,
+              parentColor: C.coral,
+              parentAv: "👤",
+              phone: r.membres?.tel || "—",
+              session: r.session,
+              _ficheEnfant: ficheEnfant || null,
+            });
+          });
         } else {
-          // Fallback : afficher le parent si pas d'enfants nominatifs
           liste.push({
-            prenom: r.membres?.prenom || "—", nom: r.membres?.nom || "",
+            prenom: r.membres?.prenom || "—",
+            nom: r.membres?.nom || "",
             naissance: "", activite: "club",
             niveau: "", allergies: "",
             parent: parentNom, parentColor: C.coral, parentAv: "👤",
             phone: r.membres?.tel || "—",
             session: r.session,
+            _ficheEnfant: null,
           });
         }
       });
@@ -4699,38 +4709,49 @@ function DayDetailModal({ day, activity, session, onClose, dbResasNat = [], dbRe
                 <div style={{ fontSize: 10, fontWeight: 900, color: actColor, textAlign: "center" }}>ÂGE</div>
               </div>
               {allEnfants.map((e, i) => (
-                <div key={i} style={{
-                  display: "grid", gridTemplateColumns: "32px 1fr 1fr 50px",
-                  background: i % 2 === 0 ? "#fff" : "#F8FBFF",
-                  padding: "10px 12px",
-                  borderBottom: "1px solid #F0F4F8",
-                  borderRadius: i === allEnfants.length - 1 ? "0 0 12px 12px" : 0,
-                  alignItems: "center",
-                }}>
+                <div key={i} onClick={() => e._ficheEnfant && setSelectedEnfant(e._ficheEnfant)}
+                  style={{
+                    display: "grid", gridTemplateColumns: "28px 1fr 1fr 44px",
+                    background: i % 2 === 0 ? "#fff" : "#F8FBFF",
+                    padding: "10px 12px",
+                    borderBottom: "1px solid #F0F4F8",
+                    borderRadius: i === allEnfants.length - 1 ? "0 0 12px 12px" : 0,
+                    alignItems: "center",
+                    cursor: e._ficheEnfant ? "pointer" : "default",
+                    transition: "background .1s",
+                  }}
+                  onMouseEnter={ev => { if (e._ficheEnfant) ev.currentTarget.style.background = `${actColor}10`; }}
+                  onMouseLeave={ev => ev.currentTarget.style.background = i % 2 === 0 ? "#fff" : "#F8FBFF"}
+                >
                   <div style={{ fontSize: 11, color: "#bbb", fontWeight: 700 }}>{i + 1}</div>
                   <div>
-                    <div style={{ fontWeight: 900, color: "#2C3E50", fontSize: 14 }}>
-                      {e.nom.toUpperCase()} <span style={{ fontWeight: 600, textTransform: "none" }}>{e.prenom}</span>
+                    <div style={{ fontWeight: 900, color: "#2C3E50", fontSize: 13 }}>
+                      {e.nom ? <>{e.nom.toUpperCase()} <span style={{ fontWeight: 600 }}>{e.prenom}</span></> : <span style={{ fontWeight: 800 }}>{e.prenom}</span>}
+                      {e._ficheEnfant && <span style={{ fontSize:10, color:actColor, marginLeft:4 }}>›</span>}
                     </div>
-                    <div style={{ display: "flex", gap: 5, marginTop: 3, flexWrap: "wrap" }}>
-                      {activity === "natation" && (
-                        <span style={{ background: `${niveauColor(e.niveau)}18`, color: niveauColor(e.niveau), borderRadius: 50, padding: "1px 8px", fontSize: 10, fontWeight: 800 }}>
+                    <div style={{ display: "flex", gap: 4, marginTop: 2, flexWrap: "wrap" }}>
+                      {activity === "natation" && e.niveau && (
+                        <span style={{ background: `${niveauColor(e.niveau)}18`, color: niveauColor(e.niveau), borderRadius: 50, padding: "1px 7px", fontSize: 9, fontWeight: 800 }}>
                           {niveauLabel(e.niveau)}
                         </span>
                       )}
                       {e.allergies && (
-                        <span style={{ background: "#FFF0F0", color: C.sunset, borderRadius: 50, padding: "1px 8px", fontSize: 10, fontWeight: 800 }}>
+                        <span style={{ background: "#FFF0F0", color: C.sunset, borderRadius: 50, padding: "1px 7px", fontSize: 9, fontWeight: 800 }}>
                           ⚠️ {e.allergies}
                         </span>
                       )}
                     </div>
                   </div>
                   <div style={{ fontSize: 11, color: "#888", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {e.parent.split(" ")[0]}
+                    {e.parent}
                   </div>
                   <div style={{ textAlign: "center" }}>
-                    <div style={{ fontWeight: 900, fontSize: 16, color: actColor }}>{calcAge(e.naissance)}</div>
-                    <div style={{ fontSize: 9, color: "#bbb" }}>ans</div>
+                    {e.naissance ? (
+                      <>
+                        <div style={{ fontWeight: 900, fontSize: 15, color: actColor }}>{calcAge(e.naissance)}</div>
+                        <div style={{ fontSize: 9, color: "#bbb" }}>ans</div>
+                      </>
+                    ) : <div style={{ fontSize: 11, color: "#ddd" }}>—</div>}
                   </div>
                 </div>
               ))}
@@ -4749,6 +4770,7 @@ function PlanningTab({ allSeasonSessions, clubPlaces, reservations = [] }) {
   const [selectedDayId, setSelectedDayId] = useState(ALL_SEASON_DAYS[0]?.id);
   const [modalDay, setModalDay] = useState(null);
   const [modalSession, setModalSession] = useState(null);
+  const [selectedEnfant, setSelectedEnfant] = useState(null);
   const [dbResasNat, setDbResasNat] = useState([]);
   const [dbResasClub, setDbResasClub] = useState([]);
 
@@ -4844,6 +4866,7 @@ function PlanningTab({ allSeasonSessions, clubPlaces, reservations = [] }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {selectedEnfant && <FicheEnfantModal enfant={selectedEnfant} onClose={() => setSelectedEnfant(null)} />}
       {modalDay && (
         <DayDetailModal
           day={modalDay}
@@ -7434,4 +7457,4 @@ export default function App() {
     </div>
   );
 }
-// fix planning doublons Wed Apr  1 21:33:47 CEST 2026
+// planning fiche enfant Wed Apr  1 21:38:23 CEST 2026
