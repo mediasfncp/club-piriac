@@ -5756,40 +5756,52 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                       {allPending.length} demande{allPending.length>1?"s":""}
                     </div>
                   </div>
-                  <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-                    {allPending.map(r => {
-                      const color = r._type === "natation" ? C.ocean : C.coral;
-                      const date  = r._date?.slice(0,10);
+                  {(() => {
+                    const groups = {};
+                    allPending.forEach(r => {
+                      const key = `${r.membre_id}-${r._type}`;
+                      if (!groups[key]) groups[key] = { membre: r.membres, type: r._type, resas: [] };
+                      groups[key].resas.push(r);
+                    });
+                    return Object.entries(groups).map(([key, g]) => {
+                      const color = g.type === "natation" ? C.ocean : C.coral;
                       return (
-                        <div key={`${r._type}-${r.id}`} style={{ background:`${C.sun}08`, borderRadius:14, padding:"12px 14px", borderLeft:`4px solid ${C.sun}` }}>
-                          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
-                            <div style={{ fontWeight:900, color:"#2C3E50", fontSize:13 }}>
-                              {r.membres ? `${r.membres.prenom} ${NOM(r.membres.nom)}` : "—"}
+                        <div key={key} style={{ background:`${C.sun}08`, borderRadius:14, padding:"12px 14px", borderLeft:`4px solid ${C.sun}` }}>
+                          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:6 }}>
+                            <div>
+                              <div style={{ fontWeight:900, color:"#2C3E50", fontSize:13 }}>
+                                {g.membre ? `${g.membre.prenom} ${NOM(g.membre.nom)}` : "—"}
+                              </div>
+                              <div style={{ fontSize:11, color, fontWeight:700 }}>
+                                {g.type==="natation"?"🏊":"🏖️"} {g.resas.length} séance{g.resas.length>1?"s":""}
+                              </div>
+                              {g.membre?.email && <div style={{ fontSize:10, color:"#bbb", marginTop:2 }}>{g.membre.email}</div>}
                             </div>
                             <button onClick={async () => {
-                              const table = r._type === "natation" ? "reservations_natation" : "reservations_club";
-                              await sb.from(table).update({ statut:"confirmed" }).eq("id", r.id);
+                              const table = g.type === "natation" ? "reservations_natation" : "reservations_club";
+                              await Promise.all(g.resas.map(r => sb.from(table).update({ statut:"confirmed" }).eq("id", r.id)));
                               refreshResas();
                             }} style={{
                               background:`linear-gradient(135deg,${C.green},#1E8449)`, border:"none",
                               color:"#fff", borderRadius:50, padding:"5px 14px",
                               cursor:"pointer", fontWeight:900, fontSize:12, fontFamily:"inherit",
-                              boxShadow:`0 3px 10px ${C.green}44`,
-                            }}>✅ Valider</button>
+                              boxShadow:`0 3px 10px ${C.green}44`, flexShrink:0, marginLeft:8,
+                            }}>✅ Valider tout</button>
                           </div>
-                          <div style={{ fontSize:12, color, fontWeight:700 }}>
-                            {r._label} · {date ? new Date(date).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}) : "—"}
+                          <div style={{ display:"flex", flexWrap:"wrap", gap:5 }}>
+                            {g.resas.map((r,i) => {
+                              const date = r._date?.slice(0,10);
+                              return (
+                                <div key={i} style={{ background:`${color}15`, color, borderRadius:8, padding:"2px 8px", fontSize:10, fontWeight:700 }}>
+                                  {r._label} · {date ? new Date(date).toLocaleDateString("fr-FR",{day:"numeric",month:"short"}) : "—"}
+                                </div>
+                              );
+                            })}
                           </div>
-                          {r.enfants?.length > 0 && (
-                            <div style={{ display:"flex", gap:4, marginTop:5, flexWrap:"wrap" }}>
-                              {r.enfants.map((e,i) => <span key={i} style={{ background:`${color}15`, color, borderRadius:50, padding:"2px 8px", fontSize:11, fontWeight:700 }}>{e}</span>)}
-                            </div>
-                          )}
-                          {r.membres?.email && <div style={{ fontSize:11, color:"#bbb", marginTop:3 }}>{r.membres.email}</div>}
                         </div>
                       );
-                    })}
-                  </div>
+                    });
+                  })()}
                 </div>
               );
             })()}
@@ -6002,42 +6014,55 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                     <div style={{ fontWeight:900, color:"#b45309", fontSize:13 }}>⏳ En attente de validation</div>
                     <span style={{ background:`${C.sun}20`, color:"#b45309", borderRadius:50, padding:"2px 10px", fontWeight:900, fontSize:11 }}>{allPending.length}</span>
                   </div>
-                  <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-                    {allPending.map(r => {
-                      const color = r._type === "natation" ? C.ocean : C.coral;
-                      const date  = r._date?.slice(0,10);
+                  {/* Regrouper par membre */}
+                  {(() => {
+                    const groups = {};
+                    allPending.forEach(r => {
+                      const key = `${r.membre_id}-${r._type}`;
+                      if (!groups[key]) groups[key] = { membre: r.membres, type: r._type, resas: [] };
+                      groups[key].resas.push(r);
+                    });
+                    return Object.entries(groups).map(([key, g]) => {
+                      const color = g.type === "natation" ? C.ocean : C.coral;
                       return (
-                        <div key={`${r._type}-${r.id}`} style={{ background:`${C.sun}08`, borderRadius:12, padding:"10px 12px", borderLeft:`3px solid ${C.sun}` }}>
-                          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
+                        <div key={key} style={{ background:`${C.sun}08`, borderRadius:12, padding:"12px 14px", borderLeft:`3px solid ${C.sun}` }}>
+                          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
                             <div>
                               <div style={{ fontWeight:900, color:"#2C3E50", fontSize:13 }}>
-                                {r.membres ? `${r.membres.prenom} ${NOM(r.membres.nom)}` : "—"}
+                                {g.membre ? `${g.membre.prenom} ${NOM(g.membre.nom)}` : "—"}
                               </div>
-                              <div style={{ fontSize:11, color, fontWeight:700 }}>
-                                {r._label} · {date ? new Date(date).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}) : "—"}
+                              <div style={{ fontSize:11, color, fontWeight:700, marginTop:2 }}>
+                                {g.type === "natation" ? "🏊 Natation" : "🏖️ Club"} · {g.resas.length} séance{g.resas.length>1?"s":""}
                               </div>
-                              {r.enfants?.length > 0 && (
-                                <div style={{ display:"flex", gap:4, marginTop:4, flexWrap:"wrap" }}>
-                                  {r.enfants.map((e,i) => <span key={i} style={{ background:`${color}15`, color, borderRadius:50, padding:"1px 8px", fontSize:10, fontWeight:700 }}>{e}</span>)}
-                                </div>
-                              )}
-                              {r.membres?.email && <div style={{ fontSize:10, color:"#bbb", marginTop:2 }}>{r.membres.email}</div>}
+                              {g.membre?.email && <div style={{ fontSize:10, color:"#bbb", marginTop:2 }}>{g.membre.email}</div>}
                             </div>
                             <button onClick={async () => {
-                              const table = r._type === "natation" ? "reservations_natation" : "reservations_club";
-                              await sb.from(table).update({ statut:"confirmed" }).eq("id", r.id);
+                              const table = g.type === "natation" ? "reservations_natation" : "reservations_club";
+                              await Promise.all(g.resas.map(r => sb.from(table).update({ statut:"confirmed" }).eq("id", r.id)));
                               refreshResas();
                             }} style={{
                               background:`linear-gradient(135deg,${C.green},#1E8449)`, border:"none",
                               color:"#fff", borderRadius:50, padding:"7px 14px",
                               cursor:"pointer", fontWeight:900, fontSize:12, fontFamily:"inherit",
                               boxShadow:`0 3px 10px ${C.green}44`, flexShrink:0, marginLeft:8,
-                            }}>✅ Valider</button>
+                            }}>✅ Valider tout</button>
+                          </div>
+                          {/* Liste des créneaux */}
+                          <div style={{ display:"flex", flexWrap:"wrap", gap:5 }}>
+                            {g.resas.map((r,i) => {
+                              const date = r._date?.slice(0,10);
+                              return (
+                                <div key={i} style={{ background:`${color}15`, color, borderRadius:8, padding:"3px 10px", fontSize:11, fontWeight:700 }}>
+                                  {r._label} · {date ? new Date(date).toLocaleDateString("fr-FR",{day:"numeric",month:"short"}) : "—"}
+                                  {r.enfants?.length > 0 && ` · ${r.enfants.join(", ")}`}
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       );
-                    })}
-                  </div>
+                    });
+                  })()}
                 </div>
               );
             })()}
@@ -6541,4 +6566,3 @@ export default function App() {
     </div>
   );
 }
-// Wed Apr  1 09:01:57 CEST 2026
