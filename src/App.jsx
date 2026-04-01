@@ -793,7 +793,7 @@ function buildEveilSundays() {
   return sundays;
 }
 
-function FormulesEveilScreen({ onNav, user }) {
+function FormulesEveilScreen({ onNav, user, panier, setPanier }) {
   const [eveilSundays, setEveilSundays] = useState(() => buildEveilSundays());
   const [selectedSunday, setSelectedSunday] = useState(0);
   const [booking, setBooking]         = useState(null);
@@ -939,6 +939,30 @@ function FormulesEveilScreen({ onNav, user }) {
             ))}
             <div style={{ fontSize:11, color:"#aaa", marginTop:6, fontStyle:"italic" }}>Votre accès sera activé à réception du paiement.</div>
           </div>
+          {setPanier && enfantsEveil.length === 0 || selectedEnfant ? (
+            <button onClick={() => {
+              if (enfantsEveil.length > 0 && !selectedEnfant) return;
+              const sun = eveilSundays[booking.sundayIdx];
+              const sl = sun.slots.find(s => s.id === booking.slotId);
+              setPanier(prev => [...prev, {
+                id: `eveil-${Date.now()}`,
+                type: "eveil",
+                label: `Éveil Aquatique · ${sun.label} ${sl.time}`,
+                emoji: "🌊",
+                color: "#9B59B6",
+                prix: 20,
+                enfant: selectedEnfant,
+                heure: sl.time,
+                date: (() => { const d = new Date(sun.date); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; })(),
+                jour: sun.label,
+                details: `${sun.label} à ${sl.time}`,
+              }]);
+              setDone({ sunday: sun.label, slot: sl.time, enfant: selectedEnfant });
+              setBooking(null);
+            }} style={{ width:"100%", background:`linear-gradient(135deg,${C.sun},${C.coral})`, border:"none", color:"#fff", borderRadius:14, padding:"12px", cursor:"pointer", fontWeight:900, fontSize:14, fontFamily:"inherit", marginBottom:8 }}>
+              🛒 Ajouter au panier
+            </button>
+          ) : null}
           <SunBtn color={enfantsEveil.length > 0 && !selectedEnfant ? "#bbb" : "#9B59B6"} full
             onClick={() => { if (enfantsEveil.length > 0 && !selectedEnfant) return; confirmBook(); }}>
             {enfantsEveil.length > 0 && !selectedEnfant ? "👆 Sélectionnez un enfant" : "📨 Envoyer la demande · 20 €"}
@@ -1032,7 +1056,7 @@ function FormulesEveilScreen({ onNav, user }) {
 }
 
 // ── FORMULES NATATION ─────────────────────────────────────
-function FormulesNatationScreen({ onNav, user, allSeasonSessions }) {
+function FormulesNatationScreen({ onNav, user, allSeasonSessions, panier, setPanier }) {
   const [selected, setSelected]             = useState(null);
   const [selectedEnfant, setSelectedEnfant] = useState(null);
   const [done, setDone]                     = useState(false);
@@ -1255,6 +1279,26 @@ function FormulesNatationScreen({ onNav, user, allSeasonSessions }) {
 
             <div style={{ display:"flex", gap:8 }}>
               <button onClick={() => setStep("formule")} style={{ flex:1, background:"#f0f0f0", border:"none", color:"#888", borderRadius:14, padding:"11px", cursor:"pointer", fontWeight:800, fontFamily:"inherit" }}>← Retour</button>
+              {setPanier && (
+                <button onClick={() => {
+                  if (selectedCreneaux.length < nbLecons) return;
+                  setPanier(prev => [...prev, {
+                    id: `nat-${Date.now()}`,
+                    type: "natation",
+                    label: `${selected.label} · ${selectedEnfant || ""}`,
+                    emoji: selected.emoji,
+                    color: C.ocean,
+                    prix: selected.price,
+                    enfant: selectedEnfant,
+                    creneaux: selectedCreneaux,
+                    details: `${nbLecons} leçon${nbLecons>1?"s":""}`,
+                  }]);
+                  setDone(true);
+                }} disabled={selectedCreneaux.length < nbLecons}
+                style={{ flex:1, background: selectedCreneaux.length < nbLecons ? "#bbb" : `linear-gradient(135deg,${C.sun},${C.coral})`, border:"none", color:"#fff", borderRadius:14, padding:"11px", cursor: selectedCreneaux.length < nbLecons ? "not-allowed":"pointer", fontWeight:900, fontSize:13, fontFamily:"inherit" }}>
+                  🛒 Panier
+                </button>
+              )}
               <SunBtn color={selectedCreneaux.length === nbLecons ? C.ocean : "#bbb"}
                 disabled={selectedCreneaux.length < nbLecons}
                 onClick={async () => {
@@ -1276,7 +1320,7 @@ function FormulesNatationScreen({ onNav, user, allSeasonSessions }) {
                   } catch(e) { console.warn(e); }
                   setDone(true);
                 }}>
-                📨 Envoyer · {selected.price} €
+                📨 Envoyer
               </SunBtn>
             </div>
           </div>
@@ -1595,7 +1639,7 @@ function ReservationClubScreen({ onNav, user, setUser, clubPlaces, setClubPlaces
   );
 }
 
-function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser }) {
+function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser, panier, setPanier }) {
   const [tab, setTab]               = useState("club");
   const [formulType, setFormulType] = useState("matin");
   const [nbEnfants, setNbEnfants]   = useState(1);
@@ -2039,6 +2083,25 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser }) 
                     if (setClubPlaces) setClubPlaces(prev => ({ ...prev, [formulType]: Math.max(0, (prev[formulType]||45) - nbEnfants) }));
                     setDone("club");
                   }}>📨 Envoyer la demande · {selectedRow.price} €</SunBtn>
+                  {setPanier && selectedDates.length > 0 && (
+                    <button onClick={() => {
+                      setPanier(prev => [...prev, {
+                        id: `club-${Date.now()}`,
+                        type: "club",
+                        label: `Club · ${formulType==="journee"?"Journée":formulType==="matin"?"Matin":"Après-midi"} · ${selectedRow?.label||""}`,
+                        emoji: "🏖️",
+                        color: C.coral,
+                        prix: selectedRow?.price || 0,
+                        enfants: selectedEnfantsClub,
+                        session: formulType,
+                        dates: selectedDates,
+                        details: `${selectedDates.length} jour${selectedDates.length>1?"s":""}`,
+                      }]);
+                      setDone("club");
+                    }} style={{ width:"100%", marginTop:8, background:`linear-gradient(135deg,${C.sun},${C.coral})`, border:"none", color:"#fff", borderRadius:14, padding:"11px", cursor:"pointer", fontWeight:900, fontSize:13, fontFamily:"inherit" }}>
+                      🛒 Ajouter au panier
+                    </button>
+                  )}
                 </div>
               </Card>
             )}
@@ -2096,20 +2159,36 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser }) 
                 </div>
                 <SunBtn color={C.coral} full onClick={async () => {
                   try {
-                    // Créer une résa club en pending comme trace de la demande liberté
                     if (user?.supabaseId) {
                       await sb.from("reservations_club").insert([{
                         membre_id: user.supabaseId,
                         date_reservation: new Date().toISOString().slice(0,10),
-                        session: "liberte",
+                        session: "matin",
                         label_jour: `Carte Liberté · ${selectedLiberte.label}`,
                         statut: "pending",
-                        enfants: [],
+                        enfants: [String(parseInt(selectedLiberte.label))],
                       }]);
                     }
                   } catch(e) { console.warn(e); }
                   setDone("liberte");
                 }}>📨 Envoyer la demande · {selectedLiberte.price} €</SunBtn>
+                {setPanier && (
+                  <button onClick={() => {
+                    setPanier(prev => [...prev, {
+                      id: `lib-${Date.now()}`,
+                      type: "liberte",
+                      label: `🎟️ Carte Liberté · ${selectedLiberte.label}`,
+                      emoji: "🎟️",
+                      color: C.coral,
+                      prix: selectedLiberte.price,
+                      nbDemiJ: parseInt(selectedLiberte.label),
+                      details: selectedLiberte.label,
+                    }]);
+                    setDone("liberte");
+                  }} style={{ width:"100%", marginTop:8, background:`linear-gradient(135deg,${C.sun},${C.coral})`, border:"none", color:"#fff", borderRadius:14, padding:"11px", cursor:"pointer", fontWeight:900, fontSize:13, fontFamily:"inherit" }}>
+                    🛒 Ajouter au panier
+                  </button>
+                )}
               </Card>
             )}
           </>
@@ -6600,12 +6679,167 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
   );
 }
 // ── BOTTOM NAV ────────────────────────────────────────────
-function BottomNav({ current, onNav }) {
+// ── PANIER ────────────────────────────────────────────────
+function PanierScreen({ onNav, user, panier, setPanier }) {
+  const [sending, setSending]   = useState(false);
+  const [done, setDone]         = useState(false);
+  const [error, setError]       = useState("");
+
+  const removeItem = (id) => setPanier(prev => prev.filter(item => item.id !== id));
+
+  const total = panier.reduce((s, item) => s + (item.prix || 0), 0);
+
+  const handleEnvoyer = async () => {
+    if (!panier.length) return;
+    if (!user?.supabaseId) { setError("Vous devez être connecté."); return; }
+    setSending(true);
+    try {
+      for (const item of panier) {
+        if (item.type === "natation") {
+          for (const c of (item.creneaux || [])) {
+            await sb.from("reservations_natation").insert([{
+              membre_id:   user.supabaseId,
+              heure:       c.time,
+              date_seance: c.dayISO,
+              enfants:     item.enfant ? [item.enfant] : [],
+              statut:      "pending",
+              montant:     Math.round(item.prix / (item.creneaux?.length || 1)),
+              jour:        new Date(c.dayISO).toLocaleDateString("fr-FR", {weekday:"short"}),
+            }]);
+          }
+        } else if (item.type === "eveil") {
+          await sb.from("reservations_natation").insert([{
+            membre_id:   user.supabaseId,
+            heure:       item.heure,
+            date_seance: item.date,
+            enfants:     item.enfant ? [item.enfant] : [],
+            statut:      "pending",
+            montant:     20,
+            jour:        item.jour || "",
+          }]);
+        } else if (item.type === "club") {
+          for (const iso of (item.dates || [])) {
+            await sb.from("reservations_club").insert([{
+              membre_id:        user.supabaseId,
+              date_reservation: iso,
+              session:          item.session || "matin",
+              statut:           "pending",
+              enfants:          item.enfants || [],
+            }]);
+          }
+        } else if (item.type === "liberte") {
+          await sb.from("reservations_club").insert([{
+            membre_id:        user.supabaseId,
+            date_reservation: new Date().toISOString().slice(0,10),
+            session:          "matin",
+            statut:           "pending",
+            enfants:          [String(item.nbDemiJ)],
+          }]);
+        }
+      }
+      setPanier([]);
+      setDone(true);
+    } catch(e) { setError("Erreur : " + e.message); }
+    setSending(false);
+  };
+
+  if (done) return (
+    <div style={{ background:C.shell, minHeight:"100%", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:"40px 28px", textAlign:"center" }}>
+      <div style={{ fontSize:80, marginBottom:16 }}>📨</div>
+      <h2 style={{ color:C.ocean, margin:"0 0 8px" }}>Demande envoyée !</h2>
+      <p style={{ color:"#888", fontSize:14, lineHeight:1.8 }}>
+        Toutes vos prestations ont été enregistrées.<br/>
+        L'équipe FNCP vous contactera pour le paiement.
+      </p>
+      <div style={{ background:`${C.ocean}10`, borderRadius:14, padding:"12px 20px", margin:"16px 0 24px", fontSize:13, color:C.ocean, fontWeight:700 }}>
+        ⏳ Vos accès seront activés à réception du paiement
+      </div>
+      <SunBtn color={C.ocean} onClick={() => { setDone(false); onNav("home"); }}>Retour à l'accueil</SunBtn>
+    </div>
+  );
+
+  return (
+    <div style={{ background:C.shell, minHeight:"100%" }}>
+      <div style={{ background:`linear-gradient(135deg,${C.ocean},${C.sea})`, padding:"20px 20px 0" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:8 }}>
+          <BackBtn onNav={onNav} to="home" />
+          <div>
+            <h2 style={{ color:"#fff", margin:0, fontWeight:900, fontSize:20 }}>🛒 Mon panier</h2>
+            <p style={{ color:"rgba(255,255,255,0.8)", margin:0, fontSize:12 }}>{panier.length} prestation{panier.length>1?"s":""}</p>
+          </div>
+        </div>
+        <Wave fill={C.shell} />
+      </div>
+
+      <div style={{ padding:"12px 18px 100px", display:"flex", flexDirection:"column", gap:12 }}>
+        {panier.length === 0 ? (
+          <div style={{ textAlign:"center", padding:"48px 24px" }}>
+            <div style={{ fontSize:64, marginBottom:12 }}>🛒</div>
+            <h3 style={{ color:C.dark, margin:"0 0 8px" }}>Panier vide</h3>
+            <p style={{ color:"#888", fontSize:14 }}>Ajoutez des prestations depuis les écrans Formules</p>
+            <SunBtn color={C.ocean} onClick={() => onNav("formules")} style={{ marginTop:16 }}>Voir les formules</SunBtn>
+          </div>
+        ) : (
+          <>
+            {panier.map(item => (
+              <div key={item.id} style={{ background:"#fff", borderRadius:18, padding:16, boxShadow:"0 4px 14px rgba(0,0,0,0.06)", borderLeft:`4px solid ${item.color || C.ocean}` }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontWeight:900, color:C.dark, fontSize:14 }}>{item.emoji} {item.label}</div>
+                    {item.enfant && <div style={{ fontSize:12, color:"#888", marginTop:2 }}>👤 {item.enfant}</div>}
+                    {item.enfants?.length > 0 && <div style={{ fontSize:12, color:"#888", marginTop:2 }}>👤 {item.enfants.join(", ")}</div>}
+                    {item.details && <div style={{ fontSize:11, color:"#aaa", marginTop:4 }}>{item.details}</div>}
+                    {item.creneaux?.length > 0 && (
+                      <div style={{ display:"flex", flexWrap:"wrap", gap:4, marginTop:6 }}>
+                        {item.creneaux.map((c,i) => (
+                          <span key={i} style={{ background:`${item.color||C.ocean}15`, color:item.color||C.ocean, borderRadius:8, padding:"2px 8px", fontSize:10, fontWeight:700 }}>
+                            {c.time} · {new Date(c.dayISO).toLocaleDateString("fr-FR",{day:"numeric",month:"short"})}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:6 }}>
+                    <div style={{ fontWeight:900, fontSize:16, color:item.color||C.ocean }}>{item.prix} €</div>
+                    <button onClick={() => removeItem(item.id)} style={{ background:"#fff0f0", border:"none", color:"#e74c3c", borderRadius:8, padding:"4px 10px", cursor:"pointer", fontSize:12, fontWeight:800, fontFamily:"inherit" }}>✕ Retirer</button>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {/* Total */}
+            <div style={{ background:`linear-gradient(135deg,${C.ocean},${C.sea})`, borderRadius:18, padding:18, color:"#fff" }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
+                <div style={{ fontWeight:800, fontSize:15 }}>Total</div>
+                <div style={{ fontWeight:900, fontSize:24 }}>{total} €</div>
+              </div>
+              <div style={{ fontSize:12, color:"rgba(255,255,255,0.7)" }}>
+                🏦 Virement · ✉️ Chèque · 🎫 Chèques vacances
+              </div>
+            </div>
+
+            {error && <div style={{ background:"#fff0f0", border:"1.5px solid #fca5a5", borderRadius:12, padding:"10px 14px", fontSize:13, color:"#e74c3c", fontWeight:700 }}>⚠️ {error}</div>}
+
+            <SunBtn color={sending ? "#aaa" : C.coral} full onClick={handleEnvoyer} disabled={sending}>
+              {sending ? "⏳ Envoi en cours..." : `📨 Envoyer la demande · ${total} €`}
+            </SunBtn>
+
+            <div style={{ textAlign:"center", fontSize:12, color:"#aaa" }}>
+              ⏳ Vos accès seront activés après réception du paiement
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
   const items = [
     { id:"home",             emoji:"🏠", label:"Accueil"    },
     { id:"formules",         emoji:"🎫", label:"Formules"   },
     { id:"reservation",      emoji:"🏊", label:"Réserver"   },
-    { id:"mes-reservations", emoji:"🎫", label:"Mes accès" },
+    { id:"mes-reservations", emoji:"🎫", label:"Mes accès"  },
     { id:"profil",           emoji:"👤", label:"Profil"     },
   ];
   return (
@@ -6617,6 +6851,23 @@ function BottomNav({ current, onNav }) {
           {current===item.id && <div style={{ width:18, height:3, background:`linear-gradient(90deg,${C.ocean},${C.sea})`, borderRadius:10, marginTop:1 }} />}
         </button>
       ))}
+      {/* Bouton panier flottant */}
+      <button onClick={() => onNav("panier")} style={{
+        position:"fixed", bottom:80, right:18, zIndex:200,
+        background: panierCount > 0 ? `linear-gradient(135deg,${C.coral},${C.sun})` : "#fff",
+        border: panierCount > 0 ? "none" : `2px solid #e0e0e0`,
+        borderRadius:"50%", width:52, height:52, cursor:"pointer",
+        boxShadow: panierCount > 0 ? `0 6px 20px ${C.coral}55` : "0 2px 10px rgba(0,0,0,0.1)",
+        display:"flex", alignItems:"center", justifyContent:"center", fontSize:22,
+        transition:"all .2s",
+      }}>
+        🛒
+        {panierCount > 0 && (
+          <div style={{ position:"absolute", top:-4, right:-4, background:C.ocean, color:"#fff", borderRadius:"50%", width:20, height:20, fontSize:11, fontWeight:900, display:"flex", alignItems:"center", justifyContent:"center" }}>
+            {panierCount}
+          </div>
+        )}
+      </button>
     </div>
   );
 }
@@ -6803,6 +7054,7 @@ export default function App() {
   const [allSeasonSessions, setAllSeasonSessions] = useState(ALL_SEASON_SLOTS_INIT);
   const [reservations, setReservations] = useState([]);
   const [clubPlaces, setClubPlaces] = useState({ matin: 45, apmidi: 45, journee: 45 });
+  const [panier, setPanier]         = useState([]); // reset à chaque session
 
   // Sauvegarder user dans localStorage à chaque changement
   useEffect(() => {
@@ -6863,7 +7115,7 @@ export default function App() {
         clearInterval(refreshInterval);
       };
   }, []);
-  const props = { onNav: setScreen, user, setUser, sessions, setSessions, reservations, setReservations, allSeasonSessions, setAllSeasonSessions, clubPlaces, setClubPlaces };
+  const props = { onNav: setScreen, user, setUser, sessions, setSessions, reservations, setReservations, allSeasonSessions, setAllSeasonSessions, clubPlaces, setClubPlaces, panier, setPanier };
 
   const renderScreen = () => {
     switch (screen) {
@@ -6876,6 +7128,7 @@ export default function App() {
       case "prestations":      return <PrestationsScreen {...props} />;
       case "reservation-club": return <ReservationClubScreen {...props} />;
       case "mes-reservations": return <MesReservationsScreen {...props} />;
+      case "panier":            return <PanierScreen {...props} />;
       case "inscription":      return <InscriptionScreen {...props} />;
       case "infos":            return <InfosScreen {...props} />;
       case "admin":            return <AdminScreen {...props} />;
@@ -6924,8 +7177,8 @@ export default function App() {
         button { font-family: 'Nunito', sans-serif; }
       `}</style>
       <div style={{ flex:1, overflowY:"auto" }}>{renderScreen()}</div>
-      {screen !== "inscription" && <BottomNav current={screen} onNav={setScreen} />}
+      {screen !== "inscription" && <BottomNav current={screen} onNav={setScreen} panierCount={panier.length} />}
     </div>
   );
 }
-// remove acces profil Wed Apr  1 16:08:08 CEST 2026
+// panier Wed Apr  1 16:22:01 CEST 2026
