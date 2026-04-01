@@ -1048,7 +1048,8 @@ function FormulesNatationScreen({ onNav, user, allSeasonSessions }) {
       sb.from("enfants").select("*").eq("membre_id", user.supabaseId)
         .then(({ data }) => setEnfantsDB(data || [])).catch(() => {});
     }
-    sb.from("reservations_natation").select("date_seance, heure")
+    sb.from("reservations_natation").select("date_seance, heure, statut")
+      .eq("statut", "confirmed")
       .then(({ data }) => setDbResasNat(data || [])).catch(() => {});
   }, [user?.supabaseId]);
 
@@ -1060,7 +1061,7 @@ function FormulesNatationScreen({ onNav, user, allSeasonSessions }) {
 
   // Calcul places réelles par créneau
   const getSpots = (dayISO, time) => {
-    const taken = dbResasNat.filter(r => r.date_seance?.slice(0,10) === dayISO && r.heure === time).length;
+    const taken = dbResasNat.filter(r => r.date_seance?.slice(0,10) === dayISO && r.heure === time && r.statut === "confirmed").length;
     return Math.max(0, 2 - taken);
   };
 
@@ -2190,9 +2191,9 @@ function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSession
 
   // Synchroniser les places depuis Supabase au chargement
   useEffect(() => {
-    sb.from("reservations_natation").select("date_seance, heure")
+    sb.from("reservations_natation").select("date_seance, heure, statut")
+      .eq("statut", "confirmed")
       .then(({ data }) => {
-        if (!data?.length) return;
         if (setAllSeasonSessions) {
           setAllSeasonSessions(() => {
             const next = ALL_SEASON_SLOTS_INIT.map(s => ({ ...s, spots: 2 }));
@@ -2938,7 +2939,8 @@ function SeancesTab({ sessions, setSessions }) {
 
   // Charger résas natation depuis Supabase
   useEffect(() => {
-    sb.from("reservations_natation").select("date_seance, heure")
+    sb.from("reservations_natation").select("date_seance, heure, statut")
+      .eq("statut", "confirmed")
       .then(({ data }) => setDbResasNat(data || []))
       .catch(() => {});
   }, []);
@@ -2948,7 +2950,7 @@ function SeancesTab({ sessions, setSessions }) {
     const dayObj = ALL_SEASON_DAYS.find(d => d.id === dayId);
     if (!dayObj?.date) return 2;
     const dateISO = `${dayObj.date.getFullYear()}-${String(dayObj.date.getMonth()+1).padStart(2,"0")}-${String(dayObj.date.getDate()).padStart(2,"0")}`;
-    const taken = dbResasNat.filter(r => r.date_seance?.slice(0,10) === dateISO && r.heure === time).length;
+    const taken = dbResasNat.filter(r => r.date_seance?.slice(0,10) === dateISO && r.heure === time && r.statut === "confirmed").length;
     return Math.max(0, 2 - taken);
   };
 
@@ -4345,7 +4347,7 @@ function PlanningTab({ allSeasonSessions, clubPlaces, reservations = [] }) {
     if (!dayObj?.date) return [];
     const dateISO = `${dayObj.date.getFullYear()}-${String(dayObj.date.getMonth()+1).padStart(2,"0")}-${String(dayObj.date.getDate()).padStart(2,"0")}`;
     return dbResasNat
-      .filter(r => r.date_seance?.slice(0,10) === dateISO && r.heure === time)
+      .filter(r => r.date_seance?.slice(0,10) === dateISO && r.heure === time && r.statut === "confirmed")
       .flatMap(r => (r.enfants || []).map(e => ({ prenom: e, parent: r.membres ? `${r.membres.prenom} ${r.membres.nom}` : "—", tel: r.membres?.tel || "" })));
   };
 
@@ -4569,7 +4571,7 @@ ${afternoon.length>0?`<h2>🌊 Après-midi</h2><table><thead><tr><th>Heure</th><
               const dateISO = d.date ? `${d.date.getFullYear()}-${String(d.date.getMonth()+1).padStart(2,"0")}-${String(d.date.getDate()).padStart(2,"0")}` : "";
               const fmt = (list) => list.map(s => {
                 const enfants = dbResasNat
-                  .filter(r => r.date_seance?.slice(0,10) === dateISO && r.heure === s.time)
+                  .filter(r => r.date_seance?.slice(0,10) === dateISO && r.heure === s.time && r.statut === "confirmed")
                   .flatMap(r => r.enfants || []);
                 const noms = enfants.length > 0 ? enfants.map(e => `<span style="display:inline-block;background:#EEF8FF;color:#1A8FE3;border-radius:4px;padding:1px 6px;margin:1px;font-size:10px;font-weight:700">👤 ${e}</span>`).join('') : '';
                 return `<span style="display:inline-block;background:${s.spots===0?'#fee':'#e8f4ff'};color:${s.spots===0?'#e74c3c':'#1A8FE3'};border-radius:6px;padding:2px 7px;margin:2px;font-size:11px;font-weight:700">${s.time} ${s.spots===0?'●':`${s.spots}/2`}</span>${noms}`;
@@ -4785,9 +4787,11 @@ function AgeGroupCard({ dbMembres = [] }) {
   const [membresLocaux, setMembresLocaux] = useState([]);
 
   useEffect(() => {
-    sb.from("reservations_natation").select("membre_id, date_seance, enfants")
+    sb.from("reservations_natation").select("membre_id, date_seance, enfants, statut")
+      .eq("statut", "confirmed")
       .then(({ data }) => setDbResasNat(data || [])).catch(() => {});
-    sb.from("reservations_club").select("membre_id, date_reservation, enfants")
+    sb.from("reservations_club").select("membre_id, date_reservation, enfants, statut")
+      .eq("statut", "confirmed")
       .then(({ data }) => setDbResasClub(data || [])).catch(() => {});
     sb.from("membres").select("id, prenom, nom, enfants(*)")
       .then(({ data }) => setMembresLocaux(data || [])).catch(() => {});
