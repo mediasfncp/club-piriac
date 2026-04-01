@@ -1356,22 +1356,30 @@ const SEASON_WEEKS = (() => {
 })();
 
 function ReservationClubScreen({ onNav, user, setUser, clubPlaces, setClubPlaces }) {
-  const [selectedDayId, setSelectedDayId]     = useState(CLUB_SEASON_DAYS[0]?.id);
+  const [selectedDate, setSelectedDate]       = useState(null); // ISO
   const [selectedSession, setSelectedSession] = useState(null);
   const [done, setDone]                       = useState(null);
-  const [weekIdx, setWeekIdx]                 = useState(0);
   const [resasClubDB, setResasClubDB]         = useState([]);
   const [selectedEnfants, setSelectedEnfants] = useState([]);
   const [enfantsDB, setEnfantsDB]             = useState([]);
+  const [balance, setBalance]                 = useState(0);
+  const [liberteTotal, setLiberteTotal]       = useState(0);
+  const [moisFilter, setMoisFilter]           = useState("juil");
+  const [loading, setLoading]                 = useState(true);
 
   useEffect(() => {
     sb.from("reservations_club").select("date_reservation, session")
       .then(({ data }) => setResasClubDB(data || [])).catch(() => {});
-    // Charger les enfants directement depuis Supabase
     if (user?.supabaseId) {
       sb.from("enfants").select("*").eq("membre_id", user.supabaseId)
         .then(({ data }) => setEnfantsDB(data || [])).catch(() => {});
-    }
+      sb.from("membres").select("liberte_balance, liberte_total").eq("id", user.supabaseId).single()
+        .then(({ data }) => {
+          setBalance(data?.liberte_balance || 0);
+          setLiberteTotal(data?.liberte_total || 0);
+          setLoading(false);
+        }).catch(() => setLoading(false));
+    } else setLoading(false);
   }, [user?.supabaseId]);
 
   const enfantsClub = enfantsDB.length > 0
@@ -1380,23 +1388,10 @@ function ReservationClubScreen({ onNav, user, setUser, clubPlaces, setClubPlaces
 
   const toggleEnfant = (prenom) => setSelectedEnfants(prev => prev.includes(prenom) ? prev.filter(x => x !== prenom) : [...prev, prenom]);
 
-  // Calculer places restantes pour la date et session sélectionnées
   const getPlacesForDate = (dateISO, session) => {
-    const taken = resasClubDB.filter(r =>
-      r.date_reservation?.slice(0,10) === dateISO && r.session === session
-    ).length;
+    const taken = resasClubDB.filter(r => r.date_reservation?.slice(0,10) === dateISO && r.session === session).length;
     return Math.max(0, 45 - taken);
   };
-
-  // Build weeks
-  const weeks = [];
-  let wk = [];
-  CLUB_SEASON_DAYS.forEach((d, i) => {
-    wk.push(d);
-    if (d.label === "Sam" || i === CLUB_SEASON_DAYS.length - 1) { weeks.push(wk); wk = []; }
-  });
-  const currentWeek = weeks[Math.min(weekIdx, weeks.length-1)] || [];
-  const handleWeekChange = (idx) => { setWeekIdx(idx); const w = weeks[Math.min(idx, weeks.length-1)]; if (w?.length) setSelectedDayId(w[0].id); };
 
   if (!user) return (
     <div style={{ background:C.shell,minHeight:"100%",display:"flex",flexDirection:"column" }}>
@@ -1405,16 +1400,13 @@ function ReservationClubScreen({ onNav, user, setUser, clubPlaces, setClubPlaces
         <Wave fill={C.shell} />
       </div>
       <div style={{ flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"32px 24px",textAlign:"center" }}>
-        <div style={{ fontSize:72 }}>🔒</div>
-        <h2 style={{ color:C.dark }}>Inscription requise</h2>
+        <div style={{ fontSize:72 }}>🔒</div><h2 style={{ color:C.dark }}>Inscription requise</h2>
         <SunBtn color={C.coral} onClick={() => onNav("inscription")}>📋 S'inscrire</SunBtn>
       </div>
     </div>
   );
 
-  const balance = user.liberteBalance || 0;
-
-  if (balance === 0) return (
+  if (!loading && balance === 0) return (
     <div style={{ background:C.shell,minHeight:"100%",display:"flex",flexDirection:"column" }}>
       <div style={{ background:`linear-gradient(135deg,${C.coral},${C.sun})`,padding:"20px 20px 0" }}>
         <div style={{ display:"flex",alignItems:"center",gap:12,marginBottom:8 }}><BackBtn onNav={onNav} to="profil" /><h2 style={{ color:"#fff",margin:0,fontWeight:900 }}>🏖️ Réserver Club</h2></div>
@@ -1423,7 +1415,7 @@ function ReservationClubScreen({ onNav, user, setUser, clubPlaces, setClubPlaces
       <div style={{ flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"32px 24px",textAlign:"center" }}>
         <div style={{ fontSize:72 }}>🎟️</div>
         <h2 style={{ color:C.dark }}>Plus de demi-journées disponibles</h2>
-        <p style={{ color:"#888",fontSize:14 }}>Recharge ta Carte Liberté pour continuer à réserver.</p>
+        <p style={{ color:"#888",fontSize:14 }}>Recharge ta Carte Liberté pour continuer.</p>
         <SunBtn color={C.coral} onClick={() => onNav("prestations")}>Recharger ma carte</SunBtn>
       </div>
     </div>
@@ -1432,60 +1424,49 @@ function ReservationClubScreen({ onNav, user, setUser, clubPlaces, setClubPlaces
   if (done) return (
     <div style={{ minHeight:"100%",background:`linear-gradient(135deg,${C.coral},${C.sun})`,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"40px 28px",textAlign:"center" }}>
       <div style={{ width:90,height:90,borderRadius:"50%",background:"rgba(255,255,255,0.25)",border:"3px solid rgba(255,255,255,0.5)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 20px",fontSize:42 }}>✓</div>
-      <h1 style={{ color:"#fff",fontSize:26,fontWeight:900,margin:"0 0 8px" }}>Réservation confirmée !</h1>
+      <h1 style={{ color:"#fff",fontSize:26,fontWeight:900,margin:"0 0 8px" }}>Demande envoyée !</h1>
       <p style={{ color:"rgba(255,255,255,0.9)",fontSize:15,margin:"0 0 4px" }}>{done.day} · {done.session}</p>
       <div style={{ background:"rgba(255,255,255,0.2)",borderRadius:14,padding:"10px 20px",margin:"12px 0 24px" }}>
-        <span style={{ color:"#fff",fontWeight:900 }}>🎟️ {user.liberteBalance} demi-j. restante{user.liberteBalance>1?"s":""}</span>
+        <span style={{ color:"#fff",fontWeight:900 }}>⏳ En attente de validation</span>
       </div>
-      <button onClick={() => { setDone(null); setSelectedSession(null); onNav("profil"); }}
+      <button onClick={() => { setDone(null); setSelectedSession(null); setSelectedDate(null); onNav("profil"); }}
         style={{ background:"#fff",color:C.coral,border:"none",borderRadius:50,padding:"14px 36px",fontSize:15,fontWeight:900,cursor:"pointer",fontFamily:"inherit" }}>
         Voir mon compte
       </button>
     </div>
   );
 
-  const weekLabel = currentWeek.length > 0 ? `${currentWeek[0].num} ${currentWeek[0].month} – ${currentWeek[currentWeek.length-1].num} ${currentWeek[currentWeek.length-1].month}` : "";
-  const selectedDay = CLUB_SEASON_DAYS.find(d => d.id === selectedDayId);
-  const selectedDayISO = selectedDay ? `${selectedDay.date.getFullYear()}-${String(selectedDay.date.getMonth()+1).padStart(2,"0")}-${String(selectedDay.date.getDate()).padStart(2,"0")}` : "";
-  const SESSIONS = [
-    { id:"matin",  label:"Demi-journée Matin",      horaires:"9h30 – 12h30",  color:C.coral,  emoji:"☀️", places: getPlacesForDate(selectedDayISO, "matin")  },
-    { id:"apmidi", label:"Demi-journée Après-midi", horaires:"14h30 – 18h00", color:C.ocean,  emoji:"🌊", places: getPlacesForDate(selectedDayISO, "apmidi") },
-  ];
-
   const handleConfirm = async () => {
-    if (!selectedSession) return;
-    setUser(prev => ({ ...prev, liberteBalance: Math.max(0, (prev.liberteBalance||0) - 1) }));
-    if (setClubPlaces) setClubPlaces(prev => ({ ...prev, [selectedSession]: Math.max(0, (prev[selectedSession]||45) - 1) }));
-    const s = SESSIONS.find(s => s.id === selectedSession);
-    // Programmer rappel veille à 20h
-    const resaDate = selectedDay?.date;
-    let rappelDate = null;
-    if (resaDate) {
-      const iso = `${resaDate.getFullYear()}-${String(resaDate.getMonth()+1).padStart(2,"0")}-${String(resaDate.getDate()).padStart(2,"0")}`;
-      rappelDate = getRappelDate(iso);
-      scheduleRappel({
-        titre: `🏖️ Rappel Club de Plage demain !`,
-        corps: `${s?.label} demain (${s?.horaires}). À demain !`,
-        dateStr: rappelDate,
+    if (!selectedDate || !selectedSession) return;
+    const sessionLabel = selectedSession === "matin" ? "☀️ Matin" : "🌊 Après-midi";
+    const dateLabel = new Date(selectedDate).toLocaleDateString("fr-FR", {weekday:"long",day:"numeric",month:"long"});
+    try {
+      await creerReservationClub({
+        membreId:        user?.supabaseId || null,
+        dateReservation: selectedDate,
+        session:         selectedSession,
+        labelJour:       `[LIBERTE] ${dateLabel}`,
+        rappelDate:      getRappelDate(selectedDate),
+        enfants:         selectedEnfants.length > 0 ? selectedEnfants : enfantsClub.map(e => e.prenom),
+        statut:          "pending",
       });
-      // Sauvegarder dans Supabase
-      try {
-        await creerReservationClub({
-          membreId:         user?.supabaseId || null,
-          dateReservation:  iso,
-          session:          selectedSession,
-          labelJour:        `[LIBERTE] ${selectedDay?.label} ${selectedDay?.num} ${selectedDay?.month}`,
-          rappelDate:       rappelDate,
-          enfants:          selectedEnfants.length > 0 ? selectedEnfants : (user?.enfants || []).filter(e => e.activite === "club" || e.activite === "les deux").map(e => e.prenom),
-          statut:           "pending",
-        });
-        const newBalance = Math.max(0, (user?.liberteBalance||0) - 1);
-        if (user?.supabaseId) await updateLiberte(user.supabaseId, newBalance, user.liberteTotal || newBalance);
-      } catch(e) { console.warn("Supabase:", e.message); }
-    }
-    setDone({ day: `${selectedDay?.label} ${selectedDay?.num} ${selectedDay?.month} 2026`, session: s?.label, rappelDate });
+    } catch(e) { console.warn("Supabase:", e.message); }
+    setDone({ day: dateLabel, session: sessionLabel });
     setSelectedSession(null);
   };
+
+  // Calendrier mensuel
+  const year = 2026;
+  const month = moisFilter === "juil" ? 6 : 7;
+  const firstDow = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month+1, 0).getDate();
+  const offset = firstDow === 0 ? 6 : firstDow - 1;
+  const dowLabels = ["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"];
+
+  const SESSIONS = [
+    { id:"matin",  label:"☀️ Matin",      horaires:"9h30 – 12h30",  color:C.coral },
+    { id:"apmidi", label:"🌊 Après-midi", horaires:"14h30 – 18h00", color:C.ocean },
+  ];
 
   return (
     <div style={{ background:C.shell, minHeight:"100%" }}>
@@ -1493,72 +1474,89 @@ function ReservationClubScreen({ onNav, user, setUser, clubPlaces, setClubPlaces
         <div style={{ display:"flex",alignItems:"center",gap:12,marginBottom:12 }}>
           <BackBtn onNav={onNav} to="profil" />
           <div>
-            <h2 style={{ color:"#fff",margin:0,fontWeight:900,fontSize:20 }}>🏖️ Réserver · Club de Plage</h2>
-            <p style={{ color:"rgba(255,255,255,0.85)",margin:0,fontSize:12 }}>Carte Liberté · {balance} demi-j. restante{balance>1?"s":""}</p>
+            <h2 style={{ color:"#fff",margin:0,fontWeight:900,fontSize:20 }}>🏖️ Réserver · Carte Liberté</h2>
+            <p style={{ color:"rgba(255,255,255,0.85)",margin:0,fontSize:12 }}>{balance} demi-j. restante{balance>1?"s":""}</p>
           </div>
         </div>
-        {/* Solde carte */}
         <div style={{ background:"rgba(255,255,255,0.2)",borderRadius:16,padding:"10px 16px",marginBottom:4,display:"flex",justifyContent:"space-between",alignItems:"center" }}>
-          <span style={{ color:"#fff",fontWeight:800,fontSize:13 }}>🎟️ Solde Carte Liberté</span>
-          <span style={{ color:"#fff",fontWeight:900,fontSize:20 }}>{balance} / {user.liberteTotal || balance}</span>
+          <span style={{ color:"#fff",fontWeight:800,fontSize:13 }}>🎟️ Solde</span>
+          <span style={{ color:"#fff",fontWeight:900,fontSize:20 }}>{balance} / {liberteTotal}</span>
         </div>
         <Wave fill={C.shell} />
       </div>
 
-      <div style={{ padding:"12px 18px 24px" }}>
-        {/* Week nav */}
-        <div style={{ background:"#fff",borderRadius:14,padding:"9px 14px",marginBottom:12,boxShadow:"0 2px 8px rgba(0,0,0,0.05)",display:"flex",alignItems:"center",justifyContent:"space-between" }}>
-          <button onClick={() => handleWeekChange(Math.max(0,weekIdx-1))} disabled={weekIdx===0} style={{ background:weekIdx===0?"#f0f0f0":C.coral,border:"none",color:weekIdx===0?"#bbb":"#fff",borderRadius:"50%",width:28,height:28,cursor:weekIdx===0?"not-allowed":"pointer",fontWeight:900,fontFamily:"inherit" }}>‹</button>
-          <div style={{ textAlign:"center" }}>
-            <div style={{ fontWeight:900,color:C.dark,fontSize:13 }}>Semaine {weekIdx+1}/{weeks.length}</div>
-            <div style={{ fontSize:11,color:"#aaa" }}>{weekLabel} 2026</div>
+      <div style={{ padding:"12px 18px 24px", display:"flex", flexDirection:"column", gap:14 }}>
+
+        {/* Toggle mois */}
+        <div style={{ display:"flex", gap:8 }}>
+          {[["juil","🌊 Juillet"],["aout","☀️ Août"]].map(([k,l]) => (
+            <button key={k} onClick={() => { setMoisFilter(k); setSelectedDate(null); setSelectedSession(null); }} style={{
+              flex:1, background: moisFilter===k ? `linear-gradient(135deg,${C.coral},${C.sun})` : "#fff",
+              color: moisFilter===k ? "#fff" : "#888", border:"none", borderRadius:14, padding:"10px",
+              cursor:"pointer", fontWeight:900, fontSize:13, fontFamily:"inherit",
+              boxShadow: moisFilter===k ? `0 4px 14px ${C.coral}44` : "0 2px 8px rgba(0,0,0,0.05)",
+            }}>{l}</button>
+          ))}
+        </div>
+
+        {/* Calendrier */}
+        <div style={{ background:"#fff", borderRadius:20, padding:16, boxShadow:"0 4px 16px rgba(0,0,0,0.06)" }}>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:3, marginBottom:6 }}>
+            {dowLabels.map(d => <div key={d} style={{ textAlign:"center", fontSize:10, fontWeight:900, color:"#aaa", paddingBottom:4 }}>{d}</div>)}
           </div>
-          <button onClick={() => handleWeekChange(Math.min(weeks.length-1,weekIdx+1))} disabled={weekIdx>=weeks.length-1} style={{ background:weekIdx>=weeks.length-1?"#f0f0f0":C.coral,border:"none",color:weekIdx>=weeks.length-1?"#bbb":"#fff",borderRadius:"50%",width:28,height:28,cursor:weekIdx>=weeks.length-1?"not-allowed":"pointer",fontWeight:900,fontFamily:"inherit" }}>›</button>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:3 }}>
+            {Array.from({length:offset}).map((_,i) => <div key={`e${i}`} />)}
+            {Array.from({length:daysInMonth}).map((_,i) => {
+              const day = i+1;
+              const iso = `${year}-${String(month+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+              const dow = new Date(year, month, day).getDay();
+              const isDim = dow === 0;
+              const inSeason = CLUB_SEASON_DAYS.some(d => {
+                const diso = `${d.date.getFullYear()}-${String(d.date.getMonth()+1).padStart(2,"0")}-${String(d.date.getDate()).padStart(2,"0")}`;
+                return diso === iso;
+              });
+              const sel = selectedDate === iso;
+              return (
+                <div key={day} onClick={() => { if (!inSeason || isDim) return; setSelectedDate(sel ? null : iso); setSelectedSession(null); }} style={{
+                  height:38, borderRadius:10, display:"flex", alignItems:"center", justifyContent:"center",
+                  fontSize:13, fontWeight: inSeason ? 800 : 400,
+                  background: sel ? `linear-gradient(135deg,${C.coral},${C.sun})` : !inSeason||isDim ? "transparent" : "#F8FBFF",
+                  color: sel ? "#fff" : !inSeason||isDim ? "#ddd" : C.dark,
+                  cursor: !inSeason||isDim ? "default" : "pointer",
+                  boxShadow: sel ? `0 3px 10px ${C.coral}44` : "none",
+                }}>{day}</div>
+              );
+            })}
+          </div>
         </div>
 
-        {/* Day selector */}
-        <div style={{ display:"flex",gap:6,marginBottom:14,overflowX:"auto",paddingBottom:2 }}>
-          {currentWeek.map(d => {
-            const sel = selectedDayId === d.id;
-            const dISO = `${d.date.getFullYear()}-${String(d.date.getMonth()+1).padStart(2,"0")}-${String(d.date.getDate()).padStart(2,"0")}`;
-            const placesM = getPlacesForDate(dISO, "matin");
-            const placesA = getPlacesForDate(dISO, "apmidi");
-            const fullDay = placesM === 0 && placesA === 0;
-            return (
-              <button key={d.id} onClick={() => { setSelectedDayId(d.id); setSelectedSession(null); }} style={{
-                flexShrink:0,
-                background: sel ? `linear-gradient(135deg,${C.coral},${C.sun})` : fullDay ? "#f5f5f5" : "#fff",
-                border:"none",borderRadius:16,padding:"10px 14px",cursor:"pointer",
-                fontFamily:"inherit",boxShadow:sel?`0 4px 14px ${C.coral}44`:"0 2px 8px rgba(0,0,0,0.06)",
-                transition:"all .15s",minWidth:65,textAlign:"center",
-                opacity: fullDay ? 0.5 : 1,
-              }}>
-                <div style={{ fontSize:10,fontWeight:900,color:sel?"rgba(255,255,255,0.8)":"#aaa" }}>{d.label}</div>
-                <div style={{ fontSize:17,fontWeight:900,color:sel?"#fff":C.dark }}>{d.num}</div>
-                <div style={{ fontSize:9,color:sel?"rgba(255,255,255,0.7)":fullDay?"#e74c3c":"#bbb",marginTop:3 }}>
-                  {fullDay ? "Complet" : d.month}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Sélection enfants — toujours visible */}
-        {enfantsClub.length > 0 && (
-          <div style={{ background:"#fff", borderRadius:18, padding:16, marginBottom:12, boxShadow:"0 2px 10px rgba(0,0,0,0.05)" }}>
-            <div style={{ fontWeight:800, color:C.dark, fontSize:14, marginBottom:10 }}>👧 Enfant(s) participants</div>
-            <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
-              {enfantsClub.map(e => {
-                const sel = selectedEnfants.includes(e.prenom);
+        {/* Choix session */}
+        {selectedDate && (
+          <div style={{ background:"#fff", borderRadius:20, padding:16, boxShadow:"0 4px 16px rgba(0,0,0,0.06)" }}>
+            <div style={{ fontWeight:800, color:C.dark, fontSize:14, marginBottom:12 }}>
+              📅 {new Date(selectedDate).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}
+            </div>
+            <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+              {SESSIONS.map(s => {
+                const places = getPlacesForDate(selectedDate, s.id);
+                const sel = selectedSession === s.id;
+                const full = places === 0;
                 return (
-                  <div key={e.prenom} onClick={() => toggleEnfant(e.prenom)} style={{
-                    background: sel ? `linear-gradient(135deg,${C.coral},${C.sun})` : "#F0F4F8",
-                    color: sel ? "#fff" : "#888",
-                    borderRadius:50, padding:"9px 18px", cursor:"pointer",
-                    fontWeight:800, fontSize:14, transition:"all .15s",
-                    boxShadow: sel ? `0 4px 12px ${C.coral}44` : "none",
+                  <div key={s.id} onClick={() => !full && setSelectedSession(sel ? null : s.id)} style={{
+                    background: sel ? `linear-gradient(135deg,${s.color},${s.color}cc)` : full ? "#f5f5f5" : "#F8FBFF",
+                    border: `2px solid ${sel ? s.color : "#e0e8f0"}`,
+                    borderRadius:16, padding:"14px 16px", cursor: full ? "not-allowed" : "pointer",
+                    display:"flex", justifyContent:"space-between", alignItems:"center",
+                    opacity: full ? 0.5 : 1,
                   }}>
-                    {sel ? "✓ " : ""}{e.prenom}
+                    <div>
+                      <div style={{ fontWeight:900, fontSize:15, color: sel?"#fff":C.dark }}>{s.label}</div>
+                      <div style={{ fontSize:12, color: sel?"rgba(255,255,255,0.8)":"#aaa" }}>{s.horaires}</div>
+                    </div>
+                    <div style={{ textAlign:"right" }}>
+                      <div style={{ fontWeight:900, color: sel?"#fff":full?"#e74c3c":C.green, fontSize:16 }}>{places}</div>
+                      <div style={{ fontSize:10, color: sel?"rgba(255,255,255,0.7)":"#aaa" }}>places</div>
+                    </div>
                   </div>
                 );
               })}
@@ -1566,72 +1564,31 @@ function ReservationClubScreen({ onNav, user, setUser, clubPlaces, setClubPlaces
           </div>
         )}
 
-        {/* Session choice */}
-        <div style={{ display:"flex",flexDirection:"column",gap:12, marginBottom:14 }}>
-          {SESSIONS.map(s => {
-            const sel = selectedSession === s.id;
-            const full = s.places === 0;
-            return (
-              <div key={s.id} onClick={() => !full && setSelectedSession(sel ? null : s.id)} style={{
-                background: sel ? `linear-gradient(135deg,${s.color}20,${s.color}08)` : full ? "#f9f9f9" : "#fff",
-                border:`2.5px solid ${sel?s.color:full?"#f0f0f0":"#f0f0f0"}`,
-                borderRadius:20,padding:"16px 18px",cursor:full?"not-allowed":"pointer",
-                boxShadow:sel?`0 6px 20px ${s.color}33`:"0 2px 10px rgba(0,0,0,0.05)",
-                opacity:full?0.6:1,transition:"all .18s",
-              }}>
-                <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center" }}>
-                  <div style={{ display:"flex",alignItems:"center",gap:14 }}>
-                    <div style={{ width:50,height:50,borderRadius:16,background:full?"#eee":`linear-gradient(135deg,${s.color},${s.color}aa)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:24 }}>{s.emoji}</div>
-                    <div>
-                      <div style={{ fontWeight:900,color:full?"#bbb":C.dark,fontSize:15 }}>{s.label}</div>
-                      <div style={{ fontSize:12,color:"#888" }}>🕐 {s.horaires}</div>
-                      <div style={{ fontSize:12,fontWeight:700,color:full?C.sunset:s.places<=10?C.coral:C.green,marginTop:2 }}>
-                        {full?"🔴 Complet":`🟢 ${s.places}/45 places`}
-                      </div>
-                    </div>
-                  </div>
-                  <div style={{ width:26,height:26,borderRadius:"50%",border:`3px solid ${sel?s.color:"#ddd"}`,background:sel?s.color:"transparent",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:900,fontSize:13 }}>{sel?"✓":""}</div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        {/* Enfants */}
+        {selectedDate && selectedSession && enfantsClub.length > 0 && (
+          <div style={{ background:"#fff", borderRadius:18, padding:16, boxShadow:"0 2px 10px rgba(0,0,0,0.05)" }}>
+            <div style={{ fontWeight:800, color:C.dark, fontSize:13, marginBottom:10 }}>👧 Enfants qui viennent</div>
+            <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+              {enfantsClub.map(e => {
+                const sel = selectedEnfants.includes(e.prenom);
+                return (
+                  <div key={e.prenom} onClick={() => toggleEnfant(e.prenom)} style={{
+                    background: sel ? `linear-gradient(135deg,${C.coral},${C.sun})` : "#f0f0f0",
+                    color: sel ? "#fff" : "#888", borderRadius:50, padding:"8px 18px",
+                    cursor:"pointer", fontWeight:800, fontSize:13,
+                    boxShadow: sel ? `0 3px 10px ${C.coral}44` : "none",
+                  }}>{sel?"✓ ":""}{e.prenom}</div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
-        {/* Recap + confirm */}
-        {selectedSession && selectedDay && (
-          <Card style={{ background:`linear-gradient(135deg,${C.coral}12,${C.sun}08)`,border:`2px solid ${C.coral}30` }}>
-            <div style={{ fontWeight:900,color:C.dark,marginBottom:2 }}>
-              {SESSIONS.find(s=>s.id===selectedSession)?.emoji} {SESSIONS.find(s=>s.id===selectedSession)?.label}
-            </div>
-            <div style={{ fontWeight:800,color:"#888",fontSize:13,marginBottom:10 }}>
-              {selectedDay.label} {selectedDay.num} {selectedDay.month} 2026
-            </div>
-            {/* Sélection enfants */}
-            {enfantsClub.length > 0 && (
-              <div style={{ marginBottom:12 }}>
-                <div style={{ fontSize:12, fontWeight:800, color:C.dark, marginBottom:8 }}>👧 Enfant(s) participants</div>
-                <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
-                  {enfantsClub.map(e => {
-                    const sel = selectedEnfants.includes(e.prenom);
-                    return (
-                      <div key={e.prenom} onClick={() => toggleEnfant(e.prenom)} style={{
-                        background: sel ? C.coral : "#f0f0f0",
-                        color: sel ? "#fff" : "#888",
-                        borderRadius:50, padding:"7px 16px", cursor:"pointer",
-                        fontWeight:800, fontSize:13, transition:"all .15s",
-                      }}>
-                        {sel ? "✓ " : ""}{e.prenom}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-            <div style={{ background:`${C.coral}15`,borderRadius:12,padding:"8px",marginBottom:14,fontSize:13,color:C.coral,fontWeight:700,textAlign:"center" }}>
-              🎟️ Décomptera 1 demi-journée · il restera {balance-1} après
-            </div>
-            <SunBtn color={C.coral} full onClick={handleConfirm}>✓ Confirmer la réservation</SunBtn>
-          </Card>
+        {/* Bouton confirmer */}
+        {selectedDate && selectedSession && (
+          <SunBtn color={C.coral} full onClick={handleConfirm}>
+            📨 Envoyer la demande · {SESSIONS.find(s=>s.id===selectedSession)?.label}
+          </SunBtn>
         )}
       </div>
     </div>
@@ -6898,4 +6855,4 @@ export default function App() {
     </div>
   );
 }
-// fix label Wed Apr  1 13:59:59 CEST 2026
+// resa club calendrier Wed Apr  1 15:22:39 CEST 2026
