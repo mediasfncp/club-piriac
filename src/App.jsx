@@ -796,9 +796,21 @@ function buildEveilSundays() {
 function FormulesEveilScreen({ onNav, user }) {
   const [eveilSundays, setEveilSundays] = useState(() => buildEveilSundays());
   const [selectedSunday, setSelectedSunday] = useState(0);
-  const [booking, setBooking] = useState(null);
-  const [done, setDone] = useState(null);
-  const [showWero, setShowWero] = useState(false);
+  const [booking, setBooking]         = useState(null);
+  const [done, setDone]               = useState(null);
+  const [selectedEnfant, setSelectedEnfant] = useState(null);
+  const [enfantsDB, setEnfantsDB]     = useState([]);
+
+  useEffect(() => {
+    if (user?.supabaseId) {
+      sb.from("enfants").select("*").eq("membre_id", user.supabaseId)
+        .then(({ data }) => setEnfantsDB(data || [])).catch(() => {});
+    }
+  }, [user?.supabaseId]);
+
+  const enfantsEveil = enfantsDB.length > 0
+    ? enfantsDB.filter(e => e.activite === "natation" || e.activite === "les deux")
+    : (user?.enfants || []).filter(e => e.activite === "natation" || e.activite === "les deux");
 
   // 🔒 Gate inscription
   if (!user) return (
@@ -840,10 +852,10 @@ function FormulesEveilScreen({ onNav, user }) {
     scheduleRappel({ titre:"🌊 Rappel Éveil Aquatique demain !", corps:`Séance d'éveil aquatique demain à ${sl.time}. N'oublie pas !`, dateStr: rappelDate });
     try {
       if (user?.supabaseId) {
-        await sb.from("reservations_natation").insert([{ membre_id: user.supabaseId, heure: sl.time, date_seance: resaDateISO, enfants: [], statut: "pending", montant: 20 }]);
+        await sb.from("reservations_natation").insert([{ membre_id: user.supabaseId, heure: sl.time, date_seance: resaDateISO, enfants: selectedEnfant ? [selectedEnfant] : [], statut: "pending", montant: 20 }]);
       }
     } catch(e) { console.warn(e); }
-    setDone({ sunday: sun.label, slot: sl.time, rappelDate });
+    setDone({ sunday: sun.label, slot: sl.time, rappelDate, enfant: selectedEnfant });
     setBooking(null);
   };
 
@@ -853,7 +865,7 @@ function FormulesEveilScreen({ onNav, user }) {
       <h2 style={{ color:"#9B59B6" }}>Demande envoyée ! 🎉</h2>
       <div style={{ background:"#fff", borderRadius:20, padding:20, margin:"16px 0", boxShadow:"0 4px 16px rgba(0,0,0,0.06)" }}>
         <p style={{ color:"#666", fontSize:14, lineHeight:1.8 }}>
-          🌊 Éveil Aquatique · <strong>{done.sunday}</strong> à {done.slot}<br/>
+          🌊 Éveil Aquatique · <strong>{done.sunday}</strong> à {done.slot}{done.enfant ? ` · pour ${done.enfant}` : ""}<br/>
           L'équipe FNCP vous contactera pour le paiement.<br/>
           🏦 Virement · ✉️ Chèque · 🎫 Chèques vacances
         </p>
@@ -888,6 +900,32 @@ function FormulesEveilScreen({ onNav, user }) {
               <span style={{ color: "#aaa" }}>Tél.</span><span>{user?.tel || "—"}</span>
             </div>
           </div>
+
+          {/* Sélection enfant nominatif */}
+          {enfantsEveil.length > 0 && (
+            <div style={{ background:"#fff", borderRadius:18, padding:16, boxShadow:"0 2px 10px rgba(0,0,0,0.05)" }}>
+              <div style={{ fontWeight:800, color:C.dark, fontSize:14, marginBottom:10 }}>🌊 Pour quel enfant ?</div>
+              <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
+                {enfantsEveil.map(e => {
+                  const sel = selectedEnfant === e.prenom;
+                  return (
+                    <div key={e.prenom} onClick={() => setSelectedEnfant(sel ? null : e.prenom)} style={{
+                      background: sel ? "linear-gradient(135deg,#9B59B6,#8E44AD)" : "#F0F4F8",
+                      color: sel ? "#fff" : "#888",
+                      borderRadius:50, padding:"9px 20px", cursor:"pointer",
+                      fontWeight:800, fontSize:14, transition:"all .15s",
+                      boxShadow: sel ? "0 4px 12px #9B59B644" : "none",
+                    }}>
+                      {sel ? "✓ " : ""}{e.prenom}
+                    </div>
+                  );
+                })}
+              </div>
+              {selectedEnfant && (
+                <div style={{ fontSize:12, color:"#9B59B6", marginTop:8, fontWeight:700 }}>✓ Séance nominative pour {selectedEnfant}</div>
+              )}
+            </div>
+          )}
           <div style={{ background: "#F3E8FF", border: "2px solid #9B59B640", borderRadius: 16, padding: "14px 18px" }}>
             <div style={{ fontWeight: 900, color: "#9B59B6", marginBottom: 4 }}>💰 Tarif : 20 €</div>
             <div style={{ fontSize: 13, color: "#777" }}>1 séance d'éveil aquatique · 30 min</div>
