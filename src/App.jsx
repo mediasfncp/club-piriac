@@ -4238,11 +4238,8 @@ function PaiementsTab({ onValidate }) {
   const getMontant = (g) => {
     if (g.type === "natation") {
       const n = g.resas.length;
-      if (n === 1)  return "20 €";
-      if (n === 5)  return "95 €";
-      if (n === 6)  return "113 €";
-      if (n === 10) return "170 €";
-      return `${g.resas.reduce((s,r) => s + Number(r.montant||0), 0)} €`;
+      const PRIX_NAT = { 1:20, 2:40, 3:60, 4:80, 5:95, 6:113, 7:131, 8:147, 9:162, 10:170 };
+      return PRIX_NAT[n] ? `${PRIX_NAT[n]} €` : `${n * 20} €`;
     }
     return getClubMontant(g);
   };
@@ -6223,7 +6220,8 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
     });
     return Object.values(groups).reduce((total, g) => {
       const n = g.length;
-      const prix = n >= 10 ? 170 : n >= 6 ? 113 : n >= 5 ? 95 : n * 20;
+      const PRIX_NAT = { 1:20, 2:40, 3:60, 4:80, 5:95, 6:113, 7:131, 8:147, 9:162, 10:170 };
+      const prix = PRIX_NAT[n] || n * 20;
       return total + prix;
     }, 0);
   };
@@ -7245,4 +7243,4 @@ export default function App() {
     </div>
   );
 }
-// club tarifs auto Wed Apr  1 16:46:55 CEST 2026
+// tarifs nat Wed Apr  1 16:54:15 CEST 2026
