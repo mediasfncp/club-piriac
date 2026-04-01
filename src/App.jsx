@@ -4635,6 +4635,7 @@ th{background:#1A8FE3;color:#fff;padding:10px 12px;text-align:left}
 
           <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(200px, 1fr))", gap:10 }}>
           {currentWeek.map(d => {
+            const slots = getNataSlots(d.id);
             const taken = slots.reduce((acc, s) => acc + (2 - s.spots), 0);
             const avail = slots.reduce((acc, s) => acc + s.spots, 0);
             const total = slots.length * 2;
@@ -6886,4 +6887,4 @@ export default function App() {
     </div>
   );
 }
-// desktop grids Wed Apr  1 13:37:30 CEST 2026
+// fix planning Wed Apr  1 13:41:09 CEST 2026
