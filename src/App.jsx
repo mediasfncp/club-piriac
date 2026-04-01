@@ -657,7 +657,7 @@ function HomeScreen({ onNav, user }) {
             { screen: "formules",         emoji: "🎫", label: "Formules",              sub: "Club · Natation",           bg: `linear-gradient(135deg, #00C9FF, ${C.ocean})`,    sh: C.ocean },
             { screen: "reservation",      emoji: "🏊", label: "Réserver",              sub: "Créneaux 30 min",            bg: `linear-gradient(135deg, ${C.sea}, #00B09B)`,      sh: C.sea   },
             { screen: "prestations",      emoji: "🏖️", label: "Club de Plage",        sub: "Demi-journée matin / après-midi", bg: `linear-gradient(135deg, ${C.coral}, ${C.sunset})`, sh: C.coral },
-            { screen: "mes-reservations", emoji: "📅", label: "Mes séances",           sub: "Historique & suivi",         bg: `linear-gradient(135deg, ${C.green}, #27AE60)`,    sh: C.green },
+            { screen: "mes-reservations", emoji: "🎫", label: "Mes accès",             sub: "Saison 2026",                 bg: `linear-gradient(135deg, ${C.green}, #27AE60)`,    sh: C.green },
           ].map(item => (
             <div key={item.screen} onClick={() => onNav(item.screen)}
               style={{ background: item.bg, borderRadius: 22, padding: "20px 14px", cursor: "pointer", boxShadow: `0 8px 22px ${item.sh}44`, transition: "transform .18s", textAlign: "center" }}
@@ -2375,36 +2375,172 @@ function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSession
 }
 
 // ── MES RÉSERVATIONS ─────────────────────────────────────
-function MesReservationsScreen({ onNav, reservations }) {
-  return (
-    <div style={{ background: C.shell, minHeight: "100%" }}>
-      <div style={{ background: `linear-gradient(135deg, ${C.green}, #27AE60)`, padding: "20px 20px 0" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}><BackBtn onNav={onNav} /><h2 style={{ color: "#fff", margin: 0, fontWeight: 900 }}>📅 Mes séances</h2></div>
+function MesReservationsScreen({ onNav, user }) {
+  const [resasNat, setResasNat]           = useState([]);
+  const [resasClub, setResasClub]         = useState([]);
+  const [loading, setLoading]             = useState(true);
+  const [refreshing, setRefreshing]       = useState(false);
+  const [liberteBalance, setLiberteBalance] = useState(0);
+  const [liberteTotal, setLiberteTotal]   = useState(0);
+  const [hasCarteActive, setHasCarteActive] = useState(false);
+
+  const loadResas = async () => {
+    if (!user?.supabaseId) { setLoading(false); return; }
+    const [{ data: nat }, { data: club }, { data: membre }] = await Promise.all([
+      sb.from("reservations_natation").select("*").eq("membre_id", user.supabaseId).order("date_seance"),
+      sb.from("reservations_club").select("*").eq("membre_id", user.supabaseId).order("date_reservation"),
+      sb.from("membres").select("liberte_balance, liberte_total").eq("id", user.supabaseId).single(),
+    ]);
+    setResasNat(nat || []);
+    setResasClub(club || []);
+    const balance = membre?.liberte_balance || 0;
+    const total   = membre?.liberte_total   || 0;
+    setLiberteBalance(balance);
+    setLiberteTotal(total);
+    const carteConfirmee = (club || []).some(r =>
+      r.statut === "confirmed" && !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6
+    );
+    setHasCarteActive(carteConfirmee && balance > 0);
+    setLoading(false);
+    setRefreshing(false);
+  };
+
+  useEffect(() => { loadResas().catch(() => setLoading(false)); }, [user?.supabaseId]);
+
+  if (!user) return (
+    <div style={{ background:C.shell, minHeight:"100%" }}>
+      <div style={{ background:`linear-gradient(135deg,${C.green},#27AE60)`, padding:"20px 20px 0" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:8 }}><BackBtn onNav={onNav} /><h2 style={{ color:"#fff", margin:0, fontWeight:900 }}>🎫 Mes accès 2026</h2></div>
         <Wave fill={C.shell} />
       </div>
-      <div style={{ padding: "10px 18px 24px" }}>
-        {reservations.length === 0 ? (
-          <Card style={{ textAlign: "center", padding: 40 }}>
-            <div style={{ fontSize: 60, marginBottom: 10 }}>🌊</div>
-            <h3 style={{ color: C.dark }}>Aucune séance pour l'instant</h3>
-            <p style={{ color: "#888", fontSize: 14 }}>Plonge et réserve ta première séance !</p>
-            <SunBtn color={C.ocean} onClick={() => onNav("reservation")}>🏊 Réserver maintenant</SunBtn>
-          </Card>
-        ) : reservations.map(r => (
-          <Card key={r.id} style={{ marginBottom: 14 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <div style={{ width: 46, height: 46, borderRadius: 14, background: `linear-gradient(135deg, ${C.ocean}, ${C.sea})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>🏊</div>
-                <div>
-                  <div style={{ fontWeight: 900, fontSize: 22, color: C.ocean }}>{r.time}</div>
-                  <div style={{ fontSize: 13, color: "#999" }}>{DAYS.find(d => d.id === r.day)?.label} {DAYS.find(d => d.id === r.day)?.num} Juillet · 30 min</div>
-                </div>
-              </div>
-              <Pill color={C.green}>✓ Confirmé</Pill>
+      <div style={{ padding:"32px 24px", textAlign:"center" }}>
+        <div style={{ fontSize:60, marginBottom:12 }}>🔒</div>
+        <h3 style={{ color:C.dark }}>Connectez-vous pour voir vos accès</h3>
+        <SunBtn color={C.ocean} onClick={() => onNav("login")}>Se connecter</SunBtn>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ background:C.shell, minHeight:"100%" }}>
+      <div style={{ background:`linear-gradient(135deg,${C.green},#27AE60)`, padding:"20px 20px 0" }}>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+            <BackBtn onNav={onNav} />
+            <div>
+              <h2 style={{ color:"#fff", margin:0, fontWeight:900, fontSize:20 }}>🎫 Mes accès saison 2026</h2>
+              <p style={{ color:"rgba(255,255,255,0.8)", margin:0, fontSize:12 }}>{user.prenom} {user.nom?.toUpperCase()}</p>
             </div>
-            {r.enfants?.length > 0 && <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>{r.enfants.map(e => <Pill key={e} color={C.sea}>{e}</Pill>)}</div>}
-          </Card>
-        ))}
+          </div>
+          <button onClick={() => { setRefreshing(true); loadResas(); }} style={{ background:"rgba(255,255,255,0.2)", border:"none", color:"#fff", borderRadius:50, padding:"6px 14px", cursor:"pointer", fontWeight:800, fontSize:12, fontFamily:"inherit" }}>
+            {refreshing ? "…" : "↻"}
+          </button>
+        </div>
+        <Wave fill={C.shell} />
+      </div>
+
+      <div style={{ padding:"12px 18px 24px", display:"flex", flexDirection:"column", gap:12 }}>
+
+        {/* Carte Liberté */}
+        {hasCarteActive ? (
+          <div style={{ background:`linear-gradient(135deg,${C.coral},${C.sun})`, borderRadius:20, padding:18, boxShadow:`0 6px 20px ${C.coral}44` }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
+              <div>
+                <div style={{ color:"#fff", fontWeight:900, fontSize:16 }}>🎟️ Carte Liberté</div>
+                <div style={{ color:"rgba(255,255,255,0.8)", fontSize:11 }}>Valable saison 2026 · 6 juil – 22 août</div>
+              </div>
+              <div style={{ textAlign:"right" }}>
+                <div style={{ color:"#fff", fontWeight:900, fontSize:28, lineHeight:1 }}>{liberteBalance}</div>
+                <div style={{ color:"rgba(255,255,255,0.8)", fontSize:11 }}>demi-j. restantes</div>
+              </div>
+            </div>
+            <div style={{ background:"rgba(255,255,255,0.25)", borderRadius:50, height:8, overflow:"hidden", marginBottom:8 }}>
+              <div style={{ height:"100%", width:`${liberteTotal > 0 ? (liberteBalance/liberteTotal)*100 : 0}%`, background:"#fff", borderRadius:50 }} />
+            </div>
+            <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, color:"rgba(255,255,255,0.75)", marginBottom:liberteBalance > 0 ? 12 : 0 }}>
+              <span>{liberteTotal - liberteBalance} utilisée{(liberteTotal-liberteBalance)>1?"s":""}</span>
+              <span>{liberteTotal} au total</span>
+            </div>
+            {liberteBalance > 0 && (
+              <button onClick={() => onNav("reservation-club")} style={{ width:"100%", background:"rgba(255,255,255,0.25)", border:"2px solid rgba(255,255,255,0.5)", color:"#fff", borderRadius:50, padding:"11px", fontWeight:900, fontSize:14, cursor:"pointer", fontFamily:"inherit" }}>
+                📅 Réserver avec ma carte
+              </button>
+            )}
+          </div>
+        ) : (
+          <div style={{ background:"#fff", borderRadius:18, padding:16, boxShadow:"0 2px 10px rgba(0,0,0,0.06)", display:"flex", alignItems:"center", gap:12 }}>
+            <div style={{ fontSize:32 }}>🎟️</div>
+            <div style={{ flex:1 }}>
+              <div style={{ fontWeight:800, color:C.dark }}>Carte Liberté</div>
+              <div style={{ fontSize:12, color:"#aaa" }}>Pas encore de carte active</div>
+            </div>
+            <button onClick={() => onNav("prestations")} style={{ background:`linear-gradient(135deg,${C.coral},${C.sun})`, border:"none", color:"#fff", borderRadius:50, padding:"8px 14px", fontWeight:900, fontSize:12, cursor:"pointer", fontFamily:"inherit" }}>Acheter</button>
+          </div>
+        )}
+
+        {/* Natation */}
+        <div style={{ background:"#fff", borderRadius:18, padding:16, boxShadow:"0 2px 10px rgba(0,0,0,0.06)" }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+            <div style={{ fontWeight:800, color:C.dark, fontSize:15 }}>🏊 Natation</div>
+            <Pill color={C.ocean}>{resasNat.length} séance{resasNat.length>1?"s":""}</Pill>
+          </div>
+          {loading ? <div style={{ fontSize:12, color:"#bbb", textAlign:"center" }}>Chargement…</div>
+          : resasNat.length === 0 ? (
+            <div style={{ fontSize:12, color:"#bbb", textAlign:"center", padding:"8px 0" }}>
+              Aucune séance réservée
+              <div style={{ marginTop:8 }}><button onClick={() => onNav("formules-natation")} style={{ background:`${C.ocean}15`, border:"none", color:C.ocean, borderRadius:50, padding:"6px 14px", cursor:"pointer", fontWeight:800, fontSize:12, fontFamily:"inherit" }}>Réserver</button></div>
+            </div>
+          ) : (
+            <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+              {resasNat.map((r,i) => (
+                <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", background: r.statut==="pending" ? `${C.sun}15` : `${C.ocean}08`, borderRadius:12, padding:"8px 12px", borderLeft:`3px solid ${r.statut==="pending" ? C.sun : C.ocean}` }}>
+                  <div>
+                    <div style={{ fontSize:13, fontWeight:800, color: r.statut==="pending" ? "#b45309" : C.ocean }}>{r.heure}</div>
+                    {r.enfants?.length > 0 && <div style={{ fontSize:11, color:"#888", fontWeight:700 }}>{r.enfants.join(", ")}</div>}
+                  </div>
+                  <div style={{ fontSize:11, color:"#888" }}>{r.date_seance ? new Date(r.date_seance).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}) : "—"}</div>
+                  {r.statut === "pending"
+                    ? <span style={{ background:`${C.sun}20`, color:"#b45309", borderRadius:50, padding:"2px 8px", fontSize:10, fontWeight:800 }}>⏳</span>
+                    : <Pill color={C.green}>✓</Pill>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Club */}
+        {(() => {
+          const resasClubFiltered = resasClub.filter(r => !(Array.isArray(r.enfants) && Number(r.enfants[0]) >= 6));
+          return (
+            <div style={{ background:"#fff", borderRadius:18, padding:16, boxShadow:"0 2px 10px rgba(0,0,0,0.06)" }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+                <div style={{ fontWeight:800, color:C.dark, fontSize:15 }}>🏖️ Club de Plage</div>
+                <Pill color={C.coral}>{resasClubFiltered.length} demi-j.</Pill>
+              </div>
+              {loading ? <div style={{ fontSize:12, color:"#bbb", textAlign:"center" }}>Chargement…</div>
+              : resasClubFiltered.length === 0 ? (
+                <div style={{ fontSize:12, color:"#bbb", textAlign:"center", padding:"8px 0" }}>Aucune réservation club</div>
+              ) : (
+                <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+                  {resasClubFiltered.map((r,i) => (
+                    <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", background: r.statut==="pending" ? `${C.sun}15` : `${C.coral}08`, borderRadius:12, padding:"8px 12px", borderLeft:`3px solid ${r.statut==="pending" ? C.sun : C.coral}` }}>
+                      <div>
+                        <div style={{ fontSize:12, fontWeight:800, color: r.statut==="pending" ? "#b45309" : C.coral }}>
+                          {(r.label_jour||"").startsWith("[LIBERTE]") ? "🎟️ Carte Liberté" : r.session==="matin"?"☀️ Matin":"🌊 Après-midi"}
+                        </div>
+                        {r.enfants?.length > 0 && !isNaN(Number(r.enfants[0])) === false && <div style={{ fontSize:11, color:"#888", fontWeight:700 }}>{r.enfants.join(", ")}</div>}
+                      </div>
+                      <div style={{ fontSize:11, color:"#888" }}>{r.date_reservation ? new Date(r.date_reservation).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}) : "—"}</div>
+                      {r.statut === "pending"
+                        ? <span style={{ background:`${C.sun}20`, color:"#b45309", borderRadius:50, padding:"2px 8px", fontSize:10, fontWeight:800 }}>⏳</span>
+                        : <Pill color={C.green}>✓</Pill>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
@@ -6469,7 +6605,7 @@ function BottomNav({ current, onNav }) {
     { id:"home",             emoji:"🏠", label:"Accueil"    },
     { id:"formules",         emoji:"🎫", label:"Formules"   },
     { id:"reservation",      emoji:"🏊", label:"Réserver"   },
-    { id:"mes-reservations", emoji:"📅", label:"Mes séances" },
+    { id:"mes-reservations", emoji:"🎫", label:"Mes accès" },
     { id:"profil",           emoji:"👤", label:"Profil"     },
   ];
   return (
@@ -6891,4 +7027,4 @@ export default function App() {
     </div>
   );
 }
-// liberté fixes Wed Apr  1 15:31:07 CEST 2026
+// mes acces Wed Apr  1 15:36:06 CEST 2026
