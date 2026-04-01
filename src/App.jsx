@@ -7683,4 +7683,3 @@ export default function App() {
     </div>
   );
 }
-// adresse vac Wed Apr  1 22:41:46 CEST 2026
