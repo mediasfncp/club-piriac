@@ -1474,7 +1474,7 @@ function ReservationClubScreen({ onNav, user, setUser, clubPlaces, setClubPlaces
           membreId:         user?.supabaseId || null,
           dateReservation:  iso,
           session:          selectedSession,
-          labelJour:        `${selectedDay?.label} ${selectedDay?.num} ${selectedDay?.month}`,
+          labelJour:        `[LIBERTE] ${selectedDay?.label} ${selectedDay?.num} ${selectedDay?.month}`,
           rappelDate:       rappelDate,
           enfants:          selectedEnfants.length > 0 ? selectedEnfants : (user?.enfants || []).filter(e => e.activite === "club" || e.activite === "les deux").map(e => e.prenom),
           statut:           "pending",
@@ -5708,7 +5708,7 @@ function CartesLiberteTab({ dbMembres }) {
     const load = async () => {
       // Résas club confirmed
       const { data: toutesResas } = await sb.from("reservations_club")
-        .select("id, membre_id, date_reservation, session, statut, enfants, created_at, membres(id, prenom, nom, email, liberte_balance, liberte_total)")
+        .select("id, membre_id, date_reservation, session, statut, enfants, label_jour, created_at, membres(id, prenom, nom, email, liberte_balance, liberte_total)")
         .eq("statut", "confirmed")
         .order("date_reservation", { ascending: true });
 
@@ -5736,8 +5736,8 @@ function CartesLiberteTab({ dbMembres }) {
         }
         if (isCarteLib(r)) {
           byMembre[r.membre_id].achats.push(r);
-        } else if (r.date_reservation) {
-          byMembre[r.membre_id].utilisees.push(r);
+        } else if (r.date_reservation && (r.label_jour || "").startsWith("[LIBERTE]")) {
+          byMembre[r.membre_id].utilisees.push(r); // uniquement résas utilisées avec la carte
         }
       });
 
@@ -5858,7 +5858,7 @@ function CartesLiberteTab({ dbMembres }) {
                     <div key={j} style={{ background:`${C.coral}12`, color:C.coral, borderRadius:8, padding:"4px 10px", fontSize:11, fontWeight:700 }}>
                       {new Date(r.date_reservation).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"})}
                       {" "}{r.session==="matin"?"☀️ Matin":"🌊 Après-midi"}
-                      {r.enfants?.length > 0 && ` · ${r.enfants.join(", ")}`}
+                      {Array.isArray(r.enfants) && r.enfants.length > 0 && !isNaN(Number(r.enfants[0])) === false && ` · ${r.enfants.join(", ")}`}
                     </div>
                   ))}
                 </div>
@@ -6867,4 +6867,4 @@ export default function App() {
     </div>
   );
 }
-// fix liberté 36 Wed Apr  1 12:45:15 CEST 2026
+// liberté tag Wed Apr  1 12:49:26 CEST 2026
