@@ -6466,6 +6466,12 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                               }
                               refreshResas();
                             }} style={{ background:`linear-gradient(135deg,${C.green},#1E8449)`, border:"none", color:"#fff", borderRadius:50, padding:"5px 14px", cursor:"pointer", fontWeight:900, fontSize:12, fontFamily:"inherit", boxShadow:`0 3px 10px ${C.green}44`, flexShrink:0, marginLeft:8 }}>✅ Valider</button>
+                            <button onClick={async () => {
+                              if (!window.confirm(`Supprimer ${g.resas.length} réservation${g.resas.length>1?"s":""} en attente ?`)) return;
+                              const table = g.type === "natation" ? "reservations_natation" : "reservations_club";
+                              await Promise.all(g.resas.map(r => sb.from(table).delete().eq("id", r.id)));
+                              refreshResas();
+                            }} style={{ background:"#FFF0F0", border:"1.5px solid #fca5a5", color:"#e74c3c", borderRadius:50, padding:"5px 12px", cursor:"pointer", fontWeight:900, fontSize:12, fontFamily:"inherit", flexShrink:0, marginLeft:4 }}>🗑</button>
                           </div>
                           <div style={{ display:"flex", flexWrap:"wrap", gap:4 }}>
                             {g.resas.map((r,ri) => {
@@ -6607,6 +6613,12 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                               cursor:"pointer", fontWeight:900, fontSize:12, fontFamily:"inherit",
                               boxShadow:`0 3px 10px ${C.green}44`, flexShrink:0, marginLeft:8,
                             }}>✅ Valider tout</button>
+                            <button onClick={async () => {
+                              if (!window.confirm(`Supprimer ${g.resas.length} réservation${g.resas.length>1?"s":""} ?`)) return;
+                              const table = g.type === "natation" ? "reservations_natation" : "reservations_club";
+                              await Promise.all(g.resas.map(r => sb.from(table).delete().eq("id", r.id)));
+                              refreshResas();
+                            }} style={{ background:"#FFF0F0", border:"1.5px solid #fca5a5", color:"#e74c3c", borderRadius:50, padding:"7px 12px", cursor:"pointer", fontWeight:900, fontSize:12, fontFamily:"inherit", flexShrink:0, marginLeft:4 }}>🗑</button>
                           </div>
                           {/* Liste des créneaux */}
                           <div style={{ display:"flex", flexWrap:"wrap", gap:5 }}>
@@ -7243,4 +7255,4 @@ export default function App() {
     </div>
   );
 }
-// tarifs nat Wed Apr  1 16:54:15 CEST 2026
+// delete pending Wed Apr  1 16:59:15 CEST 2026
