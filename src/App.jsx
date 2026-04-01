@@ -5261,7 +5261,7 @@ function ModifierResaModal({ resa, type, onClose, onSaved, dbMembres }) {
           )}
 
           {enfantsDuMembre.length > 0 && (
-            <Field label={}>
+            <Field label={"Enfants" + (enfants.length > 0 ? " · " + enfants.join(", ") : "")}>
               <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
                 {enfantsDuMembre
                   .filter(e => isNat ? (e.activite === "natation" || e.activite === "les deux") : (e.activite === "club" || e.activite === "les deux"))
@@ -6898,4 +6898,4 @@ export default function App() {
     </div>
   );
 }
-// modifier resa full Wed Apr  1 13:57:02 CEST 2026
+// fix label Wed Apr  1 13:59:59 CEST 2026
