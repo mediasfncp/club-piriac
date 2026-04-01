@@ -3922,7 +3922,7 @@ function PaiementsTab({ onValidate }) {
       sb.from("reservations_club").select("*, membres(prenom, nom, email)").order("created_at"),
     ]);
     const natFmt  = (nat  || []).map(r => ({ ...r, _type:"natation", _date:r.date_seance,      _label:`🏊 ${r.heure}` }));
-    const clubFmt = (club || []).map(r => ({ ...r, _type:"club",     _date:r.date_reservation, _label:`🏖️ ${r.session==="matin"?"Matin":"Après-midi"}` }));
+    const clubFmt = (club || []).map(r => ({ ...r, _type:"club",     _date:r.date_reservation, _label: r.session==="liberte" ? `🎟️ ${r.label_jour||"Carte Liberté"}` : r.session==="liberte" ? `🎟️ ${r.label_jour||'Carte Liberté'}` : `🏖️ ${r.session==="matin"?"Matin":"Après-midi"}` }));
     setResas([...natFmt, ...clubFmt].sort((a,b) => (a.created_at||"").localeCompare(b.created_at||"")));
     setLoading(false);
   };
@@ -3984,6 +3984,11 @@ function PaiementsTab({ onValidate }) {
       if (n === 10) return "Formule 10 leçons";
       return `${n} séances`;
     }
+    // Carte Liberté
+    if (g.resas.some(r => r.session === "liberte")) {
+      const nb = Number(g.resas[0]?.enfants?.[0]) || 0;
+      return `🎟️ Carte Liberté · ${nb} demi-journées`;
+    }
     return `${g.resas.length} demi-journée${g.resas.length>1?"s":""}`;
   };
 
@@ -3997,6 +4002,7 @@ function PaiementsTab({ onValidate }) {
       if (n === 10) return "170 €";
       return `${g.resas.reduce((s,r) => s + Number(r.montant||0), 0)} €`;
     }
+    if (g.resas.some(r => r.session === "liberte")) return "—";
     return `${g.resas.reduce((s,r) => s + Number(r.montant||0), 0)} €`;
   };
 
@@ -5860,7 +5866,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
               const pendingClub = dbResasClub.filter(r => r.statut === "pending");
               const allPending  = [
                 ...pendingNat.map(r => ({ ...r, _type:"natation", _date: r.date_seance, _label: `🏊 ${r.heure}` })),
-                ...pendingClub.map(r => ({ ...r, _type:"club", _date: r.date_reservation, _label: `🏖️ ${r.session==="matin"?"Matin":"Après-midi"}` })),
+                ...pendingClub.map(r => ({ ...r, _type:"club", _date: r.date_reservation, _label: r.session==="liberte" ? `🎟️ ${r.label_jour||'Carte Liberté'}` : `🏖️ ${r.session==="matin"?"Matin":"Après-midi"}` })),
               ].sort((a,b) => (a.created_at||"").localeCompare(b.created_at||""));
               if (allPending.length === 0) return null;
               return (
@@ -6093,7 +6099,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
               const pendingClub = dbResasClub.filter(r => r.statut === "pending");
               const allPending  = [
                 ...pendingNat.map(r => ({ ...r, _type:"natation", _date: r.date_seance,      _label:`🏊 ${r.heure}` })),
-                ...pendingClub.map(r => ({ ...r, _type:"club",    _date: r.date_reservation, _label:`🏖️ ${r.session==="matin"?"Matin":"Après-midi"}` })),
+                ...pendingClub.map(r => ({ ...r, _type:"club",    _date: r.date_reservation, _label:r.session==="liberte" ? `🎟️ ${r.label_jour||'Carte Liberté'}` : `🏖️ ${r.session==="matin"?"Matin":"Après-midi"}` })),
               ].sort((a,b) => (a.created_at||"").localeCompare(b.created_at||""));
               if (allPending.length === 0) return null;
               return (
