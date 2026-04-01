@@ -6451,7 +6451,8 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
         </div>
       </div>
 
-      {/* Cartes par membre */}
+      {/* Cartes par membre — 2 colonnes desktop */}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(340px, 1fr))", gap:12 }}>
       {membres.map(([mid, g]) => {
         const isOpen = openMembreIds[mid];
         const allR = [...g.nat, ...g.club];
@@ -6533,6 +6534,7 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
           </div>
         );
       })}
+      </div>
     </>
   );
 }
@@ -7610,4 +7612,4 @@ export default function App() {
     </div>
   );
 }
-// ResasMembreView composant Wed Apr  1 22:12:49 CEST 2026
+// resas 2col Wed Apr  1 22:17:36 CEST 2026
