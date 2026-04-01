@@ -6835,6 +6835,7 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
 }
 
 
+function BottomNav({ current, onNav, panierCount = 0 }) {
   const items = [
     { id:"home",             emoji:"🏠", label:"Accueil"    },
     { id:"formules",         emoji:"🎫", label:"Formules"   },
@@ -7181,4 +7182,4 @@ export default function App() {
     </div>
   );
 }
-// panier Wed Apr  1 16:22:01 CEST 2026
+// fix BottomNav Wed Apr  1 16:26:02 CEST 2026
