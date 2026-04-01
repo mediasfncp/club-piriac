@@ -4633,7 +4633,7 @@ th{background:#1A8FE3;color:#fff;padding:10px 12px;text-align:left}
             boxShadow: `0 4px 14px ${C.ocean}44`,
           }}>🖨️ Imprimer la semaine</button>
 
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(200px, 1fr))", gap:10 }}>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:10 }}>
           {currentWeek.map(d => {
             const slots = getNataSlots(d.id);
             const taken = slots.reduce((acc, s) => acc + (2 - s.spots), 0);
@@ -6887,4 +6887,4 @@ export default function App() {
     </div>
   );
 }
-// planning 3col Wed Apr  1 13:43:43 CEST 2026
+// 3col fix Wed Apr  1 13:48:36 CEST 2026
