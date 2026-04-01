@@ -1307,52 +1307,56 @@ function FormulesNatationScreen({ onNav, user, allSeasonSessions, panier, setPan
 
             <div style={{ display:"flex", gap:8 }}>
               <button onClick={() => setStep("formule")} style={{ flex:1, background:"#f0f0f0", border:"none", color:"#888", borderRadius:14, padding:"11px", cursor:"pointer", fontWeight:800, fontFamily:"inherit" }}>← Retour</button>
-              {setPanier && (
+              {setPanier ? (
                 <button onClick={() => {
                   if (selectedCreneaux.length < nbLecons) return;
+                  const nbEnf = Math.max(1, selectedEnfants.length);
+                  const prix = selected.price * nbEnf;
                   setPanier(prev => [...prev, {
                     id: `nat-${Date.now()}`,
                     type: "natation",
                     label: `${selected.label}${selectedEnfants.length > 0 ? " · " + selectedEnfants.join(", ") : ""}`,
                     emoji: selected.emoji,
                     color: C.ocean,
-                    prix: prixTotal,
+                    prix,
                     enfants: selectedEnfants,
                     creneaux: selectedCreneaux,
-                    details: `${nbLecons} leçon${nbLecons>1?"s":""} · ${Math.max(1,selectedEnfants.length)} enfant${selectedEnfants.length>1?"s":""}`,
+                    details: `${nbLecons} leçon${nbLecons>1?"s":""} · ${nbEnf} enfant${nbEnf>1?"s":""}`,
                   }]);
                   setDone(true);
                 }} disabled={selectedCreneaux.length < nbLecons}
-                style={{ flex:1, background:selectedCreneaux.length < nbLecons?"#bbb":`linear-gradient(135deg,${C.sun},${C.coral})`, border:"none", color:"#fff", borderRadius:14, padding:"11px", cursor:selectedCreneaux.length<nbLecons?"not-allowed":"pointer", fontWeight:900, fontSize:13, fontFamily:"inherit" }}>
-                  🛒 Panier · {prixTotal} €
+                style={{ flex:2, background:selectedCreneaux.length<nbLecons?"#bbb":`linear-gradient(135deg,${C.coral},${C.sun})`, border:"none", color:"#fff", borderRadius:14, padding:"11px", cursor:selectedCreneaux.length<nbLecons?"not-allowed":"pointer", fontWeight:900, fontSize:13, fontFamily:"inherit" }}>
+                  🛒 Ajouter au panier · {selected.price * Math.max(1, selectedEnfants.length)} €
                 </button>
-              )}
-              <SunBtn color={selectedCreneaux.length === nbLecons ? C.ocean : "#bbb"}
-                disabled={selectedCreneaux.length < nbLecons}
-                onClick={async () => {
-                  if (selectedCreneaux.length < nbLecons) return;
-                  const enfantsAInserer = selectedEnfants.length > 0 ? selectedEnfants : [];
-                  try {
-                    if (user?.supabaseId) {
-                      for (const c of selectedCreneaux) {
-                        const spotsDispos = getSpots(c.dayISO, c.time);
-                        const enfantsCreneau = enfantsAInserer.slice(0, spotsDispos);
-                        await sb.from("reservations_natation").insert([{
-                          membre_id:   user.supabaseId,
-                          heure:       c.time,
-                          date_seance: c.dayISO,
-                          enfants:     enfantsCreneau,
-                          statut:      "pending",
-                          montant:     Math.round(prixTotal / nbLecons),
-                          jour:        new Date(c.dayISO).toLocaleDateString("fr-FR",{weekday:"short"}),
-                        }]);
+              ) : (
+                <SunBtn color={selectedCreneaux.length === nbLecons ? C.ocean : "#bbb"}
+                  disabled={selectedCreneaux.length < nbLecons}
+                  onClick={async () => {
+                    if (selectedCreneaux.length < nbLecons) return;
+                    const nbEnf = Math.max(1, selectedEnfants.length);
+                    const prix = selected.price * nbEnf;
+                    try {
+                      if (user?.supabaseId) {
+                        for (const c of selectedCreneaux) {
+                          const spotsDispos = getSpots(c.dayISO, c.time);
+                          const enfantsCreneau = selectedEnfants.slice(0, spotsDispos);
+                          await sb.from("reservations_natation").insert([{
+                            membre_id:   user.supabaseId,
+                            heure:       c.time,
+                            date_seance: c.dayISO,
+                            enfants:     enfantsCreneau,
+                            statut:      "pending",
+                            montant:     Math.round(prix / nbLecons),
+                            jour:        new Date(c.dayISO).toLocaleDateString("fr-FR",{weekday:"short"}),
+                          }]);
+                        }
                       }
-                    }
-                  } catch(e) { console.warn(e); }
-                  setDone(true);
-                }}>
-                📨 Envoyer · {prixTotal} €
-              </SunBtn>
+                    } catch(e) { console.warn(e); }
+                    setDone(true);
+                  }}>
+                  📨 Envoyer · {selected.price * Math.max(1, selectedEnfants.length)} €
+                </SunBtn>
+              )}
             </div>
           </div>
         )}
@@ -7289,4 +7293,4 @@ export default function App() {
     </div>
   );
 }
-// multi-enfants nat Wed Apr  1 17:11:23 CEST 2026
+// prix nat multi Wed Apr  1 17:17:17 CEST 2026
