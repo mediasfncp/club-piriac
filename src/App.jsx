@@ -5706,43 +5706,34 @@ function CartesLiberteTab({ dbMembres }) {
 
   useEffect(() => {
     const load = async () => {
-      // Charger toutes les résas club confirmées de type liberté
-      const { data: resasLib } = await sb.from("reservations_club")
-        .select("*, membres(id, prenom, nom, email, tel, liberte_balance, liberte_total)")
+      // Toutes les résas club confirmed avec infos membres et enfants
+      const { data: toutesResas } = await sb.from("reservations_club")
+        .select("*, membres(id, prenom, nom, email, tel, liberte_balance, liberte_total, enfants(prenom, activite))")
         .eq("statut", "confirmed")
-        .order("created_at", { ascending: false });
+        .order("date_reservation", { ascending: true });
 
-      // Charger les résas liberté utilisées (celles avec dates réelles)
-      const { data: resasUtil } = await sb.from("reservations_club")
-        .select("membre_id, date_reservation, session, statut")
-        .eq("statut", "confirmed")
-        .not("date_reservation", "is", null);
+      if (!toutesResas) { setLoading(false); return; }
+
+      // Séparer cartes liberté (enfants[0] = nb >= 6) des résas normales
+      const isCarteLib = r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6;
 
       // Grouper par membre
       const byMembre = {};
-      (resasLib || []).forEach(r => {
-        const nb = Number(r.enfants?.[0]);
-        if (!nb || nb < 6) return; // pas une carte liberté
+      toutesResas.forEach(r => {
+        if (!r.membre_id) return;
         if (!byMembre[r.membre_id]) {
-          byMembre[r.membre_id] = {
-            membre: r.membres,
-            cartes: [],
-            utilisees: [],
-          };
+          byMembre[r.membre_id] = { membre: r.membres, achats: [], utilisees: [] };
         }
-        byMembre[r.membre_id].cartes.push(r);
-      });
-
-      // Ajouter les demi-journées utilisées
-      (resasUtil || []).forEach(r => {
-        if (byMembre[r.membre_id]) {
-          // Ne compter que les résas normales (pas les cartes)
-          const isCarteEntry = !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6;
-          if (!isCarteEntry) byMembre[r.membre_id].utilisees.push(r);
+        if (isCarteLib(r)) {
+          byMembre[r.membre_id].achats.push(r); // entrée d'achat carte
+        } else if (r.date_reservation) {
+          byMembre[r.membre_id].utilisees.push(r); // demi-journée utilisée
         }
       });
 
-      setCartes(Object.values(byMembre));
+      // Ne garder que les membres avec une carte active
+      const result = Object.values(byMembre).filter(c => c.achats.length > 0);
+      setCartes(result);
       setLoading(false);
     };
     load().catch(() => setLoading(false));
@@ -5762,100 +5753,102 @@ function CartesLiberteTab({ dbMembres }) {
       {/* Barre de recherche */}
       <div style={{ position:"relative" }}>
         <span style={{ position:"absolute", left:14, top:"50%", transform:"translateY(-50%)", fontSize:16 }}>🔍</span>
-        <input
-          value={query} onChange={e => setQuery(e.target.value)}
+        <input value={query} onChange={e => setQuery(e.target.value)}
           placeholder="Rechercher par nom ou email…"
-          style={{ width:"100%", border:"2px solid #e0e8f0", borderRadius:14, padding:"12px 14px 12px 40px", fontSize:14, fontFamily:"inherit", outline:"none", background:"#fff", boxSizing:"border-box" }}
-        />
+          style={{ width:"100%", border:"2px solid #e0e8f0", borderRadius:14, padding:"12px 14px 12px 40px", fontSize:14, fontFamily:"inherit", outline:"none", background:"#fff", boxSizing:"border-box" }} />
         {query && <button onClick={() => setQuery("")} style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", cursor:"pointer", fontSize:16, color:"#aaa" }}>✕</button>}
       </div>
 
-      {/* KPI */}
+      {/* KPIs */}
       <div style={{ display:"flex", gap:8 }}>
-        <div style={{ flex:1, background:"#fff", borderRadius:16, padding:"12px 8px", textAlign:"center", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
-          <div style={{ fontWeight:900, fontSize:20, color:C.coral }}>{cartes.length}</div>
-          <div style={{ fontSize:10, color:"#aaa", fontWeight:700 }}>Cartes actives</div>
-        </div>
-        <div style={{ flex:1, background:"#fff", borderRadius:16, padding:"12px 8px", textAlign:"center", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
-          <div style={{ fontWeight:900, fontSize:20, color:C.green }}>
-            {cartes.reduce((s,c) => s + (c.membre?.liberte_balance||0), 0)}
+        {[
+          { label:"Cartes actives", value:cartes.length, color:C.coral },
+          { label:"Demi-j. restantes", value:cartes.reduce((s,c)=>s+(c.membre?.liberte_balance||0),0), color:C.green },
+          { label:"Demi-j. total", value:cartes.reduce((s,c)=>s+(c.membre?.liberte_total||0),0), color:C.ocean },
+        ].map(k => (
+          <div key={k.label} style={{ flex:1, background:"#fff", borderRadius:16, padding:"12px 8px", textAlign:"center", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
+            <div style={{ fontWeight:900, fontSize:20, color:k.color }}>{k.value}</div>
+            <div style={{ fontSize:10, color:"#aaa", fontWeight:700 }}>{k.label}</div>
           </div>
-          <div style={{ fontSize:10, color:"#aaa", fontWeight:700 }}>Demi-j. restantes</div>
-        </div>
-        <div style={{ flex:1, background:"#fff", borderRadius:16, padding:"12px 8px", textAlign:"center", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
-          <div style={{ fontWeight:900, fontSize:20, color:C.ocean }}>
-            {cartes.reduce((s,c) => s + (c.membre?.liberte_total||0), 0)}
-          </div>
-          <div style={{ fontSize:10, color:"#aaa", fontWeight:700 }}>Demi-j. total</div>
-        </div>
+        ))}
       </div>
 
       {loading && <div style={{ textAlign:"center", padding:"32px 0", color:"#bbb" }}>Chargement…</div>}
-
       {!loading && filtered.length === 0 && (
         <div style={{ textAlign:"center", padding:"32px 0", color:"#bbb", fontSize:14 }}>
           {q ? "Aucun résultat" : "Aucune carte active"}
         </div>
       )}
 
-      {/* Liste des cartes */}
+      {/* Cartes */}
       {filtered.map((c, i) => {
-        const balance = c.membre?.liberte_balance || 0;
-        const total   = c.membre?.liberte_total   || 0;
-        const used    = total - balance;
-        const pct     = total > 0 ? Math.round((balance/total)*100) : 0;
-        const nbCartes = c.cartes.reduce((s,r) => s + (Number(r.enfants?.[0])||0), 0);
+        const balance  = c.membre?.liberte_balance || 0;
+        const total    = c.membre?.liberte_total   || 0;
+        const used     = total - balance;
+        const pct      = total > 0 ? Math.round((used / total) * 100) : 0;
+        const nbAchete = c.achats.reduce((s, r) => s + (Number(r.enfants?.[0])||0), 0);
 
-        // Dates utilisées depuis résas confirmées
-        const datesUtil = c.utilisees
-          .filter(r => r.date_reservation)
-          .sort((a,b) => a.date_reservation.localeCompare(b.date_reservation));
+        // Enfants inscrits club ou les deux
+        const enfantsClub = (c.membre?.enfants || [])
+          .filter(e => e.activite === "club" || e.activite === "les deux")
+          .map(e => e.prenom);
+
+        const datesUtil = [...c.utilisees]
+          .sort((a,b) => (a.date_reservation||"").localeCompare(b.date_reservation||""));
 
         return (
           <div key={i} style={{ background:"#fff", borderRadius:20, padding:18, boxShadow:"0 4px 16px rgba(0,0,0,0.06)" }}>
-            {/* Header membre */}
-            <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:14 }}>
+
+            {/* Header */}
+            <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:12 }}>
               <div style={{ width:46, height:46, borderRadius:16, background:`linear-gradient(135deg,${C.coral},${C.sun})`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, flexShrink:0 }}>🎟️</div>
               <div style={{ flex:1 }}>
-                <div style={{ fontWeight:900, color:C.dark, fontSize:14 }}>
-                  {c.membre?.prenom} {NOM(c.membre?.nom)}
-                </div>
+                <div style={{ fontWeight:900, color:C.dark, fontSize:14 }}>{c.membre?.prenom} {NOM(c.membre?.nom)}</div>
                 <div style={{ fontSize:11, color:"#aaa" }}>{c.membre?.email}</div>
               </div>
               <div style={{ textAlign:"right" }}>
-                <div style={{ fontWeight:900, color: balance > 0 ? C.green : C.sunset, fontSize:22 }}>{balance}</div>
+                <div style={{ fontWeight:900, color: balance > 0 ? C.green : C.sunset, fontSize:24, lineHeight:1 }}>{balance}</div>
                 <div style={{ fontSize:10, color:"#aaa" }}>restantes</div>
               </div>
             </div>
 
-            {/* Barre de progression */}
+            {/* Enfants */}
+            {enfantsClub.length > 0 && (
+              <div style={{ display:"flex", gap:5, flexWrap:"wrap", marginBottom:10 }}>
+                {enfantsClub.map((e,j) => (
+                  <span key={j} style={{ background:`${C.coral}15`, color:C.coral, borderRadius:50, padding:"3px 10px", fontSize:11, fontWeight:800 }}>👧 {e}</span>
+                ))}
+              </div>
+            )}
+
+            {/* Barre progression */}
             <div style={{ marginBottom:10 }}>
               <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, color:"#888", marginBottom:4 }}>
-                <span>🎟️ {nbCartes} demi-j. achetées</span>
+                <span>{nbAchete} demi-j. achetées</span>
                 <span>{used} utilisées · {balance} restantes</span>
               </div>
               <div style={{ background:"#F0F4F8", borderRadius:50, height:10, overflow:"hidden" }}>
-                <div style={{ height:"100%", width:`${100 - pct}%`, background:`linear-gradient(90deg,${C.coral},${C.sun})`, borderRadius:50 }} />
+                <div style={{ height:"100%", width:`${pct}%`, background:`linear-gradient(90deg,${C.coral},${C.sun})`, borderRadius:50, transition:"width .3s" }} />
               </div>
             </div>
 
             {/* Dates utilisées */}
-            {datesUtil.length > 0 && (
+            {datesUtil.length > 0 ? (
               <div>
                 <div style={{ fontSize:11, fontWeight:900, color:"#aaa", textTransform:"uppercase", marginBottom:6 }}>
-                  📅 Dates prises ({datesUtil.length})
+                  📅 {datesUtil.length} demi-journée{datesUtil.length>1?"s":""} utilisée{datesUtil.length>1?"s":""}
                 </div>
                 <div style={{ display:"flex", flexWrap:"wrap", gap:5 }}>
                   {datesUtil.map((r,j) => (
-                    <div key={j} style={{ background:`${C.coral}12`, color:C.coral, borderRadius:8, padding:"3px 10px", fontSize:11, fontWeight:700 }}>
+                    <div key={j} style={{ background:`${C.coral}12`, color:C.coral, borderRadius:8, padding:"4px 10px", fontSize:11, fontWeight:700 }}>
                       {new Date(r.date_reservation).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"})}
-                      {" · "}{r.session==="matin"?"☀️":"🌊"}
+                      {" "}{r.session==="matin"?"☀️ Matin":"🌊 Après-midi"}
+                      {r.enfants?.length > 0 && ` · ${r.enfants.join(", ")}`}
                     </div>
                   ))}
                 </div>
               </div>
-            )}
-            {datesUtil.length === 0 && (
+            ) : (
               <div style={{ fontSize:12, color:"#bbb", fontStyle:"italic" }}>Aucune demi-journée utilisée pour l'instant</div>
             )}
           </div>
@@ -6859,4 +6852,4 @@ export default function App() {
     </div>
   );
 }
-// fix carte liberté Wed Apr  1 12:26:43 CEST 2026
+// liberté tab fix Wed Apr  1 12:32:35 CEST 2026
