@@ -18,7 +18,13 @@ export async function creerMembre(form) {
       nom:              form.nom,
       email:            form.email,
       tel:              form.tel,
+      tel2:             form.tel2 || null,
       adresse:          form.adresse,
+      ville:            form.ville,
+      cp:               form.cp,
+      adresse_vac:      form.adresse_vac || null,
+      ville_vac:        form.ville_vac || null,
+      cp_vac:           form.cp_vac || null,
       droit_image:      form.droitImage,
       droit_diffusion:  form.droitDiffusion,
       cgv_accepted:     form.cgvAccepted,
@@ -102,14 +108,14 @@ export async function creerReservationClub({ membreId, dateReservation, session,
   const { data, error } = await supabase
     .from('reservations_club')
     .insert([{
-      membre_id:             membreId,
-      date_reservation:      dateReservation,
-      session:               session,
-      label_jour:            labelJour,
-      statut:                statut || 'pending',
-      rappel_date:           rappelDate || null,
+      membre_id:               membreId,
+      date_reservation:        dateReservation,
+      session:                 session,
+      label_jour:              labelJour,
+      statut:                  statut || 'pending',
+      rappel_date:             rappelDate || null,
       demi_journees_utilisees: 1,
-      enfants:               enfants || [],
+      enfants:                 enfants || [],
     }])
     .select()
     .single()
