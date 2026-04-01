@@ -4548,17 +4548,31 @@ function DayDetailModal({ day, activity, session, onClose, dbResasNat = [], dbRe
       });
       const liste = [];
       resasJour.forEach(r => {
+        // Exclure les achats carte
+        if (Array.isArray(r.enfants) && Number(r.enfants[0]) >= 6) return;
         const parentNom = r.membres ? `${r.membres.prenom} ${r.membres.nom}` : "—";
-        const enfants = (r.membres?.enfants || [])
-          .filter(e => e.activite === "club" || e.activite === "les deux");
-        enfants.forEach(e => liste.push({
-          prenom: e.prenom, nom: e.nom || "",
-          naissance: e.naissance || "", activite: "club",
-          niveau: e.niveau || "", allergies: e.allergies || "",
-          parent: parentNom, parentColor: C.coral, parentAv: "👤",
-          phone: r.membres?.tel || "—",
-          session: r.session,
-        }));
+        // Prendre les prénoms stockés dans la résa
+        const prenoms = (r.enfants || []).filter(e => isNaN(Number(e)));
+        if (prenoms.length > 0) {
+          prenoms.forEach(prenom => liste.push({
+            prenom, nom: "",
+            naissance: "", activite: "club",
+            niveau: "", allergies: "",
+            parent: parentNom, parentColor: C.coral, parentAv: "👤",
+            phone: r.membres?.tel || "—",
+            session: r.session,
+          }));
+        } else {
+          // Fallback : afficher le parent si pas d'enfants nominatifs
+          liste.push({
+            prenom: r.membres?.prenom || "—", nom: r.membres?.nom || "",
+            naissance: "", activite: "club",
+            niveau: "", allergies: "",
+            parent: parentNom, parentColor: C.coral, parentAv: "👤",
+            phone: r.membres?.tel || "—",
+            session: r.session,
+          });
+        }
       });
       return liste.sort((a, b) => (a.nom||"").localeCompare(b.nom||""));
     }
@@ -5114,11 +5128,13 @@ th{background:#1A8FE3;color:#fff;padding:10px 12px;text-align:left}
                 {/* Enfants inscrits */}
                 {inscrits.length > 0 && (
                   <div style={{ display:"flex", gap:5, flexWrap:"wrap", marginBottom:8 }}>
-                    {inscrits.flatMap(r => {
-                      const enfants = (r.membres?.enfants || [])
-                        .filter(e => e.activite === "club" || e.activite === "les deux");
-                      return enfants.map(e => e.prenom);
-                    }).slice(0,8).map((nom, i) => (
+                    {[...new Set(inscrits.flatMap(r => {
+                      // Utiliser les prénoms de la résa directement
+                      const enfantsResa = Array.isArray(r.enfants) ? r.enfants.filter(e => isNaN(Number(e))) : [];
+                      if (enfantsResa.length > 0) return enfantsResa;
+                      // Fallback : nom du parent
+                      return r.membres ? [`${r.membres.prenom} ${NOM(r.membres.nom)}`] : [];
+                    }))].slice(0,8).map((nom, i) => (
                       <div key={i} style={{ background:`${s.color}15`, color:s.color, borderRadius:8, padding:"2px 8px", fontSize:10, fontWeight:800 }}>
                         👤 {nom}
                       </div>
@@ -7418,4 +7434,4 @@ export default function App() {
     </div>
   );
 }
-// fix jsx orphan Wed Apr  1 17:37:41 CEST 2026
+// fix planning doublons Wed Apr  1 21:33:47 CEST 2026
