@@ -2507,33 +2507,6 @@ function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSession
   const morning   = allForDay.filter(s => { const [h] = s.time.split(":").map(Number); return h < 13; });
   const afternoon = allForDay.filter(s => { const [h] = s.time.split(":").map(Number); return h >= 13; });
 
-  // Date ISO du jour sélectionné
-  const getDateISO = (day) => {
-    if (!day?.date) return "";
-    return `${day.date.getFullYear()}-${String(day.date.getMonth()+1).padStart(2,"0")}-${String(day.date.getDate()).padStart(2,"0")}`;
-  };
-
-  const handleConfirm = async () => {
-    if (setAllSeasonSessions) setAllSeasonSessions(prev => prev.map(s => s.id === booking.id ? { ...s, spots: Math.max(0, s.spots-1) } : s));
-    const resaDateISO = getDateISO(selectedDay);
-    const rappelDate  = getRappelDate(resaDateISO);
-    scheduleRappel({ titre:"🏊 Rappel séance natation demain !", corps:`Ta séance à ${booking.time} est demain !`, dateStr:rappelDate });
-    try {
-      await sb.from("reservations_natation").insert([{
-        membre_id:   user?.supabaseId || null,
-        jour:        booking.day,
-        heure:       booking.time,
-        date_seance: resaDateISO,
-        enfants:     selectedEnfants,
-        statut:      "pending",
-        rappel_date: rappelDate || null,
-        montant:     20,
-      }]);
-    } catch(e) { console.warn("Supabase:", e.message); }
-    setDone({ ...booking, enfants: selectedEnfants, rappelDate });
-    setBooking(null);
-    setSelectedEnfants([]);
-  };
 
   if (!user) return (
     <div style={{ background:C.shell, minHeight:"100%", display:"flex", flexDirection:"column" }}>
@@ -7510,4 +7483,4 @@ export default function App() {
     </div>
   );
 }
-// resa screen panier Wed Apr  1 17:25:18 CEST 2026
+// fix dup Wed Apr  1 17:29:08 CEST 2026
