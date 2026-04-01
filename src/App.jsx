@@ -5385,15 +5385,14 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
             }
           }
         } else if (forfaitClub === "liberte") {
-          await sb.from("reservations_club").insert([{
+          const { error: insertError } = await sb.from("reservations_club").insert([{
             membre_id:        membreId || null,
             date_reservation: new Date().toISOString().slice(0,10),
             session:          "liberte",
-            label_jour:       `Carte Liberté · ${nbLiberte} demi-journées`,
             statut:           statutResa,
-            enfants:          [String(nbLiberte)], // stocke nb dans enfants pour récupération
+            enfants:          [String(nbLiberte)],
           }]);
-          // Si directement confirmé (payé), créditer le solde immédiatement
+          if (insertError) { setError("Erreur : " + insertError.message); setSaving(false); return; }
           if (statutResa === "confirmed" && membreId) {
             const membre = dbMembres.find(m => m.id === membreId);
             const newBalance = (membre?.liberte_balance || 0) + nbLiberte;
@@ -6669,4 +6668,4 @@ export default function App() {
     </div>
   );
 }
-// Wed Apr  1 10:40:09 CEST 2026
+// fix
