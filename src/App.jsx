@@ -3074,8 +3074,8 @@ function SeancesTab({ sessions, setSessions }) {
         ))}
       </div>
 
-      {/* Day selector */}
-      <div style={{ display: "flex", gap: 6, marginBottom: 14, overflowX: "auto", paddingBottom: 2 }}>
+      {/* Day selector — centré */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 14, overflowX: "auto", paddingBottom: 2, justifyContent: "center", flexWrap: "wrap" }}>
         {currentWeek.map(d => {
           const ds = sessions.filter(s => s.day === d.id);
           const dAvail = ds.reduce((acc, s) => acc + s.spots, 0) > 0;
@@ -3102,15 +3102,15 @@ function SeancesTab({ sessions, setSessions }) {
         })}
       </div>
 
-      {/* Slot grid */}
+      {/* Slot grid — 2 colonnes sur desktop */}
       {daySessions.length === 0 ? (
         <div style={{ textAlign: "center", padding: "32px 0", color: "#aaa", fontSize: 14 }}>Aucun créneau ce jour</div>
       ) : (
-        <div style={{ background: "#fff", borderRadius: 20, padding: 16, boxShadow: "0 4px 16px rgba(0,0,0,0.06)" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
           {morning.length > 0 && (
-            <>
+            <div style={{ background: "#fff", borderRadius: 20, padding: 16, boxShadow: "0 4px 16px rgba(0,0,0,0.06)" }}>
               <div style={{ fontSize: 11, fontWeight: 900, color: C.coral, letterSpacing: 1, textTransform: "uppercase", marginBottom: 10 }}>☀️ Matin</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                 {morning.map(s => (
                   <div key={s.id} onClick={() => setConfirmCancel(confirmCancel === s.id ? null : s.id)} style={{
                     display: "flex", alignItems: "center", gap: 6,
@@ -3129,10 +3129,11 @@ function SeancesTab({ sessions, setSessions }) {
                   </div>
                 ))}
               </div>
-            </>
+              <div style={{ marginTop: 10, fontSize: 11, color: "#bbb", fontStyle: "italic" }}>💡 Cliquer pour annuler</div>
+            </div>
           )}
           {afternoon.length > 0 && (
-            <>
+            <div style={{ background: "#fff", borderRadius: 20, padding: 16, boxShadow: "0 4px 16px rgba(0,0,0,0.06)" }}>
               <div style={{ fontSize: 11, fontWeight: 900, color: C.ocean, letterSpacing: 1, textTransform: "uppercase", marginBottom: 10 }}>🌊 Après-midi</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                 {afternoon.map(s => (
@@ -3153,11 +3154,9 @@ function SeancesTab({ sessions, setSessions }) {
                   </div>
                 ))}
               </div>
-            </>
+              <div style={{ marginTop: 10, fontSize: 11, color: "#bbb", fontStyle: "italic" }}>💡 Cliquer pour annuler</div>
+            </div>
           )}
-          <div style={{ marginTop: 14, fontSize: 11, color: "#bbb", fontStyle: "italic" }}>
-            💡 Appuie sur un créneau pour l'annuler
-          </div>
         </div>
       )}
     </div>
@@ -3666,6 +3665,7 @@ function MembresTab({ allResas, dbMembres, onRefresh }) {
         </button>
       </div>
 
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(280px, 1fr))", gap:10 }}>
       {tousLesMembres.map((u, i) => (
         <div key={u.id || i} style={{ background:"#fff", borderRadius:20, padding:"14px 16px", boxShadow:"0 4px 16px rgba(0,0,0,0.06)" }}>
           <div style={{ display:"flex", alignItems:"center", gap:14, cursor:"pointer" }} onClick={() => setSelectedMembre(u)}>
@@ -3696,6 +3696,7 @@ function MembresTab({ allResas, dbMembres, onRefresh }) {
           )}
         </div>
       ))}
+      </div>
     </div>
   );
 }
@@ -4046,7 +4047,7 @@ function PaiementsTab({ onValidate }) {
       ) : filtered.length === 0 ? (
         <div style={{ textAlign:"center", padding:"32px 0", color:"#bbb", fontSize:14 }}>Aucune réservation</div>
       ) : (
-        <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(320px, 1fr))", gap:12 }}>
           {filtered.map(g => {
             const color   = CAT_COLOR[g.type];
             const isPaid  = g.statut === "confirmed";
@@ -4632,8 +4633,8 @@ th{background:#1A8FE3;color:#fff;padding:10px 12px;text-align:left}
             boxShadow: `0 4px 14px ${C.ocean}44`,
           }}>🖨️ Imprimer la semaine</button>
 
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(200px, 1fr))", gap:10 }}>
           {currentWeek.map(d => {
-            const slots = getNataSlots(d.id);
             const taken = slots.reduce((acc, s) => acc + (2 - s.spots), 0);
             const avail = slots.reduce((acc, s) => acc + s.spots, 0);
             const total = slots.length * 2;
@@ -4677,10 +4678,9 @@ th{background:#1A8FE3;color:#fff;padding:10px 12px;text-align:left}
               </div>
             );
           })}
+          </div>
         </div>
       )}
-
-      {/* ── CLUB CONTENT ── */}
       {activity === "club" && viewMode === "jour" && (() => {
         const day = ALL_SEASON_DAYS.find(d => d.id === selectedDayId);
         const SESSIONS_JOUR = [
@@ -5797,7 +5797,8 @@ function CartesLiberteTab({ dbMembres }) {
         </div>
       )}
 
-      {/* Cartes */}
+      {/* Cartes — 4 colonnes desktop */}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(280px, 1fr))", gap:14 }}>
       {filtered.map((c, i) => {
         const balance  = c.membre?.liberte_balance || 0;
         const total    = c.membre?.liberte_total   || 0;
@@ -5869,6 +5870,7 @@ function CartesLiberteTab({ dbMembres }) {
           </div>
         );
       })}
+      </div>
     </div>
   );
 }
@@ -6358,7 +6360,8 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
             {/* Natation */}
             {dbResas.length > 0 && (
               <>
-                <div style={{ fontWeight:800, color:C.ocean, fontSize:12, marginBottom:-4 }}>🏊 NATATION ({dbResas.length})</div>
+                <div style={{ fontWeight:800, color:C.ocean, fontSize:12, marginBottom:4 }}>🏊 NATATION ({dbResas.length})</div>
+                <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(340px, 1fr))", gap:10 }}>
                 {dbResas.map(r => (
                   <div key={r.id} style={{ background:"#fff", borderRadius:18, padding:"12px 14px", boxShadow:"0 2px 10px rgba(0,0,0,0.05)", borderLeft:`4px solid ${r.statut==="pending"?C.sun:C.ocean}` }}>
                     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
@@ -6383,13 +6386,15 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                     {r.enfants?.length > 0 && <div style={{ display:"flex", gap:5, marginTop:6, flexWrap:"wrap" }}>{r.enfants.map((e,i) => <Pill key={i} color={C.sea}>{e}</Pill>)}</div>}
                   </div>
                 ))}
+                </div>
               </>
             )}
 
             {/* Club */}
             {dbResasClub.length > 0 && (
               <>
-                <div style={{ fontWeight:800, color:C.coral, fontSize:12, marginBottom:-4 }}>🏖️ CLUB DE PLAGE ({dbResasClub.length})</div>
+                <div style={{ fontWeight:800, color:C.coral, fontSize:12, marginBottom:4 }}>🏖️ CLUB DE PLAGE ({dbResasClub.length})</div>
+                <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(340px, 1fr))", gap:10 }}>
                 {dbResasClub.map(r => (
                   <div key={r.id} style={{ background:"#fff", borderRadius:18, padding:"12px 14px", boxShadow:"0 2px 10px rgba(0,0,0,0.05)", borderLeft:`4px solid ${r.statut==="pending"?C.sun:C.coral}` }}>
                     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
@@ -6411,11 +6416,12 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                       </div>
                     </div>
                     <div style={{ fontSize:12, color:C.coral, fontWeight:700 }}>
-                      {r.session === "matin" ? "☀️ Matin" : "🌊 Après-midi"} · {r.date_reservation ? new Date(r.date_reservation).toLocaleDateString("fr-FR") : "—"}
+                      {(!isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6) ? `🎟️ Carte Liberté · ${r.enfants[0]} demi-j.` : r.session === "matin" ? "☀️ Matin" : "🌊 Après-midi"} · {r.date_reservation ? new Date(r.date_reservation).toLocaleDateString("fr-FR") : "—"}
                     </div>
-                    {r.enfants?.length > 0 && <div style={{ display:"flex", gap:5, marginTop:6, flexWrap:"wrap" }}>{r.enfants.map((e,i) => <Pill key={i} color={C.coral}>{e}</Pill>)}</div>}
+                    {r.enfants?.length > 0 && !(!isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6) && <div style={{ display:"flex", gap:5, marginTop:6, flexWrap:"wrap" }}>{r.enfants.map((e,i) => <Pill key={i} color={C.coral}>{e}</Pill>)}</div>}
                   </div>
                 ))}
+                </div>
               </>
             )}
 
@@ -6868,7 +6874,7 @@ export default function App() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
         * { box-sizing: border-box; }
-        body { margin: 0; }
+        body, #root { margin: 0; padding: 0; width: 100%; }
         input:focus, select:focus { border-color: #1A8FE3 !important; box-shadow: 0 0 0 3px rgba(26,143,227,0.15); outline: none; }
         a { text-decoration: none; color: inherit; }
         a:hover { text-decoration: underline; }
@@ -6880,4 +6886,4 @@ export default function App() {
     </div>
   );
 }
-// fix Wed Apr  1 13:13:10 CEST 2026
+// desktop grids Wed Apr  1 13:37:30 CEST 2026
