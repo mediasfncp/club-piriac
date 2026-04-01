@@ -1180,14 +1180,12 @@ function FormulesNatationScreen({ onNav, user, allSeasonSessions }) {
           </div>
         )}
 
-        {selected && selectedEnfant && (
-          {/* Étape 1 — bouton Choisir mes créneaux */}
-          {selected && selectedEnfant && step === "formule" && (
-            <SunBtn color={selected.color} full onClick={() => { setStep("creneaux"); setSelectedCreneaux([]); }}>
-              Choisir mes {nbLecons} créneau{nbLecons>1?"x":""} →
-            </SunBtn>
-          )}
-        </div>
+        {/* Étape 1 — bouton Choisir mes créneaux */}
+        {selected && selectedEnfant && step === "formule" && (
+          <SunBtn color={selected.color} full onClick={() => { setStep("creneaux"); setSelectedCreneaux([]); }}>
+            Choisir mes {nbLecons} créneau{nbLecons>1?"x":""} →
+          </SunBtn>
+        )}
 
         {/* Étape 2 — Sélection des créneaux */}
         {selected && selectedEnfant && step === "creneaux" && (
