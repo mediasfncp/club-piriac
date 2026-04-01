@@ -3922,7 +3922,7 @@ function PaiementsTab({ onValidate }) {
       sb.from("reservations_club").select("*, membres(prenom, nom, email)").order("created_at"),
     ]);
     const natFmt  = (nat  || []).map(r => ({ ...r, _type:"natation", _date:r.date_seance,      _label:`🏊 ${r.heure}` }));
-    const clubFmt = (club || []).map(r => ({ ...r, _type:"club",     _date:r.date_reservation, _label: r.session==="liberte" ? `🎟️ ${r.label_jour||"Carte Liberté"}` : r.session==="liberte" ? `🎟️ ${r.label_jour||'Carte Liberté'}` : `🏖️ ${r.session==="matin"?"Matin":"Après-midi"}` }));
+    const clubFmt = (club || []).map(r => ({ ...r, _type:"club",     _date:r.date_reservation, _label: (!isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6) ? "🎟️ Carte Liberté" : `🏖️ ${r.session==="matin"?"Matin":"Après-midi"}` }));
     setResas([...natFmt, ...clubFmt].sort((a,b) => (a.created_at||"").localeCompare(b.created_at||"")));
     setLoading(false);
   };
@@ -5869,7 +5869,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
               const pendingClub = dbResasClub.filter(r => r.statut === "pending");
               const allPending  = [
                 ...pendingNat.map(r => ({ ...r, _type:"natation", _date: r.date_seance, _label: `🏊 ${r.heure}` })),
-                ...pendingClub.map(r => ({ ...r, _type:"club", _date: r.date_reservation, _label: r.session==="liberte" ? `🎟️ ${r.label_jour||'Carte Liberté'}` : `🏖️ ${r.session==="matin"?"Matin":"Après-midi"}` })),
+                ...pendingClub.map(r => ({ ...r, _type:"club", _date: r.date_reservation, _label: (!isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6) ? "🎟️ Carte Liberté" : `🏖️ ${r.session==="matin"?"Matin":"Après-midi"}` })),
               ].sort((a,b) => (a.created_at||"").localeCompare(b.created_at||""));
               if (allPending.length === 0) return null;
               return (
@@ -6102,7 +6102,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
               const pendingClub = dbResasClub.filter(r => r.statut === "pending");
               const allPending  = [
                 ...pendingNat.map(r => ({ ...r, _type:"natation", _date: r.date_seance,      _label:`🏊 ${r.heure}` })),
-                ...pendingClub.map(r => ({ ...r, _type:"club",    _date: r.date_reservation, _label:r.session==="liberte" ? `🎟️ ${r.label_jour||'Carte Liberté'}` : `🏖️ ${r.session==="matin"?"Matin":"Après-midi"}` })),
+                ...pendingClub.map(r => ({ ...r, _type:"club",    _date: r.date_reservation, _label:(!isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6) ? "🎟️ Carte Liberté" : `🏖️ ${r.session==="matin"?"Matin":"Après-midi"}` })),
               ].sort((a,b) => (a.created_at||"").localeCompare(b.created_at||""));
               if (allPending.length === 0) return null;
               return (
@@ -6292,19 +6292,33 @@ function BottomNav({ current, onNav }) {
 const ADMIN_CODE = "club2026";
 
 function ProfilConnecte({ user, setUser, setScreen, reservations }) {
-  const [resasNat, setResasNat]   = useState([]);
-  const [resasClub, setResasClub] = useState([]);
-  const [loading, setLoading]     = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [resasNat, setResasNat]       = useState([]);
+  const [resasClub, setResasClub]     = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [refreshing, setRefreshing]   = useState(false);
+  const [liberteBalance, setLiberteBalance] = useState(user?.liberteBalance || 0);
+  const [liberteTotal, setLiberteTotal]     = useState(user?.liberteTotal   || 0);
+  const [hasCarteActive, setHasCarteActive] = useState(false);
 
   const loadResas = async () => {
     if (!user?.supabaseId) { setLoading(false); return; }
-    const [{ data: nat }, { data: club }] = await Promise.all([
+    const [{ data: nat }, { data: club }, { data: membre }] = await Promise.all([
       sb.from("reservations_natation").select("*").eq("membre_id", user.supabaseId).order("date_seance"),
       sb.from("reservations_club").select("*").eq("membre_id", user.supabaseId).order("date_reservation"),
+      sb.from("membres").select("liberte_balance, liberte_total").eq("id", user.supabaseId).single(),
     ]);
     setResasNat(nat || []);
     setResasClub(club || []);
+    // Solde liberté depuis Supabase (source de vérité)
+    const balance = membre?.liberte_balance || 0;
+    const total   = membre?.liberte_total   || 0;
+    setLiberteBalance(balance);
+    setLiberteTotal(total);
+    // Carte active = résas liberté confirmées
+    const carteConfirmee = (club || []).some(r =>
+      r.statut === "confirmed" && !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6
+    );
+    setHasCarteActive(carteConfirmee || balance > 0);
     setLoading(false);
     setRefreshing(false);
   };
@@ -6329,7 +6343,7 @@ function ProfilConnecte({ user, setUser, setScreen, reservations }) {
         <div style={{ fontWeight:900, color:C.dark, fontSize:14, marginBottom:10 }}>🎫 Mes accès saison 2026</div>
 
         {/* Carte Liberté */}
-        {(user.liberteBalance > 0 || user.liberteTotal > 0) ? (
+        {hasCarteActive ? (
           <div style={{ background:`linear-gradient(135deg,${C.coral},${C.sun})`, borderRadius:20, padding:18, marginBottom:12, boxShadow:`0 6px 20px ${C.coral}44` }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
               <div>
@@ -6337,18 +6351,18 @@ function ProfilConnecte({ user, setUser, setScreen, reservations }) {
                 <div style={{ color:"rgba(255,255,255,0.8)", fontSize:11 }}>Valable saison 2026 · 6 juil – 22 août</div>
               </div>
               <div style={{ textAlign:"right" }}>
-                <div style={{ color:"#fff", fontWeight:900, fontSize:28, lineHeight:1 }}>{user.liberteBalance || 0}</div>
+                <div style={{ color:"#fff", fontWeight:900, fontSize:28, lineHeight:1 }}>{liberteBalance}</div>
                 <div style={{ color:"rgba(255,255,255,0.8)", fontSize:11 }}>demi-j. restantes</div>
               </div>
             </div>
             <div style={{ background:"rgba(255,255,255,0.25)", borderRadius:50, height:8, overflow:"hidden", marginBottom:8 }}>
-              <div style={{ height:"100%", width:`${((user.liberteBalance||0)/(user.liberteTotal||1))*100}%`, background:"#fff", borderRadius:50 }} />
+              <div style={{ height:"100%", width:`${liberteTotal > 0 ? (liberteBalance/liberteTotal)*100 : 0}%`, background:"#fff", borderRadius:50 }} />
             </div>
             <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, color:"rgba(255,255,255,0.75)" }}>
-              <span>{(user.liberteTotal||0)-(user.liberteBalance||0)} utilisée{((user.liberteTotal||0)-(user.liberteBalance||0))>1?"s":""}</span>
-              <span>{user.liberteTotal||0} au total</span>
+              <span>{liberteTotal - liberteBalance} utilisée{(liberteTotal-liberteBalance)>1?"s":""}</span>
+              <span>{liberteTotal} au total</span>
             </div>
-            {(user.liberteBalance||0) > 0 && (
+            {liberteBalance > 0 && (
               <div style={{ marginTop:12 }}>
                 <button onClick={() => setScreen("reservation-club")} style={{ width:"100%", background:"rgba(255,255,255,0.25)", border:"2px solid rgba(255,255,255,0.5)", color:"#fff", borderRadius:50, padding:"11px", fontWeight:900, fontSize:14, cursor:"pointer", fontFamily:"inherit" }}>
                   📅 Réserver avec ma carte
@@ -6672,4 +6686,4 @@ export default function App() {
     </div>
   );
 }
-// liberté fix Wed Apr  1 11:28:06 CEST 2026
+// carte liberté fix Wed Apr  1 11:42:47 CEST 2026
