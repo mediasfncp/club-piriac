@@ -4178,7 +4178,61 @@ function PaiementsTab({ onValidate }) {
       const nb = Number(g.resas[0]?.enfants?.[0]) || 0;
       return `🎟️ Carte Liberté · ${nb} demi-journées`;
     }
-    return `${g.resas.length} demi-journée${g.resas.length>1?"s":""}`;
+    // Club normal
+    const resas = g.resas.filter(r => !(Array.isArray(r.enfants) && Number(r.enfants[0]) >= 6));
+    const nbMatin  = resas.filter(r => r.session === "matin").length;
+    const nbApmidi = resas.filter(r => r.session === "apmidi").length;
+    const isJournee = nbMatin > 0 && nbApmidi > 0 && Math.abs(nbMatin - nbApmidi) <= 1;
+    const sessionLabel = isJournee ? "Journée" : nbMatin >= nbApmidi ? "☀️ Matin" : "🌊 Après-midi";
+    const nbJours = isJournee ? Math.round(resas.length / 2) : resas.length;
+    const nbSemaines = Math.round(nbJours / 6);
+    const nbEnfants = (resas[0]?.enfants || []).length || 1;
+    if (nbSemaines >= 1) return `🏖️ Club ${sessionLabel} · ${nbSemaines} semaine${nbSemaines>1?"s":""} · ${nbEnfants} enfant${nbEnfants>1?"s":""}`;
+    return `🏖️ Club ${sessionLabel} · ${nbJours} demi-journée${nbJours>1?"s":""} · ${nbEnfants} enfant${nbEnfants>1?"s":""}`;
+  };
+
+  const getClubMontant = (g) => {
+    if (isLiberte(g)) {
+      const nb = Number(g.resas[0]?.enfants?.[0]) || 0;
+      return LIBERTE_PRIX[nb] ? `${LIBERTE_PRIX[nb]} €` : "—";
+    }
+    // Lire montant stocké dans label_jour [MONTANT:xx]
+    const label = g.resas[0]?.label_jour || "";
+    const montantMatch = label.match(/\[MONTANT:(\d+)\]/);
+    if (montantMatch) return `${montantMatch[1]} €`;
+
+    // Calculer automatiquement depuis les tarifs
+    const resas = g.resas.filter(r => !(Array.isArray(r.enfants) && Number(r.enfants[0]) >= 6));
+    if (resas.length === 0) return "—";
+
+    // Détecter session dominante
+    const nbMatin  = resas.filter(r => r.session === "matin").length;
+    const nbApmidi = resas.filter(r => r.session === "apmidi").length;
+    const isJournee = nbMatin > 0 && nbApmidi > 0 && Math.abs(nbMatin - nbApmidi) <= 1;
+    const session = isJournee ? "journee" : nbMatin >= nbApmidi ? "matin" : "apmidi";
+
+    // Nb de jours réels (journée = 1 jour = 2 résas)
+    const nbJours = isJournee ? Math.round(resas.length / 2) : resas.length;
+    const nbSemaines = Math.round(nbJours / 6);
+
+    // Nb enfants
+    const nbEnfants = (resas[0]?.enfants || []).length || 1;
+
+    const tarif = session === "matin" ? TARIFS_MATIN : session === "apmidi" ? TARIFS_APMIDI : TARIFS_JOURNEE;
+
+    // Trouver la bonne ligne selon nb semaines/jours
+    let rowIdx = 0;
+    if (nbSemaines >= 4) rowIdx = 4;
+    else if (nbSemaines === 3) rowIdx = 3;
+    else if (nbSemaines === 2) rowIdx = 2;
+    else if (nbSemaines === 1) rowIdx = 1;
+    else rowIdx = 0; // 1 demi-journée
+
+    const row = tarif.rows[rowIdx];
+    if (!row) return "—";
+
+    let prix = nbEnfants === 1 ? row.e1 : nbEnfants === 2 ? row.e2 : nbEnfants === 3 ? row.e3 : row.e3 + (nbEnfants - 3) * row.sup;
+    return `${prix} €`;
   };
 
   const getMontant = (g) => {
@@ -4190,15 +4244,7 @@ function PaiementsTab({ onValidate }) {
       if (n === 10) return "170 €";
       return `${g.resas.reduce((s,r) => s + Number(r.montant||0), 0)} €`;
     }
-    if (isLiberte(g)) {
-      const nb = Number(g.resas[0]?.enfants?.[0]) || 0;
-      return LIBERTE_PRIX[nb] ? `${LIBERTE_PRIX[nb]} €` : "—";
-    }
-    // Club normal : chercher montant dans label_jour si stocké
-    const label = g.resas[0]?.label_jour || "";
-    const montantMatch = label.match(/\[MONTANT:(\d+)\]/);
-    if (montantMatch) return `${montantMatch[1]} €`;
-    return "—"; // montant à renseigner
+    return getClubMontant(g);
   };
 
   const filtered = filter === "tous" ? allGroups : allGroups.filter(g => g.statut === filter);
@@ -4258,30 +4304,8 @@ function PaiementsTab({ onValidate }) {
                       <div style={{ fontSize:12, color:"#888", marginTop:1 }}>{enfants.join(", ")}</div>
                     )}
                   </div>
-                  <div style={{ fontWeight:900, fontSize:16, color: isPaid ? C.green : "#b45309", marginLeft:8, display:"flex", alignItems:"center", gap:4 }}>
-                    {getMontant(g) === "—" ? (
-                      <div style={{ display:"flex", alignItems:"center", gap:4 }}>
-                        <input
-                          type="number"
-                          placeholder="Prix €"
-                          defaultValue=""
-                          onBlur={async (e) => {
-                            const val = Number(e.target.value);
-                            if (!val) return;
-                            // Stocker dans label_jour de la première résa
-                            const r0 = g.resas[0];
-                            if (r0?.id) {
-                              await sb.from("reservations_club").update({
-                                label_jour: `[MONTANT:${val}] ${r0.label_jour||""}`
-                              }).eq("id", r0.id);
-                              await loadAll();
-                            }
-                          }}
-                          style={{ width:70, border:`1.5px solid ${C.coral}`, borderRadius:8, padding:"4px 8px", fontSize:13, fontFamily:"inherit", outline:"none", textAlign:"right" }}
-                        />
-                        <span style={{ color:"#888", fontSize:13 }}>€</span>
-                      </div>
-                    ) : getMontant(g)}
+                  <div style={{ fontWeight:900, fontSize:16, color: isPaid ? C.green : "#b45309", marginLeft:8 }}>
+                    {getMontant(g)}
                   </div>
                 </div>
 
@@ -7221,4 +7245,4 @@ export default function App() {
     </div>
   );
 }
-// montant club Wed Apr  1 16:42:02 CEST 2026
+// club tarifs auto Wed Apr  1 16:46:55 CEST 2026
