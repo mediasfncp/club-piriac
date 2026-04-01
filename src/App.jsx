@@ -2503,11 +2503,6 @@ function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSession
       }).catch(() => {});
   }, []);
 
-  const allForDay = (allSeasonSessions || []).filter(s => s.day === effectiveDayId);
-  const morning   = allForDay.filter(s => { const [h] = s.time.split(":").map(Number); return h < 13; });
-  const afternoon = allForDay.filter(s => { const [h] = s.time.split(":").map(Number); return h >= 13; });
-
-
   if (!user) return (
     <div style={{ background:C.shell, minHeight:"100%", display:"flex", flexDirection:"column" }}>
       <div style={{ background:`linear-gradient(135deg, #00C9FF, ${C.sea})`, padding:"20px 20px 0" }}>
@@ -7483,4 +7478,4 @@ export default function App() {
     </div>
   );
 }
-// fix dup Wed Apr  1 17:29:08 CEST 2026
+// fix dup2 Wed Apr  1 17:32:18 CEST 2026
