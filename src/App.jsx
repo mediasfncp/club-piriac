@@ -3892,18 +3892,31 @@ function PaiementsTab({ onValidate }) {
     const newStatut = groupe.statut === "pending" ? "confirmed" : "pending";
     await Promise.all(groupe.resas.map(r => sb.from(table).update({ statut: newStatut }).eq("id", r.id)));
 
-    // Si c'est une Carte Liberté → créditer ou décréditer le solde
-    if (groupe.type === "club" && groupe.resas.some(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) > 0)) {
+    // Si c'est un achat Carte Liberté → créditer ou décréditer le solde
+    if (groupe.type === "club" && groupe.resas.some(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6)) {
       const r = groupe.resas[0];
-      const credit = Number(r.enfants?.[0]) || 0; // nb stocké dans enfants[0]
+      const credit = Number(r.enfants?.[0]) || 0;
       if (credit > 0 && r.membre_id) {
         const { data: m } = await sb.from("membres").select("liberte_balance, liberte_total").eq("id", r.membre_id).single();
         if (m) {
           const delta = newStatut === "confirmed" ? credit : -credit;
           await sb.from("membres").update({
             liberte_balance: Math.max(0, (m.liberte_balance||0) + delta),
-            liberte_total:   Math.max(0, (m.liberte_total||0)   + (newStatut === "confirmed" ? credit : 0)),
+            liberte_total:   Math.max(0, (m.liberte_total||0) + (newStatut === "confirmed" ? credit : 0)),
           }).eq("id", r.membre_id);
+        }
+      }
+    }
+
+    // Si c'est une utilisation carte liberté → décrémenter ou récréditer
+    if (groupe.type === "club" && groupe.resas.some(r => (r.label_jour||"").startsWith("[LIBERTE]"))) {
+      const membreId = groupe.resas[0]?.membre_id;
+      const nbUtil = groupe.resas.filter(r => (r.label_jour||"").startsWith("[LIBERTE]")).length;
+      if (membreId && nbUtil > 0) {
+        const { data: m } = await sb.from("membres").select("liberte_balance").eq("id", membreId).single();
+        if (m) {
+          const delta = newStatut === "confirmed" ? -nbUtil : nbUtil; // confirmer = décrémenter
+          await sb.from("membres").update({ liberte_balance: Math.max(0, (m.liberte_balance||0) + delta) }).eq("id", membreId);
         }
       }
     }
@@ -4341,7 +4354,9 @@ function PlanningTab({ allSeasonSessions, clubPlaces, reservations = [] }) {
     const dayObj = ALL_SEASON_DAYS.find(d => d.id === dayId);
     if (!dayObj?.date) return 45;
     const dateISO = `${dayObj.date.getFullYear()}-${String(dayObj.date.getMonth()+1).padStart(2,"0")}-${String(dayObj.date.getDate()).padStart(2,"0")}`;
-    const taken = dbResasClub.filter(r => r.date_reservation?.slice(0,10) === dateISO && r.session === session).length;
+    const taken = dbResasClub.filter(r => r.date_reservation?.slice(0,10) === dateISO && r.session === session
+      && !(Array.isArray(r.enfants) && Number(r.enfants[0]) >= 6) // exclure entrées achat carte
+    ).length;
     return Math.max(0, 45 - taken);
   };
 
@@ -4350,7 +4365,9 @@ function PlanningTab({ allSeasonSessions, clubPlaces, reservations = [] }) {
     const dayObj = ALL_SEASON_DAYS.find(d => d.id === dayId);
     if (!dayObj?.date) return [];
     const dateISO = `${dayObj.date.getFullYear()}-${String(dayObj.date.getMonth()+1).padStart(2,"0")}-${String(dayObj.date.getDate()).padStart(2,"0")}`;
-    return dbResasClub.filter(r => r.date_reservation?.slice(0,10) === dateISO && r.session === session);
+    return dbResasClub.filter(r => r.date_reservation?.slice(0,10) === dateISO && r.session === session
+      && !(Array.isArray(r.enfants) && Number(r.enfants[0]) >= 6)
+    );
   };
 
   // Build weeks from ALL_SEASON_DAYS
@@ -6164,12 +6181,22 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                             <button onClick={async () => {
                               const table = g.type === "natation" ? "reservations_natation" : "reservations_club";
                               await Promise.all(g.resas.map(r => sb.from(table).update({ statut:"confirmed" }).eq("id", r.id)));
+                              // Achat carte liberté → créditer solde
                               if (g.type === "club" && g.resas.some(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6)) {
                                 const r0 = g.resas[0];
                                 const credit = Number(r0.enfants?.[0]) || 0;
                                 if (credit > 0 && r0.membre_id) {
                                   const { data: m } = await sb.from("membres").select("liberte_balance, liberte_total").eq("id", r0.membre_id).single();
                                   if (m) await sb.from("membres").update({ liberte_balance:(m.liberte_balance||0)+credit, liberte_total:(m.liberte_total||0)+credit }).eq("id", r0.membre_id);
+                                }
+                              }
+                              // Utilisation carte liberté → décrémenter solde
+                              if (g.type === "club" && g.resas.some(r => (r.label_jour||"").startsWith("[LIBERTE]"))) {
+                                const membreId = g.resas[0]?.membre_id;
+                                const nbUtil = g.resas.filter(r => (r.label_jour||"").startsWith("[LIBERTE]")).length;
+                                if (membreId && nbUtil > 0) {
+                                  const { data: m } = await sb.from("membres").select("liberte_balance").eq("id", membreId).single();
+                                  if (m) await sb.from("membres").update({ liberte_balance: Math.max(0, (m.liberte_balance||0) - nbUtil) }).eq("id", membreId);
                                 }
                               }
                               refreshResas();
@@ -6289,13 +6316,22 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                             <button onClick={async () => {
                               const table = g.type === "natation" ? "reservations_natation" : "reservations_club";
                               await Promise.all(g.resas.map(r => sb.from(table).update({ statut:"confirmed" }).eq("id", r.id)));
-                              // Carte Liberté : créditer le solde
-                              if (g.type === "club" && g.resas.some(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) > 0)) {
+                              // Achat carte liberté → créditer
+                              if (g.type === "club" && g.resas.some(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6)) {
                                 const r0 = g.resas[0];
-                                const credit = Number(r0.enfants?.[0]) || 0; // nb demi-j stocké dans enfants[0]
+                                const credit = Number(r0.enfants?.[0]) || 0;
                                 if (credit > 0 && r0.membre_id) {
                                   const { data: m } = await sb.from("membres").select("liberte_balance, liberte_total").eq("id", r0.membre_id).single();
                                   if (m) await sb.from("membres").update({ liberte_balance: (m.liberte_balance||0)+credit, liberte_total: (m.liberte_total||0)+credit }).eq("id", r0.membre_id);
+                                }
+                              }
+                              // Utilisation carte liberté → décrémenter
+                              if (g.type === "club" && g.resas.some(r => (r.label_jour||"").startsWith("[LIBERTE]"))) {
+                                const membreId = g.resas[0]?.membre_id;
+                                const nbUtil = g.resas.filter(r => (r.label_jour||"").startsWith("[LIBERTE]")).length;
+                                if (membreId && nbUtil > 0) {
+                                  const { data: m } = await sb.from("membres").select("liberte_balance").eq("id", membreId).single();
+                                  if (m) await sb.from("membres").update({ liberte_balance: Math.max(0, (m.liberte_balance||0) - nbUtil) }).eq("id", membreId);
                                 }
                               }
                               refreshResas();
@@ -6855,4 +6891,4 @@ export default function App() {
     </div>
   );
 }
-// resa club calendrier Wed Apr  1 15:22:39 CEST 2026
+// liberté fixes Wed Apr  1 15:31:07 CEST 2026
