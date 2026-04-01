@@ -4144,15 +4144,16 @@ function PaiementsTab({ onValidate }) {
   const grouper = (liste) => {
     const groups = {};
     liste.forEach(r => {
-      const dateCreation = (r.created_at||"").slice(0,10);
-      const key = `${r.membre_id}-${r._type}-${dateCreation}`;
+      // Grouper à la minute : résas d'une même commande créées quasi-simultanément
+      const minuteCreation = (r.created_at||"").slice(0,16);
+      const key = `${r.membre_id}-${r._type}-${minuteCreation}`;
       if (!groups[key]) groups[key] = {
         key, membre: r.membres, type: r._type, statut: r.statut,
         created_at: r.created_at, resas: [],
       };
       groups[key].resas.push(r);
     });
-    return Object.values(groups).sort((a,b) => (a.created_at||"").localeCompare(b.created_at||""));
+    return Object.values(groups).sort((a,b) => (b.created_at||"").localeCompare(a.created_at||""));
   };
 
   const allGroups    = grouper(resas);
@@ -6257,7 +6258,8 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
           const pendingGroups = (() => {
             const groups = {};
             allPending.forEach(r => {
-              const key = `${r.membre_id}-${r._type}`;
+              const minuteCreation = (r.created_at||"").slice(0,16);
+              const key = `${r.membre_id}-${r._type}-${minuteCreation}`;
               if (!groups[key]) groups[key] = { membre: r.membres, type: r._type, resas: [] };
               groups[key].resas.push(r);
             });
@@ -6510,7 +6512,8 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                   {(() => {
                     const groups = {};
                     allPending.forEach(r => {
-                      const key = `${r.membre_id}-${r._type}`;
+                      const minuteCreation = (r.created_at||"").slice(0,16);
+                      const key = `${r.membre_id}-${r._type}-${minuteCreation}`;
                       if (!groups[key]) groups[key] = { membre: r.membres, type: r._type, resas: [] };
                       groups[key].resas.push(r);
                     });
@@ -7192,4 +7195,4 @@ export default function App() {
     </div>
   );
 }
-// fix panier inserts Wed Apr  1 16:32:54 CEST 2026
+// fix groupement minute Wed Apr  1 16:36:53 CEST 2026
