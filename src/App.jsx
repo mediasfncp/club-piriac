@@ -3909,7 +3909,7 @@ const ALL_PAYMENTS = [
   { id:50, parent:"Jean-Pierre Roy", montant:20,  type:"Natation · 1 leçon",            date:"2026-08-22", categorie:"natation"  },
 ];
 
-function PaiementsTab() {
+function PaiementsTab({ onValidate }) {
   const [resas, setResas]     = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter]   = useState("tous");
@@ -3928,10 +3928,11 @@ function PaiementsTab() {
   useEffect(() => { loadAll().catch(() => setLoading(false)); }, []);
 
   const toggleStatut = async (groupe) => {
-    const table    = groupe.type === "natation" ? "reservations_natation" : "reservations_club";
+    const table     = groupe.type === "natation" ? "reservations_natation" : "reservations_club";
     const newStatut = groupe.statut === "pending" ? "confirmed" : "pending";
     await Promise.all(groupe.resas.map(r => sb.from(table).update({ statut: newStatut }).eq("id", r.id)));
     await loadAll();
+    onValidate?.(); // Rafraîchir aussi l'onglet Résas
   };
 
   // Grouper par membre + type + bloc temporel (créés le même jour)
@@ -6214,7 +6215,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
         )}
 
         {tab === "paiements" && (
-          <PaiementsTab dbPaiements={dbPaiements} />
+          <PaiementsTab dbPaiements={dbPaiements} onValidate={refreshResas} />
         )}
 
         {tab === "planning" && (
