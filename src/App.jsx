@@ -6015,7 +6015,8 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
 
   return (
     <div style={{ background: "#F0F4F8", minHeight: "100%" }}>
-      <div style={{ background: "linear-gradient(135deg, #0F2027, #203A43, #2C5364)", padding: "24px 20px 0" }}>
+      <div style={{ background: "linear-gradient(135deg, #0F2027, #203A43, #2C5364)", padding: "24px 24px 0" }}>
+        <div style={{ maxWidth: 1400, margin: "0 auto" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <BackBtn onNav={onNav} />
@@ -6037,9 +6038,10 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
             </button>
           ))}
         </div>
+        </div>
       </div>
 
-      <div style={{ padding: "16px 16px 24px" }}>
+      <div style={{ padding: "16px 24px 24px", maxWidth: 1400, margin: "0 auto", width: "100%" }}>
         {tab === "dashboard" && (() => {
 
           const pendingNat  = dbResas.filter(r => r.statut === "pending");
@@ -6855,12 +6857,14 @@ export default function App() {
     }
   };
 
+  const isAdmin = screen === "admin";
+
   return (
-    <div style={{ maxWidth:430, margin:"0 auto", minHeight:"100vh", display:"flex", flexDirection:"column", fontFamily:"'Nunito','Segoe UI',sans-serif", background:C.shell }}>
+    <div style={{ maxWidth: isAdmin ? "100%" : 430, margin:"0 auto", minHeight:"100vh", display:"flex", flexDirection:"column", fontFamily:"'Nunito','Segoe UI',sans-serif", background: isAdmin ? "#F0F4F8" : C.shell }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
         * { box-sizing: border-box; }
-        body { margin: 0; background: #87CEEB; }
+        body { margin: 0; background: ${isAdmin ? "#F0F4F8" : "#87CEEB"}; }
         input:focus, select:focus { border-color: #1A8FE3 !important; box-shadow: 0 0 0 3px rgba(26,143,227,0.15); outline: none; }
         a { text-decoration: none; color: inherit; }
         a:hover { text-decoration: underline; }
@@ -6872,4 +6876,4 @@ export default function App() {
     </div>
   );
 }
-// dashboard desktop Wed Apr  1 13:01:09 CEST 2026
+// admin desktop fullwidth Wed Apr  1 13:06:29 CEST 2026
