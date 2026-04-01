@@ -939,7 +939,10 @@ function FormulesEveilScreen({ onNav, user }) {
             ))}
             <div style={{ fontSize:11, color:"#aaa", marginTop:6, fontStyle:"italic" }}>Votre accès sera activé à réception du paiement.</div>
           </div>
-          <SunBtn color="#9B59B6" full onClick={confirmBook}>📨 Envoyer la demande · 20 €</SunBtn>
+          <SunBtn color={enfantsEveil.length > 0 && !selectedEnfant ? "#bbb" : "#9B59B6"} full
+            onClick={() => { if (enfantsEveil.length > 0 && !selectedEnfant) return; confirmBook(); }}>
+            {enfantsEveil.length > 0 && !selectedEnfant ? "👆 Sélectionnez un enfant" : "📨 Envoyer la demande · 20 €"}
+          </SunBtn>
         </div>
       </div>
     );
@@ -1159,7 +1162,10 @@ function FormulesNatationScreen({ onNav, user }) {
               ))}
               <div style={{ fontSize:11, color:"#aaa", marginTop:6, fontStyle:"italic" }}>Votre accès sera activé à réception du paiement.</div>
             </div>
-            <SunBtn color={selected.color} full onClick={() => setDone(true)}>📨 Envoyer la demande · {selected?.price} €</SunBtn>
+            <SunBtn color={enfantsNat.length > 0 && !selectedEnfant ? "#bbb" : selected.color} full
+              onClick={() => { if (enfantsNat.length > 0 && !selectedEnfant) return; setDone(true); }}>
+              {enfantsNat.length > 0 && !selectedEnfant ? "👆 Sélectionnez un enfant" : `📨 Envoyer la demande · ${selected?.price} €`}
+            </SunBtn>
           </Card>
         )}
       </div>
