@@ -6859,12 +6859,16 @@ export default function App() {
 
   const isAdmin = screen === "admin";
 
+  useEffect(() => {
+    document.body.style.background = isAdmin ? "#F0F4F8" : "#87CEEB";
+  }, [isAdmin]);
+
   return (
-    <div style={{ maxWidth: isAdmin ? "100%" : 430, margin:"0 auto", minHeight:"100vh", display:"flex", flexDirection:"column", fontFamily:"'Nunito','Segoe UI',sans-serif", background: isAdmin ? "#F0F4F8" : C.shell }}>
+    <div style={{ maxWidth: isAdmin ? "none" : 430, margin:"0 auto", minHeight:"100vh", display:"flex", flexDirection:"column", fontFamily:"'Nunito','Segoe UI',sans-serif", background: isAdmin ? "#F0F4F8" : C.shell }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
         * { box-sizing: border-box; }
-        body { margin: 0; background: ${isAdmin ? "#F0F4F8" : "#87CEEB"}; }
+        body { margin: 0; }
         input:focus, select:focus { border-color: #1A8FE3 !important; box-shadow: 0 0 0 3px rgba(26,143,227,0.15); outline: none; }
         a { text-decoration: none; color: inherit; }
         a:hover { text-decoration: underline; }
@@ -6876,4 +6880,4 @@ export default function App() {
     </div>
   );
 }
-// admin desktop fullwidth Wed Apr  1 13:06:29 CEST 2026
+// admin fullwidth fix Wed Apr  1 13:10:33 CEST 2026
