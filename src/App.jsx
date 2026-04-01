@@ -2116,7 +2116,16 @@ function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSession
     const rappelDate  = getRappelDate(resaDateISO);
     scheduleRappel({ titre:"🏊 Rappel séance natation demain !", corps:`Ta séance à ${booking.time} est demain !`, dateStr:rappelDate });
     try {
-      await creerReservationNatation({ membreId:user?.supabaseId||null, jour:booking.day, heure:booking.time, dateSeance:resaDateISO, enfants:selectedEnfants, rappelDate, montant:20 });
+      await sb.from("reservations_natation").insert([{
+        membre_id:   user?.supabaseId || null,
+        jour:        booking.day,
+        heure:       booking.time,
+        date_seance: resaDateISO,
+        enfants:     selectedEnfants,
+        statut:      "pending",
+        rappel_date: rappelDate || null,
+        montant:     20,
+      }]);
     } catch(e) { console.warn("Supabase:", e.message); }
     setDone({ ...booking, enfants: selectedEnfants, rappelDate });
     setBooking(null);

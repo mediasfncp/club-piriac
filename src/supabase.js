@@ -4,7 +4,7 @@
 import { createClient } from '@supabase/supabase-js'
 
 const SUPABASE_URL = 'https://rnaosrftcntomehaepjh.supabase.co'
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJuYW9zcmZ0Y250b21laGFlcGpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxNjgzOTQsImV4cCI6MjA4OTc0NDM5NH0.9y9XK2FG5-o03ICrLTzgan3cBIWrg2wPTuMfFLf_3dY'
+const SUPABASE_KEY = 'sb_publishable_n9m3QjIKt9OnyN_d8n9cAQ_VQpUpnOu'
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
 
@@ -67,7 +67,7 @@ export async function updateLiberte(membreId, balance, total) {
 
 // ── RÉSERVATIONS NATATION ─────────────────────────────────
 
-export async function creerReservationNatation({ membreId, jour, heure, dateSeance, enfants, rappelDate, montant }) {
+export async function creerReservationNatation({ membreId, jour, heure, dateSeance, enfants, rappelDate, montant, statut }) {
   const { data, error } = await supabase
     .from('reservations_natation')
     .insert([{
@@ -76,7 +76,7 @@ export async function creerReservationNatation({ membreId, jour, heure, dateSean
       heure:       heure,
       date_seance: dateSeance,
       enfants:     enfants || [],
-      statut:      'confirmed',
+      statut:      statut || 'pending',
       rappel_date: rappelDate || null,
       montant:     montant || 20,
     }])
@@ -98,7 +98,7 @@ export async function getReservationsNatation(membreId) {
 
 // ── RÉSERVATIONS CLUB ─────────────────────────────────────
 
-export async function creerReservationClub({ membreId, dateReservation, session, labelJour, rappelDate }) {
+export async function creerReservationClub({ membreId, dateReservation, session, labelJour, rappelDate, enfants, statut }) {
   const { data, error } = await supabase
     .from('reservations_club')
     .insert([{
@@ -106,9 +106,10 @@ export async function creerReservationClub({ membreId, dateReservation, session,
       date_reservation:      dateReservation,
       session:               session,
       label_jour:            labelJour,
-      statut:                'confirmed',
+      statut:                statut || 'pending',
       rappel_date:           rappelDate || null,
       demi_journees_utilisees: 1,
+      enfants:               enfants || [],
     }])
     .select()
     .single()
@@ -181,30 +182,4 @@ export async function getAllReservations() {
     .order('created_at', { ascending: false })
   if (error) throw error
   return data || []
-}
-
-// ── RÉSAS CLUB ────────────────────────────────────────────
-export async function getAllReservationsClub() {
-  const { data, error } = await supabase
-    .from('reservations_club')
-    .select('*, membres(prenom, nom, email, tel)')
-    .order('created_at', { ascending: false })
-  if (error) throw error
-  return data || []
-}
-
-// ── STATS DASHBOARD ───────────────────────────────────────
-export async function getStatsGlobales() {
-  const [membres, resaNat, resaClub, paiements] = await Promise.all([
-    supabase.from('membres').select('id', { count: 'exact' }),
-    supabase.from('reservations_natation').select('id', { count: 'exact' }),
-    supabase.from('reservations_club').select('id', { count: 'exact' }),
-    supabase.from('paiements').select('montant').eq('statut', 'completed'),
-  ])
-  return {
-    nbMembres: membres.count || 0,
-    nbResaNat: resaNat.count || 0,
-    nbResaClub: resaClub.count || 0,
-    totalEncaisse: (paiements.data || []).reduce((s, p) => s + Number(p.montant), 0),
-  }
 }
