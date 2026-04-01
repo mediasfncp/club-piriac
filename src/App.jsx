@@ -5255,139 +5255,129 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
   const [selectedEnfants, setSelectedEnfants] = useState([]);
   const [saving, setSaving]             = useState(false);
   const [error, setError]               = useState("");
-  const [statutResa, setStatutResa]     = useState("pending"); // pending | confirmed
+  const [statutResa, setStatutResa]     = useState("pending");
 
   // Natation
-  const [forfaitNat, setForfaitNat]     = useState("unite"); // unite | forfait5 | forfait10
-  const [seancesNat, setSeancesNat]     = useState([{ date:"", heure:"" }]);
+  const [forfaitNat, setForfaitNat]     = useState("unite");
+  const [selectedCreneaux, setSelectedCreneaux] = useState([]); // [{dayISO, time}]
+  const [natWeekIdx, setNatWeekIdx]     = useState(0);
+  const [dbResasNat, setDbResasNat]     = useState([]);
 
   // Club
-  const [forfaitClub, setForfaitClub]     = useState("unite"); // unite | semaines | liberte
-  const [sessionClub, setSessionClub]     = useState("matin");
-  const [seancesClub, setSeancesClub]     = useState([{ date:"", session:"matin" }]);
-  const [selectedWeeks, setSelectedWeeks] = useState([]); // indices des semaines sélectionnées
-  const [moisFilter, setMoisFilter]       = useState("juil"); // juil | aout
+  const [forfaitClub, setForfaitClub]   = useState("unite");
+  const [sessionClub, setSessionClub]   = useState("matin");
+  const [seancesClub, setSeancesClub]   = useState([{ date:"", session:"matin" }]);
+  const [nbLiberte, setNbLiberte]       = useState(1); // nb demi-journées liberté
+  const [moisFilter, setMoisFilter]     = useState("juil");
+  // Club semaines — calendrier 1er jour
+  const [selectedStartDate, setSelectedStartDate] = useState(null); // ISO
+  const [nbSemainesClub, setNbSemainesClub] = useState(1);
 
-  const heuresNatation = [
-    "09:00","09:30","10:00","10:30","11:00","11:30","12:00",
-    "13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00","18:30","19:00"
-  ];
+  useEffect(() => {
+    sb.from("reservations_natation").select("date_seance, heure, statut")
+      .eq("statut","confirmed")
+      .then(({ data }) => setDbResasNat(data || [])).catch(() => {});
+  }, []);
+
+  const heuresNatation = ["09:00","09:30","10:00","10:30","11:00","11:30","12:00","12:30","13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00","18:30","19:00"];
 
   const membreSelectionne = dbMembres.find(m => m.id === membreId);
   const enfantsDuMembre   = membreSelectionne?.enfants || [];
   const liberteBalance    = membreSelectionne?.liberte_balance || 0;
 
-  const toggleEnfant = (prenom) => setSelectedEnfants(prev =>
-    prev.includes(prenom) ? prev.filter(e => e !== prenom) : [...prev, prenom]
-  );
+  const toggleEnfant = (prenom) => setSelectedEnfants(prev => prev.includes(prenom) ? prev.filter(e => e !== prenom) : [...prev, prenom]);
   const handleMembreChange = (id) => { setMembreId(id); setSelectedEnfants([]); };
 
-  // Natation : nombre de séances selon forfait
   const nbSeancesNat = forfaitNat === "unite" ? 1 : forfaitNat === "forfait5" ? 5 : forfaitNat === "forfait6" ? 6 : 10;
 
-  const updateSeanceNat = (idx, field, val) => {
-    const next = [...seancesNat];
-    next[idx] = { ...next[idx], [field]: val };
-    setSeancesNat(next);
+  const getSpots = (dayISO, time) => {
+    const taken = dbResasNat.filter(r => r.date_seance?.slice(0,10) === dayISO && r.heure === time).length;
+    return Math.max(0, 2 - taken);
   };
-  const addSeanceNat = () => setSeancesNat(prev => [...prev, { date:"", heure:"" }]);
-  const removeSeanceNat = (idx) => setSeancesNat(prev => prev.filter((_, i) => i !== idx));
 
+  const toggleCreneau = (dayISO, time) => {
+    const key = `${dayISO}-${time}`;
+    setSelectedCreneaux(prev => {
+      const exists = prev.find(c => c.key === key);
+      if (exists) return prev.filter(c => c.key !== key);
+      if (prev.length >= nbSeancesNat) return prev;
+      return [...prev, { key, dayISO, time }];
+    });
+  };
+
+  // Semaines natation
+  const natWeeks = [];
+  let wk = [];
+  ALL_SEASON_DAYS.forEach((d, i) => {
+    wk.push(d);
+    if (d.label === "Sam" || i === ALL_SEASON_DAYS.length - 1) { natWeeks.push([...wk]); wk = []; }
+  });
+  const natCurrentWeek = natWeeks[Math.min(natWeekIdx, natWeeks.length-1)] || [];
+
+  // Génération jours club pour semaines (N×6 jours depuis selectedStartDate)
+  const getClubWeekDays = () => {
+    if (!selectedStartDate) return [];
+    const startIdx = CLUB_SEASON_DAYS.findIndex(d => {
+      const iso = `${d.date.getFullYear()}-${String(d.date.getMonth()+1).padStart(2,"0")}-${String(d.date.getDate()).padStart(2,"0")}`;
+      return iso === selectedStartDate;
+    });
+    if (startIdx === -1) return [];
+    return CLUB_SEASON_DAYS.slice(startIdx, startIdx + nbSemainesClub * 6);
+  };
+
+  const addSeanceClub = () => setSeancesClub(prev => [...prev, { date:"", session:"matin" }]);
+  const removeSeanceClub = (idx) => setSeancesClub(prev => prev.filter((_, i) => i !== idx));
   const updateSeanceClub = (idx, field, val) => {
     const next = [...seancesClub];
     next[idx] = { ...next[idx], [field]: val };
     setSeancesClub(next);
   };
-  const addSeanceClub = () => setSeancesClub(prev => [...prev, { date:"", session:"matin" }]);
-  const removeSeanceClub = (idx) => setSeancesClub(prev => prev.filter((_, i) => i !== idx));
 
   const handleSave = async () => {
     setSaving(true);
     try {
       if (type === "natation") {
-        const seancesValides = seancesNat.filter(s => s.date && s.heure);
-        if (!seancesValides.length) { setError("Ajoutez au moins une séance avec date et heure."); setSaving(false); return; }
-        for (const s of seancesValides) {
+        if (!selectedCreneaux.length) { setError("Sélectionnez au moins un créneau."); setSaving(false); return; }
+        for (const c of selectedCreneaux) {
           await creerReservationNatation({
             membreId: membreId || null,
-            jour: new Date(s.date).toLocaleDateString("fr-FR", { weekday: "short" }),
-            heure: s.heure,
-            dateSeance: s.date,
+            jour: new Date(c.dayISO).toLocaleDateString("fr-FR", { weekday: "short" }),
+            heure: c.time,
+            dateSeance: c.dayISO,
             enfants: selectedEnfants,
-            rappelDate: getRappelDate(s.date),
+            rappelDate: getRappelDate(c.dayISO),
             montant: forfaitNat === "unite" ? 20 : forfaitNat === "forfait5" ? 95 : forfaitNat === "forfait6" ? 113 : 170,
             statut: statutResa,
           });
-          // Décrémenter 1 place dans allSeasonSessions
-          if (setAllSeasonSessions) {
-            setAllSeasonSessions(prev => {
-              let decremented = false;
-              return prev.map(slot => {
-                if (!decremented && slot.time === s.heure && slot.spots > 0) {
-                  // Trouver le slot du bon jour
-                  const dayObj = ALL_SEASON_DAYS.find(d => d.id === slot.day);
-                  if (dayObj) {
-                    const y = 2026;
-                    const m = String(dayObj.month === "Juillet" ? 7 : 8).padStart(2,"0");
-                    const d2 = String(dayObj.num).padStart(2,"0");
-                    const slotDate = `${y}-${m}-${d2}`;
-                    if (slotDate === s.date) { decremented = true; return { ...slot, spots: Math.max(0, slot.spots - 1) }; }
-                  }
-                }
-                return slot;
-              });
-            });
-          }
         }
       } else {
-        // SEMAINES — générer toutes les séances des semaines sélectionnées
         if (forfaitClub === "semaines") {
-          if (!selectedWeeks.length) { setError("Sélectionnez au moins une semaine."); setSaving(false); return; }
+          if (!selectedStartDate) { setError("Sélectionnez un jour de début."); setSaving(false); return; }
+          const days = getClubWeekDays();
           const sessions = sessionClub === "journee" ? ["matin","apmidi"] : [sessionClub];
-          for (const wIdx of selectedWeeks) {
-            const week = SEASON_WEEKS[wIdx];
-            for (const day of week.days) {
-              const dateStr = `${day.date.getFullYear()}-${String(day.date.getMonth()+1).padStart(2,"0")}-${String(day.date.getDate()).padStart(2,"0")}`;
-              for (const sess of sessions) {
-                await creerReservationClub({
-                  membreId: membreId || null,
-                  dateReservation: dateStr,
-                  session: sess,
-                  labelJour: day.date.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }),
-                  rappelDate: getRappelDate(dateStr),
-                  enfants: selectedEnfants,
-                  statut: statutResa,
-                });
-                if (setClubPlaces) setClubPlaces(prev => ({ ...prev, [sess]: Math.max(0, (prev[sess]||45) - 1) }));
-              }
+          for (const day of days) {
+            const dateStr = `${day.date.getFullYear()}-${String(day.date.getMonth()+1).padStart(2,"0")}-${String(day.date.getDate()).padStart(2,"0")}`;
+            for (const sess of sessions) {
+              await creerReservationClub({ membreId: membreId||null, dateReservation:dateStr, session:sess, labelJour:day.date.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"}), rappelDate:getRappelDate(dateStr), enfants:selectedEnfants, statut:statutResa });
             }
+          }
+        } else if (forfaitClub === "liberte") {
+          const seancesValides = seancesClub.filter(s => s.date).slice(0, nbLiberte);
+          if (!seancesValides.length) { setError("Ajoutez au moins une séance."); setSaving(false); return; }
+          for (const s of seancesValides) {
+            await creerReservationClub({ membreId:membreId||null, dateReservation:s.date, session:s.session, labelJour:new Date(s.date).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"}), rappelDate:getRappelDate(s.date), enfants:selectedEnfants, statut:statutResa });
           }
         } else {
           const seancesValides = seancesClub.filter(s => s.date);
           if (!seancesValides.length) { setError("Ajoutez au moins une séance."); setSaving(false); return; }
-          if (forfaitClub === "liberte" && seancesValides.length > liberteBalance) {
-            setError(`Solde insuffisant : ${liberteBalance} demi-journée(s) restante(s).`); setSaving(false); return;
-          }
           for (const s of seancesValides) {
-            await creerReservationClub({
-              membreId: membreId || null,
-              dateReservation: s.date,
-              session: s.session,
-              labelJour: new Date(s.date).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }),
-              rappelDate: getRappelDate(s.date),
-              enfants: selectedEnfants,
-              statut: statutResa,
-            });
-            if (setClubPlaces) setClubPlaces(prev => ({ ...prev, [s.session]: Math.max(0, (prev[s.session]||45) - 1) }));
+            await creerReservationClub({ membreId:membreId||null, dateReservation:s.date, session:s.session, labelJour:new Date(s.date).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"}), rappelDate:getRappelDate(s.date), enfants:selectedEnfants, statut:statutResa });
           }
         }
       }
       onSaved();
       onClose();
-    } catch(e) {
-      setError("Erreur : " + e.message);
-      setSaving(false);
-    }
+    } catch(e) { setError("Erreur : " + e.message); setSaving(false); }
   };
 
   return (
@@ -5410,7 +5400,7 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
             <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, textTransform:"uppercase" }}>Activité</label>
             <div style={{ display:"flex", gap:8 }}>
               {[["natation","🏊 Natation"],["club","🏖️ Club"]].map(([k,l]) => (
-                <button key={k} onClick={() => setType(k)} style={{ flex:1, background: type===k ? C.ocean : "#f0f0f0", color: type===k ? "#fff" : "#888", border:"none", borderRadius:14, padding:"10px", cursor:"pointer", fontWeight:900, fontSize:13, fontFamily:"inherit" }}>{l}</button>
+                <button key={k} onClick={() => { setType(k); setSelectedCreneaux([]); }} style={{ flex:1, background: type===k ? C.ocean : "#f0f0f0", color: type===k ? "#fff" : "#888", border:"none", borderRadius:14, padding:"10px", cursor:"pointer", fontWeight:900, fontSize:13, fontFamily:"inherit" }}>{l}</button>
               ))}
             </div>
           </div>
@@ -5425,16 +5415,12 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
             </select>
           </div>
 
-          {/* Statut paiement */}
+          {/* Statut */}
           <div>
             <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, textTransform:"uppercase" }}>Statut paiement</label>
             <div style={{ display:"flex", gap:8 }}>
               {[["pending","⏳ En attente"],["confirmed","✅ Payé"]].map(([k,l]) => (
-                <button key={k} onClick={() => setStatutResa(k)} style={{
-                  flex:1, background: statutResa===k ? (k==="confirmed" ? C.green : C.sun) : "#f0f0f0",
-                  color: statutResa===k ? "#fff" : "#888", border:"none", borderRadius:12,
-                  padding:"10px", cursor:"pointer", fontWeight:900, fontSize:13, fontFamily:"inherit",
-                }}>{l}</button>
+                <button key={k} onClick={() => setStatutResa(k)} style={{ flex:1, background: statutResa===k ? (k==="confirmed" ? C.green : C.sun) : "#f0f0f0", color: statutResa===k ? "#fff" : "#888", border:"none", borderRadius:12, padding:"10px", cursor:"pointer", fontWeight:900, fontSize:13, fontFamily:"inherit" }}>{l}</button>
               ))}
             </div>
           </div>
@@ -5443,24 +5429,14 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
           {enfantsDuMembre.length > 0 && (
             <div>
               <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, textTransform:"uppercase" }}>
-                Enfants {selectedEnfants.length > 0 && `· ${selectedEnfants.length} sélectionné${selectedEnfants.length>1?"s":""}`}
+                Enfants {selectedEnfants.length > 0 && `· ${selectedEnfants.join(", ")}`}
               </label>
-              <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+              <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
                 {enfantsDuMembre.map((e, i) => {
                   const sel = selectedEnfants.includes(e.prenom);
                   return (
-                    <div key={i} onClick={() => toggleEnfant(e.prenom)} style={{
-                      display:"flex", alignItems:"center", gap:10,
-                      background: sel ? `${C.ocean}15` : "#fff",
-                      border: `2px solid ${sel ? C.ocean : "#e0e8f0"}`,
-                      borderRadius:12, padding:"10px 14px", cursor:"pointer",
-                    }}>
-                      <div style={{ width:28, height:28, borderRadius:8, background: sel ? C.ocean : "#f0f0f0", display:"flex", alignItems:"center", justifyContent:"center", color: sel?"#fff":"#bbb", fontWeight:900, fontSize:13 }}>{sel?"✓":""}</div>
-                      <div style={{ flex:1 }}>
-                        <div style={{ fontWeight:900, color:"#2C3E50", fontSize:13 }}>{e.prenom} {NOM(e.nom)}</div>
-                        <div style={{ fontSize:11, color:"#aaa" }}>{calcAge(e.naissance)} ans</div>
-                      </div>
-                      {e.allergies && <div style={{ background:"#FFF0F0", color:C.sunset, borderRadius:50, padding:"2px 8px", fontSize:10, fontWeight:800 }}>⚠️</div>}
+                    <div key={i} onClick={() => toggleEnfant(e.prenom)} style={{ background: sel ? C.ocean : "#f0f0f0", color: sel?"#fff":"#888", borderRadius:50, padding:"8px 16px", cursor:"pointer", fontWeight:800, fontSize:13 }}>
+                      {sel ? "✓ " : ""}{e.prenom}
                     </div>
                   );
                 })}
@@ -5475,35 +5451,62 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
                 <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, textTransform:"uppercase" }}>Formule</label>
                 <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
                   {[["unite","1 · 20€"],["forfait5","5 · 95€"],["forfait6","6 · 113€"],["forfait10","10 · 170€"]].map(([k,l]) => (
-                    <button key={k} onClick={() => { setForfaitNat(k); const n = k==="unite"?1:k==="forfait5"?5:k==="forfait6"?6:10; setSeancesNat(Array.from({length:n},()=>({date:"",heure:""}))); }} style={{ flex:1, background: forfaitNat===k ? C.ocean : "#f0f0f0", color: forfaitNat===k ? "#fff" : "#888", border:"none", borderRadius:12, padding:"8px 4px", cursor:"pointer", fontWeight:800, fontSize:10, fontFamily:"inherit" }}>{l}</button>
+                    <button key={k} onClick={() => { setForfaitNat(k); setSelectedCreneaux([]); }} style={{ flex:1, background: forfaitNat===k ? C.ocean : "#f0f0f0", color: forfaitNat===k ? "#fff" : "#888", border:"none", borderRadius:12, padding:"8px 4px", cursor:"pointer", fontWeight:800, fontSize:10, fontFamily:"inherit" }}>{l}</button>
                   ))}
                 </div>
               </div>
 
-              <div>
-                <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, textTransform:"uppercase" }}>
-                  Séances ({seancesNat.length}/{nbSeancesNat})
-                </label>
-                <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-                  {seancesNat.map((s, i) => (
-                    <div key={i} style={{ background:"#fff", borderRadius:12, padding:"10px 12px", display:"flex", gap:8, alignItems:"center" }}>
-                      <div style={{ width:24, height:24, borderRadius:8, background:`${C.ocean}20`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:900, color:C.ocean, flexShrink:0 }}>{i+1}</div>
-                      <input type="date" value={s.date} onChange={e => updateSeanceNat(i,"date",e.target.value)} min="2026-07-06" max="2026-08-22"
-                        style={{ flex:1, border:"1.5px solid #e0e8f0", borderRadius:10, padding:"8px", fontSize:12, fontFamily:"inherit", outline:"none" }} />
-                      <select value={s.heure} onChange={e => updateSeanceNat(i,"heure",e.target.value)}
-                        style={{ flex:1, border:"1.5px solid #e0e8f0", borderRadius:10, padding:"8px", fontSize:12, fontFamily:"inherit", outline:"none", background:"#fff" }}>
-                        <option value="">Heure</option>
-                        {heuresNatation.map(h => <option key={h} value={h}>{h}</option>)}
-                      </select>
-                      {seancesNat.length > 1 && <button onClick={() => removeSeanceNat(i)} style={{ background:"#FFF0F0", border:"none", color:C.sunset, borderRadius:8, width:28, height:28, cursor:"pointer", fontWeight:900, fontFamily:"inherit" }}>✕</button>}
-                    </div>
-                  ))}
-                  {seancesNat.length < nbSeancesNat && (
-                    <button onClick={addSeanceNat} style={{ background:`${C.ocean}10`, border:`1.5px dashed ${C.ocean}40`, color:C.ocean, borderRadius:12, padding:"8px", cursor:"pointer", fontWeight:800, fontSize:12, fontFamily:"inherit" }}>
-                      ➕ Ajouter une séance
-                    </button>
-                  )}
+              {/* Navigation semaine */}
+              <div style={{ background:"#fff", borderRadius:16, padding:14, boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
+                <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:10 }}>
+                  <button onClick={() => setNatWeekIdx(Math.max(0,natWeekIdx-1))} disabled={natWeekIdx===0}
+                    style={{ background:natWeekIdx===0?"#eee":C.ocean, border:"none", color:natWeekIdx===0?"#bbb":"#fff", borderRadius:"50%", width:28, height:28, cursor:natWeekIdx===0?"not-allowed":"pointer", fontWeight:900, fontFamily:"inherit", fontSize:14 }}>‹</button>
+                  <div style={{ flex:1, textAlign:"center", fontWeight:800, color:C.dark, fontSize:12 }}>
+                    {natCurrentWeek[0]?.num} {natCurrentWeek[0]?.month} – {natCurrentWeek[natCurrentWeek.length-1]?.num} {natCurrentWeek[natCurrentWeek.length-1]?.month} 2026
+                  </div>
+                  <button onClick={() => setNatWeekIdx(Math.min(natWeeks.length-1,natWeekIdx+1))} disabled={natWeekIdx>=natWeeks.length-1}
+                    style={{ background:natWeekIdx>=natWeeks.length-1?"#eee":C.ocean, border:"none", color:natWeekIdx>=natWeeks.length-1?"#bbb":"#fff", borderRadius:"50%", width:28, height:28, cursor:natWeekIdx>=natWeeks.length-1?"not-allowed":"pointer", fontWeight:900, fontFamily:"inherit", fontSize:14 }}>›</button>
                 </div>
+
+                <div style={{ fontSize:11, color:"#888", marginBottom:8 }}>{selectedCreneaux.length}/{nbSeancesNat} sélectionné{selectedCreneaux.length>1?"s":""}</div>
+
+                {natCurrentWeek.map(d => {
+                  const dayISO = `${d.date.getFullYear()}-${String(d.date.getMonth()+1).padStart(2,"0")}-${String(d.date.getDate()).padStart(2,"0")}`;
+                  const daySlots = ALL_SEASON_SLOTS_INIT.filter(s => s.day === d.id);
+                  if (!daySlots.length) return null;
+                  return (
+                    <div key={d.id} style={{ marginBottom:10 }}>
+                      <div style={{ fontSize:10, fontWeight:900, color:C.ocean, textTransform:"uppercase", marginBottom:5 }}>{d.label} {d.num} {d.month}</div>
+                      <div style={{ display:"flex", flexWrap:"wrap", gap:5 }}>
+                        {daySlots.map(slot => {
+                          const spots = getSpots(dayISO, slot.time);
+                          const key = `${dayISO}-${slot.time}`;
+                          const sel = selectedCreneaux.find(c => c.key === key);
+                          const blocked = !sel && selectedCreneaux.length >= nbSeancesNat;
+                          const full = spots === 0;
+                          return (
+                            <div key={slot.id} onClick={() => !full && !blocked && toggleCreneau(dayISO, slot.time)} style={{
+                              background: sel ? `linear-gradient(135deg,${C.ocean},${C.sea})` : full?"#f5f5f5":blocked?"#f8f8f8":"#F0F4F8",
+                              color: sel?"#fff":full||blocked?"#ccc":C.dark,
+                              borderRadius:8, padding:"5px 10px", cursor:full||blocked?"not-allowed":"pointer",
+                              fontWeight:800, fontSize:11, border:`1.5px solid ${sel?C.ocean:"#e0e8f0"}`,
+                              boxShadow: sel?`0 2px 8px ${C.ocean}44`:"none",
+                            }}>
+                              {slot.time} {!full && <span style={{ fontSize:9, opacity:.7 }}>{spots}/2</span>}
+                              {full && <span style={{ fontSize:9 }}> Complet</span>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {selectedCreneaux.length > 0 && (
+                  <div style={{ background:`${C.ocean}10`, borderRadius:10, padding:"8px 10px", marginTop:8, fontSize:11, color:C.ocean, fontWeight:700 }}>
+                    ✓ {selectedCreneaux.map(c => `${c.time} (${new Date(c.dayISO).toLocaleDateString("fr-FR",{day:"numeric",month:"short"})})`).join(" · ")}
+                  </div>
+                )}
               </div>
             </>
           )}
@@ -5512,83 +5515,91 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
           {type === "club" && (
             <>
               <div>
-                <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, textTransform:"uppercase" }}>Formule</label>
+                <label style={{ fontSize:11, fontWeight:900, color:C.coral, display:"block", marginBottom:6, textTransform:"uppercase" }}>Formule</label>
                 <div style={{ display:"flex", gap:6 }}>
-                  {[["unite","Unité"],["semaines","Semaine(s)"],["liberte","Carte Liberté"]].map(([k,l]) => (
-                    <button key={k} onClick={() => { setForfaitClub(k); setSelectedWeeks([]); setSeancesClub([{date:"",session:"matin"}]); }} style={{ flex:1, background: forfaitClub===k ? C.coral : "#f0f0f0", color: forfaitClub===k ? "#fff" : "#888", border:"none", borderRadius:12, padding:"8px 4px", cursor:"pointer", fontWeight:800, fontSize:10, fontFamily:"inherit" }}>{l}</button>
+                  {[["unite","½ Journée"],["semaines","Semaine(s)"],["liberte","Carte Liberté"]].map(([k,l]) => (
+                    <button key={k} onClick={() => { setForfaitClub(k); setSelectedStartDate(null); setSeancesClub([{date:"",session:"matin"}]); }} style={{ flex:1, background: forfaitClub===k ? C.coral : "#f0f0f0", color: forfaitClub===k ? "#fff" : "#888", border:"none", borderRadius:12, padding:"8px 4px", cursor:"pointer", fontWeight:800, fontSize:10, fontFamily:"inherit" }}>{l}</button>
                   ))}
                 </div>
               </div>
 
-              {/* Semaines — grille 2 colonnes */}
+              {/* Club Semaines — calendrier */}
               {forfaitClub === "semaines" && (
-                <div>
-                  <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:8, textTransform:"uppercase" }}>
-                    Semaine(s) {selectedWeeks.length > 0 && <span style={{ color:C.coral }}>· {selectedWeeks.length} sélectionnée{selectedWeeks.length>1?"s":""}</span>}
-                  </label>
-
-                  {/* Toggle Juillet / Août */}
-                  <div style={{ display:"flex", gap:8, marginBottom:10 }}>
-                    {[["juil","🌊 Juillet"],["aout","☀️ Août"]].map(([k,l]) => (
-                      <button key={k} onClick={() => setMoisFilter(k)}
-                        style={{ flex:1, background: moisFilter===k ? `linear-gradient(135deg,${C.ocean},${C.sea})` : "#f0f0f0", color: moisFilter===k ? "#fff" : "#888", border:"none", borderRadius:14, padding:"10px", cursor:"pointer", fontWeight:900, fontSize:13, fontFamily:"inherit", boxShadow: moisFilter===k ? `0 4px 12px ${C.ocean}44` : "none" }}>
-                        {l}
-                      </button>
+                <div style={{ background:"#fff", borderRadius:16, padding:14, boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
+                  <div style={{ fontWeight:800, color:C.dark, fontSize:13, marginBottom:10 }}>📅 Nombre de semaines</div>
+                  <div style={{ display:"flex", gap:8, marginBottom:12 }}>
+                    {[1,2,3,4].map(n => (
+                      <button key={n} onClick={() => { setNbSemainesClub(n); setSelectedStartDate(null); }} style={{ flex:1, background: nbSemainesClub===n ? C.coral : "#f0f0f0", color: nbSemainesClub===n?"#fff":"#888", border:"none", borderRadius:10, padding:"8px", cursor:"pointer", fontWeight:900, fontSize:13, fontFamily:"inherit" }}>{n}</button>
                     ))}
                   </div>
 
-                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
-                    {SEASON_WEEKS.filter(w => {
-                      const m = w.days[0].date.getMonth();
-                      return moisFilter === "juil" ? m === 6 : m === 7;
-                    }).map((w, i) => {
-                      const realIdx = SEASON_WEEKS.indexOf(w);
-                      const sel = selectedWeeks.includes(realIdx);
-                      const first = w.days[0];
-                      const last  = w.days[w.days.length-1];
-                      return (
-                        <div key={realIdx} onClick={() => setSelectedWeeks(prev => sel ? prev.filter(x=>x!==realIdx) : [...prev, realIdx])}
-                          style={{
-                            background: sel ? `linear-gradient(135deg,${C.coral},${C.sun})` : "#fff",
-                            border: `2px solid ${sel ? C.coral : "#e0e8f0"}`,
-                            borderRadius: 16, padding: "10px 10px 8px",
-                            cursor: "pointer",
-                            boxShadow: sel ? `0 4px 14px ${C.coral}44` : "0 2px 6px rgba(0,0,0,0.04)",
-                          }}>
-                          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
-                            <div style={{ fontSize:9, fontWeight:900, color: sel?"rgba(255,255,255,0.8)":"#aaa", textTransform:"uppercase" }}>
-                              {first.label} → {last.label}
-                            </div>
-                            <div style={{ width:16, height:16, borderRadius:5, background: sel?"rgba(255,255,255,0.35)":"#f0f0f0", display:"flex", alignItems:"center", justifyContent:"center", fontSize:9, color: sel?"#fff":"#bbb", fontWeight:900 }}>
-                              {sel ? "✓" : ""}
-                            </div>
-                          </div>
-                          <div style={{ fontWeight:900, color: sel?"#fff":"#2C3E50", fontSize:13 }}>
-                            {first.num} {first.month}
-                          </div>
-                          <div style={{ fontSize:11, color: sel?"rgba(255,255,255,0.75)":"#aaa", marginBottom:6 }}>
-                            → {last.num} {last.month}
-                          </div>
-                          <div style={{ display:"flex", gap:2, flexWrap:"wrap" }}>
-                            {w.days.map((d, di) => (
-                              <div key={di} style={{
-                                background: sel ? "rgba(255,255,255,0.25)" : "#F0F4F8",
-                                color: sel ? "#fff" : "#888",
-                                borderRadius:4, padding:"1px 4px",
-                                fontSize:9, fontWeight:800,
-                              }}>{d.label}</div>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })}
+                  <div style={{ fontWeight:800, color:C.dark, fontSize:13, marginBottom:6 }}>Choisir le 1er jour</div>
+                  {/* Toggle mois */}
+                  <div style={{ display:"flex", gap:8, marginBottom:10 }}>
+                    {[["juil","Juillet"],["aout","Août"]].map(([k,l]) => (
+                      <button key={k} onClick={() => setMoisFilter(k)} style={{ flex:1, background: moisFilter===k ? `linear-gradient(135deg,${C.coral},${C.sun})` : "#f0f0f0", color: moisFilter===k?"#fff":"#888", border:"none", borderRadius:12, padding:"8px", cursor:"pointer", fontWeight:900, fontSize:12, fontFamily:"inherit" }}>{l}</button>
+                    ))}
                   </div>
-                  {selectedWeeks.length > 0 && (
-                    <div style={{ marginTop:12 }}>
-                      <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, textTransform:"uppercase" }}>Session</label>
+
+                  {/* Calendrier */}
+                  {(() => {
+                    const year = 2026;
+                    const month = moisFilter === "juil" ? 6 : 7;
+                    const firstDay = new Date(year, month, 1).getDay();
+                    const daysInMonth = new Date(year, month+1, 0).getDate();
+                    const offset = firstDay === 0 ? 6 : firstDay - 1;
+                    const dowLabels = ["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"];
+                    return (
+                      <div>
+                        <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:3, marginBottom:4 }}>
+                          {dowLabels.map(d => <div key={d} style={{ textAlign:"center", fontSize:9, fontWeight:900, color:"#aaa" }}>{d}</div>)}
+                        </div>
+                        <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:3 }}>
+                          {Array.from({length:offset}).map((_,i) => <div key={`e${i}`} />)}
+                          {Array.from({length:daysInMonth}).map((_,i) => {
+                            const day = i+1;
+                            const date = new Date(year, month, day);
+                            const dow = date.getDay();
+                            const iso = `${year}-${String(month+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+                            const isDim = dow === 0;
+                            const inSeason = CLUB_SEASON_DAYS.some(d => {
+                              const diso = `${d.date.getFullYear()}-${String(d.date.getMonth()+1).padStart(2,"0")}-${String(d.date.getDate()).padStart(2,"0")}`;
+                              return diso === iso;
+                            });
+                            const startIdx = CLUB_SEASON_DAYS.findIndex(d => {
+                              const diso = `${d.date.getFullYear()}-${String(d.date.getMonth()+1).padStart(2,"0")}-${String(d.date.getDate()).padStart(2,"0")}`;
+                              return diso === iso;
+                            });
+                            const disabled = !inSeason || isDim || CLUB_SEASON_DAYS.slice(startIdx, startIdx + nbSemainesClub*6).length < nbSemainesClub*6;
+                            const sel = selectedStartDate === iso;
+                            return (
+                              <div key={day} onClick={() => !disabled && setSelectedStartDate(sel ? null : iso)} style={{
+                                height:34, borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center",
+                                fontSize:12, fontWeight: inSeason?800:400,
+                                background: sel ? `linear-gradient(135deg,${C.coral},${C.sun})` : !inSeason||isDim?"transparent":"#F8FBFF",
+                                color: sel?"#fff":!inSeason||isDim?"#ddd":disabled?"#ccc":C.dark,
+                                cursor: disabled||!inSeason||isDim?"default":"pointer",
+                                border:`1.5px solid ${sel?C.coral:"transparent"}`,
+                              }}>{day}</div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {selectedStartDate && (
+                    <div style={{ marginTop:10, background:`${C.coral}10`, borderRadius:10, padding:"8px 12px", fontSize:12, color:C.coral, fontWeight:700 }}>
+                      ✓ Du {new Date(selectedStartDate).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"})} · {nbSemainesClub} sem. · {nbSemainesClub*6} jours
+                    </div>
+                  )}
+
+                  {selectedStartDate && (
+                    <div style={{ marginTop:10 }}>
+                      <label style={{ fontSize:11, fontWeight:900, color:C.coral, display:"block", marginBottom:6, textTransform:"uppercase" }}>Session</label>
                       <div style={{ display:"flex", gap:8 }}>
-                        {[["matin","Matin"],["apmidi","Après-midi"],["journee","Journée"]].map(([k,l]) => (
-                          <button key={k} onClick={() => setSessionClub(k)} style={{ flex:1, background: sessionClub===k ? C.coral : "#f0f0f0", color: sessionClub===k ? "#fff" : "#888", border:"none", borderRadius:12, padding:"8px 4px", cursor:"pointer", fontWeight:800, fontSize:10, fontFamily:"inherit" }}>{l}</button>
+                        {[["matin","☀️ Matin"],["apmidi","🌊 Après-midi"],["journee","☀️🌊 Journée"]].map(([k,l]) => (
+                          <button key={k} onClick={() => setSessionClub(k)} style={{ flex:1, background: sessionClub===k ? C.coral : "#f0f0f0", color: sessionClub===k?"#fff":"#888", border:"none", borderRadius:10, padding:"8px 4px", cursor:"pointer", fontWeight:800, fontSize:10, fontFamily:"inherit" }}>{l}</button>
                         ))}
                       </div>
                     </div>
@@ -5596,26 +5607,20 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
                 </div>
               )}
 
-              {/* Carte Liberté — solde */}
+              {/* Carte Liberté — nb demi-journées */}
               {forfaitClub === "liberte" && (
-                <div style={{ background: liberteBalance > 0 ? `${C.coral}12` : "#fff0f0", border:`1.5px solid ${liberteBalance>0?C.coral:"#fca5a5"}`, borderRadius:12, padding:"10px 14px" }}>
-                  <div style={{ fontWeight:900, color: liberteBalance>0?C.coral:"#e74c3c", fontSize:13 }}>
-                    🎟️ Solde Carte Liberté : <strong>{liberteBalance}</strong> demi-journée{liberteBalance>1?"s":""}
+                <div style={{ background:"#fff", borderRadius:16, padding:14, boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
+                  <div style={{ fontWeight:800, color:C.dark, fontSize:13, marginBottom:10 }}>🎟️ Nombre de demi-journées</div>
+                  <div style={{ display:"flex", gap:8, marginBottom:12 }}>
+                    {[["6","6 demi-j."],["10","10 demi-j."],["15","15 demi-j."],["20","20 demi-j."]].map(([n,l]) => (
+                      <button key={n} onClick={() => { setNbLiberte(Number(n)); setSeancesClub(Array.from({length:Number(n)},()=>({date:"",session:"matin"}))); }} style={{ flex:1, background: nbLiberte===Number(n) ? C.coral : "#f0f0f0", color: nbLiberte===Number(n)?"#fff":"#888", border:"none", borderRadius:10, padding:"7px 4px", cursor:"pointer", fontWeight:800, fontSize:10, fontFamily:"inherit" }}>{l}</button>
+                    ))}
                   </div>
-                  {liberteBalance === 0 && <div style={{ fontSize:11, color:"#e74c3c", marginTop:4 }}>Solde insuffisant — rechargez la carte</div>}
-                </div>
-              )}
-
-              {/* Séances unitaires ou liberté */}
-              {(forfaitClub === "unite" || forfaitClub === "liberte") && (
-                <div>
-                  <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, textTransform:"uppercase" }}>
-                    Séances {forfaitClub==="liberte" ? `(${seancesClub.length}/${liberteBalance} demi-j.)` : ""}
-                  </label>
+                  {membreId && <div style={{ fontSize:12, color:"#888", marginBottom:10 }}>Solde actuel : <strong>{liberteBalance}</strong> demi-j.</div>}
                   <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
                     {seancesClub.map((s, i) => (
-                      <div key={i} style={{ background:"#fff", borderRadius:12, padding:"10px 12px", display:"flex", gap:8, alignItems:"center" }}>
-                        <div style={{ width:24, height:24, borderRadius:8, background:`${C.coral}20`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:900, color:C.coral, flexShrink:0 }}>{i+1}</div>
+                      <div key={i} style={{ background:"#f8f8f8", borderRadius:12, padding:"10px 12px", display:"flex", gap:8, alignItems:"center" }}>
+                        <div style={{ width:22, height:22, borderRadius:6, background:`${C.coral}20`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, fontWeight:900, color:C.coral, flexShrink:0 }}>{i+1}</div>
                         <input type="date" value={s.date} onChange={e => updateSeanceClub(i,"date",e.target.value)} min="2026-07-06" max="2026-08-22"
                           style={{ flex:1, border:"1.5px solid #e0e8f0", borderRadius:10, padding:"8px", fontSize:12, fontFamily:"inherit", outline:"none" }} />
                         <select value={s.session} onChange={e => updateSeanceClub(i,"session",e.target.value)}
@@ -5623,23 +5628,41 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
                           <option value="matin">☀️ Matin</option>
                           <option value="apmidi">🌊 Après-midi</option>
                         </select>
-                        {seancesClub.length > 1 && <button onClick={() => removeSeanceClub(i)} style={{ background:"#FFF0F0", border:"none", color:C.sunset, borderRadius:8, width:28, height:28, cursor:"pointer", fontWeight:900, fontFamily:"inherit" }}>✕</button>}
+                        <button onClick={() => removeSeanceClub(i)} style={{ background:"#FFF0F0", border:"none", color:C.sunset, borderRadius:8, width:26, height:26, cursor:"pointer", fontWeight:900, fontFamily:"inherit" }}>✕</button>
                       </div>
                     ))}
-                    {(forfaitClub !== "liberte" || seancesClub.length < liberteBalance) && (
+                    {seancesClub.length < nbLiberte && (
                       <button onClick={addSeanceClub} style={{ background:`${C.coral}10`, border:`1.5px dashed ${C.coral}40`, color:C.coral, borderRadius:12, padding:"8px", cursor:"pointer", fontWeight:800, fontSize:12, fontFamily:"inherit" }}>
-                        ➕ Ajouter une séance
+                        ➕ Ajouter une séance ({seancesClub.length}/{nbLiberte})
                       </button>
                     )}
                   </div>
+                </div>
+              )}
+
+              {/* Unitaire */}
+              {forfaitClub === "unite" && (
+                <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                  {seancesClub.map((s, i) => (
+                    <div key={i} style={{ background:"#fff", borderRadius:12, padding:"10px 12px", display:"flex", gap:8, alignItems:"center" }}>
+                      <input type="date" value={s.date} onChange={e => updateSeanceClub(i,"date",e.target.value)} min="2026-07-06" max="2026-08-22"
+                        style={{ flex:1, border:"1.5px solid #e0e8f0", borderRadius:10, padding:"8px", fontSize:12, fontFamily:"inherit", outline:"none" }} />
+                      <select value={s.session} onChange={e => updateSeanceClub(i,"session",e.target.value)}
+                        style={{ flex:1, border:"1.5px solid #e0e8f0", borderRadius:10, padding:"8px", fontSize:12, fontFamily:"inherit", outline:"none", background:"#fff" }}>
+                        <option value="matin">☀️ Matin</option>
+                        <option value="apmidi">🌊 Après-midi</option>
+                      </select>
+                      {seancesClub.length > 1 && <button onClick={() => removeSeanceClub(i)} style={{ background:"#FFF0F0", border:"none", color:C.sunset, borderRadius:8, width:28, height:28, cursor:"pointer", fontWeight:900, fontFamily:"inherit" }}>✕</button>}
+                    </div>
+                  ))}
+                  <button onClick={addSeanceClub} style={{ background:`${C.coral}10`, border:`1.5px dashed ${C.coral}40`, color:C.coral, borderRadius:12, padding:"8px", cursor:"pointer", fontWeight:800, fontSize:12, fontFamily:"inherit" }}>➕ Ajouter une séance</button>
                 </div>
               )}
             </>
           )}
 
           {error && <div style={{ background:"#fff0f0", border:"1.5px solid #fca5a5", borderRadius:10, padding:"9px 14px", fontSize:13, color:"#e74c3c", fontWeight:700 }}>⚠️ {error}</div>}
-
-          <SunBtn color={saving ? "#aaa" : C.green} full onClick={handleSave} disabled={saving}>
+          <SunBtn color={saving ? "#aaa" : C.ocean} full onClick={handleSave} disabled={saving}>
             {saving ? "⏳ Enregistrement..." : "✅ Créer la réservation"}
           </SunBtn>
         </div>
