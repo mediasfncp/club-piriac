@@ -6363,6 +6363,180 @@ function CartesLiberteTab({ dbMembres }) {
   );
 }
 
+// ── RÉSAS PAR MEMBRE ─────────────────────────────────────
+function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, supprimerResaNatation, supprimerResaClub }) {
+  const allWeeks = (() => {
+    const ws = []; let wk = [];
+    ALL_SEASON_DAYS.forEach((d, i) => {
+      wk.push(d);
+      if (d.label === "Sam" || i === ALL_SEASON_DAYS.length - 1) { ws.push([...wk]); wk = []; }
+    });
+    return ws;
+  })();
+
+  const today = new Date();
+  const defaultWeekIdx = (() => {
+    let idx = 0;
+    allWeeks.forEach((w, i) => {
+      if (w.some(d => d.date && Math.abs(d.date - today) < 7*24*3600*1000)) idx = i;
+    });
+    return idx;
+  })();
+
+  const [weekIdx, setWeekIdx]           = useState(defaultWeekIdx);
+  const [openMembreIds, setOpenMembreIds] = useState({});
+  const [filterStatut, setFilterStatut]  = useState("tous");
+
+  const currentWeek = allWeeks[Math.min(weekIdx, allWeeks.length-1)] || [];
+  const weekStart   = currentWeek[0];
+  const weekEnd     = currentWeek[currentWeek.length-1];
+
+  const weekISOs = currentWeek.map(d => {
+    if (!d.date) return null;
+    return `${d.date.getFullYear()}-${String(d.date.getMonth()+1).padStart(2,"0")}-${String(d.date.getDate()).padStart(2,"0")}`;
+  }).filter(Boolean);
+
+  const resasSemNat  = dbResas.filter(r => weekISOs.includes(r.date_seance?.slice(0,10)));
+  const resasSemClub = dbResasClub.filter(r => weekISOs.includes(r.date_reservation?.slice(0,10)));
+
+  const membresMap = {};
+  [...resasSemNat.map(r => ({ ...r, _type:"nat" })),
+   ...resasSemClub.map(r => ({ ...r, _type:"club" }))
+  ].forEach(r => {
+    const mid = r.membre_id || "inconnu";
+    if (!membresMap[mid]) membresMap[mid] = { membre: r.membres, nat: [], club: [] };
+    if (r._type === "nat") membresMap[mid].nat.push(r);
+    else membresMap[mid].club.push(r);
+  });
+
+  const membres = Object.entries(membresMap)
+    .filter(([, g]) => {
+      if (filterStatut === "tous") return true;
+      return [...g.nat, ...g.club].some(r => r.statut === filterStatut);
+    })
+    .sort(([,a],[,b]) => {
+      const na = a.membre ? `${a.membre.nom} ${a.membre.prenom}` : "z";
+      const nb = b.membre ? `${b.membre.nom} ${b.membre.prenom}` : "z";
+      return na.localeCompare(nb);
+    });
+
+  const toggleMembre = (mid) => setOpenMembreIds(prev => ({ ...prev, [mid]: !prev[mid] }));
+
+  if (membres.length === 0) return (
+    <div style={{ textAlign:"center", padding:"32px 0", color:"#bbb", fontSize:14 }}>
+      Aucune réservation cette semaine
+    </div>
+  );
+
+  return (
+    <>
+      {/* Nav semaine + filtre */}
+      <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+        <div style={{ background:"#fff", borderRadius:14, padding:"9px 14px", display:"flex", alignItems:"center", justifyContent:"space-between", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
+          <button onClick={() => setWeekIdx(Math.max(0, weekIdx-1))} disabled={weekIdx===0}
+            style={{ background:weekIdx===0?"#f0f0f0":C.ocean, border:"none", color:weekIdx===0?"#bbb":"#fff", borderRadius:"50%", width:30, height:30, cursor:weekIdx===0?"not-allowed":"pointer", fontWeight:900, fontFamily:"inherit", fontSize:16 }}>‹</button>
+          <div style={{ textAlign:"center" }}>
+            <div style={{ fontWeight:900, color:C.dark, fontSize:13 }}>
+              {weekStart?.num} {weekStart?.month} – {weekEnd?.num} {weekEnd?.month} 2026
+            </div>
+            <div style={{ fontSize:11, color:"#aaa" }}>Semaine {weekIdx+1}/{allWeeks.length} · {membres.length} famille{membres.length>1?"s":""}</div>
+          </div>
+          <button onClick={() => setWeekIdx(Math.min(allWeeks.length-1, weekIdx+1))} disabled={weekIdx>=allWeeks.length-1}
+            style={{ background:weekIdx>=allWeeks.length-1?"#f0f0f0":C.ocean, border:"none", color:weekIdx>=allWeeks.length-1?"#bbb":"#fff", borderRadius:"50%", width:30, height:30, cursor:weekIdx>=allWeeks.length-1?"not-allowed":"pointer", fontWeight:900, fontFamily:"inherit", fontSize:16 }}>›</button>
+        </div>
+        <div style={{ display:"flex", gap:6 }}>
+          {[["tous","Tout"],["pending","⏳ En attente"],["confirmed","✅ Confirmés"]].map(([k,l]) => (
+            <button key={k} onClick={() => setFilterStatut(k)} style={{ flex:1, background:filterStatut===k?C.ocean:"#f0f0f0", color:filterStatut===k?"#fff":"#888", border:"none", borderRadius:10, padding:"7px 4px", cursor:"pointer", fontWeight:800, fontSize:11, fontFamily:"inherit" }}>{l}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Cartes par membre */}
+      {membres.map(([mid, g]) => {
+        const isOpen = openMembreIds[mid];
+        const allR = [...g.nat, ...g.club];
+        const hasPending = allR.some(r => r.statut === "pending");
+        const nomMembre = g.membre ? `${g.membre.prenom} ${NOM(g.membre.nom)}` : "—";
+        return (
+          <div key={mid} style={{ background:"#fff", borderRadius:18, boxShadow:"0 3px 12px rgba(0,0,0,0.07)", overflow:"hidden", border: hasPending ? `2px solid ${C.sun}60` : "2px solid transparent" }}>
+            <div onClick={() => toggleMembre(mid)} style={{ padding:"14px 16px", display:"flex", alignItems:"center", gap:12, cursor:"pointer" }}>
+              <div style={{ width:42, height:42, borderRadius:14, background:`linear-gradient(135deg,${C.ocean},${C.sea})`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0 }}>👤</div>
+              <div style={{ flex:1 }}>
+                <div style={{ fontWeight:900, color:C.dark, fontSize:14 }}>{nomMembre}</div>
+                <div style={{ display:"flex", gap:6, marginTop:3, flexWrap:"wrap" }}>
+                  {g.nat.length > 0 && <span style={{ background:`${C.ocean}15`, color:C.ocean, borderRadius:50, padding:"1px 8px", fontSize:10, fontWeight:800 }}>🏊 {g.nat.length} nat.</span>}
+                  {g.club.length > 0 && <span style={{ background:`${C.coral}15`, color:C.coral, borderRadius:50, padding:"1px 8px", fontSize:10, fontWeight:800 }}>🏖️ {g.club.length} club</span>}
+                  {hasPending && <span style={{ background:`${C.sun}25`, color:"#b45309", borderRadius:50, padding:"1px 8px", fontSize:10, fontWeight:800 }}>⏳ En attente</span>}
+                </div>
+              </div>
+              <div style={{ fontSize:18, color:"#ccc", transform: isOpen ? "rotate(90deg)" : "none", transition:"transform .15s" }}>›</div>
+            </div>
+
+            {isOpen && (
+              <div style={{ borderTop:"1px solid #f0f0f0", padding:"10px 14px 14px", display:"flex", flexDirection:"column", gap:8 }}>
+                {g.nat.length > 0 && (
+                  <div>
+                    <div style={{ fontSize:10, fontWeight:900, color:C.ocean, textTransform:"uppercase", marginBottom:6 }}>🏊 Natation</div>
+                    {g.nat.map(r => (
+                      <div key={r.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", background:`${C.ocean}08`, borderRadius:10, padding:"7px 10px", marginBottom:4, borderLeft:`3px solid ${r.statut==="pending"?C.sun:C.ocean}` }}>
+                        <div>
+                          <span style={{ fontWeight:800, color:C.dark, fontSize:12 }}>{r.heure}</span>
+                          <span style={{ color:"#aaa", fontSize:11, marginLeft:6 }}>{r.date_seance ? new Date(r.date_seance).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}) : "—"}</span>
+                          {r.enfants?.length > 0 && <span style={{ color:C.ocean, fontSize:10, marginLeft:6, fontWeight:700 }}>{r.enfants.join(", ")}</span>}
+                        </div>
+                        <div style={{ display:"flex", gap:4, alignItems:"center" }}>
+                          {r.statut === "pending" ? (
+                            <button onClick={async () => { await sb.from("reservations_natation").update({statut:"confirmed"}).eq("id",r.id); refreshResas(); }}
+                              style={{ background:C.green, border:"none", color:"#fff", borderRadius:8, padding:"3px 8px", cursor:"pointer", fontWeight:900, fontSize:10, fontFamily:"inherit" }}>✅</button>
+                          ) : <span style={{ fontSize:10, color:C.green, fontWeight:800 }}>✓</span>}
+                          <button onClick={() => setModifierResa({ resa: r, type:"natation" })}
+                            style={{ background:`${C.ocean}15`, border:"none", color:C.ocean, borderRadius:8, width:24, height:24, cursor:"pointer", fontSize:11, fontFamily:"inherit" }}>✏️</button>
+                          <button onClick={() => { if(window.confirm("Supprimer ?")) supprimerResaNatation(r.id); }}
+                            style={{ background:"#FFF0F0", border:"none", color:C.sunset, borderRadius:8, width:24, height:24, cursor:"pointer", fontSize:11, fontFamily:"inherit" }}>🗑</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {g.club.length > 0 && (
+                  <div>
+                    <div style={{ fontSize:10, fontWeight:900, color:C.coral, textTransform:"uppercase", marginBottom:6 }}>🏖️ Club de Plage</div>
+                    {g.club.map(r => {
+                      const isLiberte = !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6;
+                      const isLib = (r.label_jour||"").startsWith("[LIBERTE]");
+                      return (
+                        <div key={r.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", background:`${C.coral}08`, borderRadius:10, padding:"7px 10px", marginBottom:4, borderLeft:`3px solid ${r.statut==="pending"?C.sun:C.coral}` }}>
+                          <div>
+                            <span style={{ fontWeight:800, color:C.dark, fontSize:12 }}>
+                              {isLiberte ? `🎟️ Carte ${r.enfants[0]} demi-j.` : isLib ? "🎟️ Liberté" : r.session==="matin"?"☀️ Matin":"🌊 Après-midi"}
+                            </span>
+                            <span style={{ color:"#aaa", fontSize:11, marginLeft:6 }}>{r.date_reservation ? new Date(r.date_reservation).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}) : "—"}</span>
+                            {r.enfants?.length > 0 && !isLiberte && <span style={{ color:C.coral, fontSize:10, marginLeft:6, fontWeight:700 }}>{r.enfants.join(", ")}</span>}
+                          </div>
+                          <div style={{ display:"flex", gap:4, alignItems:"center" }}>
+                            {r.statut === "pending" ? (
+                              <button onClick={async () => { await sb.from("reservations_club").update({statut:"confirmed"}).eq("id",r.id); refreshResas(); }}
+                                style={{ background:C.green, border:"none", color:"#fff", borderRadius:8, padding:"3px 8px", cursor:"pointer", fontWeight:900, fontSize:10, fontFamily:"inherit" }}>✅</button>
+                            ) : <span style={{ fontSize:10, color:C.green, fontWeight:800 }}>✓</span>}
+                            <button onClick={() => setModifierResa({ resa: r, type:"club" })}
+                              style={{ background:`${C.coral}15`, border:"none", color:C.coral, borderRadius:8, width:24, height:24, cursor:"pointer", fontSize:11, fontFamily:"inherit" }}>✏️</button>
+                            <button onClick={() => { if(window.confirm("Supprimer ?")) supprimerResaClub(r.id); }}
+                              style={{ background:"#FFF0F0", border:"none", color:C.sunset, borderRadius:8, width:24, height:24, cursor:"pointer", fontSize:11, fontFamily:"inherit" }}>🗑</button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
 function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSessions, setAllSeasonSessions, clubPlaces, setClubPlaces }) {
   const [tab, setTab] = useState("dashboard");
   const [dbResas, setDbResas]         = useState([]);
@@ -6880,188 +7054,14 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
             })()}
 
             {/* ── VUE PAR MEMBRE · SEMAINE ── */}
-            {(() => {
-              // Semaines depuis ALL_SEASON_DAYS
-              const allWeeks = [];
-              let wk = [];
-              ALL_SEASON_DAYS.forEach((d, i) => {
-                wk.push(d);
-                if (d.label === "Sam" || i === ALL_SEASON_DAYS.length - 1) { allWeeks.push([...wk]); wk = []; }
-              });
-
-              // Semaine courante = celle qui contient aujourd'hui ou la première
-              const today = new Date();
-              let defaultWeekIdx = 0;
-              allWeeks.forEach((w, i) => {
-                if (w.some(d => d.date && Math.abs(d.date - today) < 7*24*3600*1000)) defaultWeekIdx = i;
-              });
-
-              const [weekIdx, setWeekIdx] = React.useState(defaultWeekIdx);
-              const [openMembreIds, setOpenMembreIds] = React.useState({});
-              const [filterStatut, setFilterStatut] = React.useState("tous"); // tous | pending | confirmed
-
-              const currentWeek = allWeeks[Math.min(weekIdx, allWeeks.length-1)] || [];
-              const weekStart = currentWeek[0];
-              const weekEnd   = currentWeek[currentWeek.length-1];
-
-              // ISO de chaque jour de la semaine
-              const weekISOs = currentWeek.map(d => {
-                if (!d.date) return null;
-                return `${d.date.getFullYear()}-${String(d.date.getMonth()+1).padStart(2,"0")}-${String(d.date.getDate()).padStart(2,"0")}`;
-              }).filter(Boolean);
-
-              // Filtrer résas de la semaine
-              const resasSemNat  = dbResas.filter(r => weekISOs.includes(r.date_seance?.slice(0,10)));
-              const resasSemClub = dbResasClub.filter(r => weekISOs.includes(r.date_reservation?.slice(0,10)));
-
-              // Regrouper par membre
-              const membresMap = {};
-              [...resasSemNat.map(r => ({ ...r, _type:"nat" })),
-               ...resasSemClub.map(r => ({ ...r, _type:"club" }))
-              ].forEach(r => {
-                const mid = r.membre_id || "inconnu";
-                if (!membresMap[mid]) membresMap[mid] = {
-                  membre: r.membres,
-                  nat: [], club: [],
-                };
-                if (r._type === "nat") membresMap[mid].nat.push(r);
-                else membresMap[mid].club.push(r);
-              });
-
-              const membres = Object.entries(membresMap)
-                .filter(([, g]) => {
-                  if (filterStatut === "tous") return true;
-                  return [...g.nat, ...g.club].some(r => r.statut === filterStatut);
-                })
-                .sort(([,a],[,b]) => {
-                  const na = a.membre ? `${a.membre.nom} ${a.membre.prenom}` : "z";
-                  const nb = b.membre ? `${b.membre.nom} ${b.membre.prenom}` : "z";
-                  return na.localeCompare(nb);
-                });
-
-              const toggleMembre = (mid) => setOpenMembreIds(prev => ({ ...prev, [mid]: !prev[mid] }));
-
-              if (membres.length === 0) return (
-                <div style={{ textAlign:"center", padding:"32px 0", color:"#bbb", fontSize:14 }}>
-                  Aucune réservation cette semaine
-                </div>
-              );
-
-              return (
-                <>
-                  {/* Nav semaine + filtre */}
-                  <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-                    <div style={{ background:"#fff", borderRadius:14, padding:"9px 14px", display:"flex", alignItems:"center", justifyContent:"space-between", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
-                      <button onClick={() => setWeekIdx(Math.max(0, weekIdx-1))} disabled={weekIdx===0}
-                        style={{ background:weekIdx===0?"#f0f0f0":C.ocean, border:"none", color:weekIdx===0?"#bbb":"#fff", borderRadius:"50%", width:30, height:30, cursor:weekIdx===0?"not-allowed":"pointer", fontWeight:900, fontFamily:"inherit", fontSize:16 }}>‹</button>
-                      <div style={{ textAlign:"center" }}>
-                        <div style={{ fontWeight:900, color:C.dark, fontSize:13 }}>
-                          {weekStart?.num} {weekStart?.month} – {weekEnd?.num} {weekEnd?.month} 2026
-                        </div>
-                        <div style={{ fontSize:11, color:"#aaa" }}>Semaine {weekIdx+1}/{allWeeks.length} · {membres.length} famille{membres.length>1?"s":""}</div>
-                      </div>
-                      <button onClick={() => setWeekIdx(Math.min(allWeeks.length-1, weekIdx+1))} disabled={weekIdx>=allWeeks.length-1}
-                        style={{ background:weekIdx>=allWeeks.length-1?"#f0f0f0":C.ocean, border:"none", color:weekIdx>=allWeeks.length-1?"#bbb":"#fff", borderRadius:"50%", width:30, height:30, cursor:weekIdx>=allWeeks.length-1?"not-allowed":"pointer", fontWeight:900, fontFamily:"inherit", fontSize:16 }}>›</button>
-                    </div>
-                    {/* Filtre statut */}
-                    <div style={{ display:"flex", gap:6 }}>
-                      {[["tous","Tout"],["pending","⏳ En attente"],["confirmed","✅ Confirmés"]].map(([k,l]) => (
-                        <button key={k} onClick={() => setFilterStatut(k)} style={{ flex:1, background:filterStatut===k?C.ocean:"#f0f0f0", color:filterStatut===k?"#fff":"#888", border:"none", borderRadius:10, padding:"7px 4px", cursor:"pointer", fontWeight:800, fontSize:11, fontFamily:"inherit" }}>{l}</button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Cartes par membre */}
-                  {membres.map(([mid, g]) => {
-                    const isOpen = openMembreIds[mid];
-                    const allR = [...g.nat, ...g.club];
-                    const hasPending = allR.some(r => r.statut === "pending");
-                    const nomMembre = g.membre ? `${g.membre.prenom} ${NOM(g.membre.nom)}` : "—";
-                    return (
-                      <div key={mid} style={{ background:"#fff", borderRadius:18, boxShadow:"0 3px 12px rgba(0,0,0,0.07)", overflow:"hidden", border: hasPending ? `2px solid ${C.sun}60` : "2px solid transparent" }}>
-                        {/* Header cliquable */}
-                        <div onClick={() => toggleMembre(mid)} style={{ padding:"14px 16px", display:"flex", alignItems:"center", gap:12, cursor:"pointer" }}>
-                          <div style={{ width:42, height:42, borderRadius:14, background:`linear-gradient(135deg,${C.ocean},${C.sea})`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0 }}>👤</div>
-                          <div style={{ flex:1 }}>
-                            <div style={{ fontWeight:900, color:C.dark, fontSize:14 }}>{nomMembre}</div>
-                            <div style={{ display:"flex", gap:6, marginTop:3, flexWrap:"wrap" }}>
-                              {g.nat.length > 0 && <span style={{ background:`${C.ocean}15`, color:C.ocean, borderRadius:50, padding:"1px 8px", fontSize:10, fontWeight:800 }}>🏊 {g.nat.length} nat.</span>}
-                              {g.club.length > 0 && <span style={{ background:`${C.coral}15`, color:C.coral, borderRadius:50, padding:"1px 8px", fontSize:10, fontWeight:800 }}>🏖️ {g.club.length} club</span>}
-                              {hasPending && <span style={{ background:`${C.sun}25`, color:"#b45309", borderRadius:50, padding:"1px 8px", fontSize:10, fontWeight:800 }}>⏳ En attente</span>}
-                            </div>
-                          </div>
-                          <div style={{ fontSize:18, color:"#ccc", transform: isOpen ? "rotate(90deg)" : "none", transition:"transform .15s" }}>›</div>
-                        </div>
-
-                        {/* Détail dépliable */}
-                        {isOpen && (
-                          <div style={{ borderTop:"1px solid #f0f0f0", padding:"10px 14px 14px", display:"flex", flexDirection:"column", gap:8 }}>
-
-                            {/* Natation */}
-                            {g.nat.length > 0 && (
-                              <div>
-                                <div style={{ fontSize:10, fontWeight:900, color:C.ocean, textTransform:"uppercase", marginBottom:6 }}>🏊 Natation</div>
-                                {g.nat.map(r => (
-                                  <div key={r.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", background:`${C.ocean}08`, borderRadius:10, padding:"7px 10px", marginBottom:4, borderLeft:`3px solid ${r.statut==="pending"?C.sun:C.ocean}` }}>
-                                    <div>
-                                      <span style={{ fontWeight:800, color:C.dark, fontSize:12 }}>{r.heure}</span>
-                                      <span style={{ color:"#aaa", fontSize:11, marginLeft:6 }}>{r.date_seance ? new Date(r.date_seance).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}) : "—"}</span>
-                                      {r.enfants?.length > 0 && <span style={{ color:C.ocean, fontSize:10, marginLeft:6, fontWeight:700 }}>{r.enfants.join(", ")}</span>}
-                                    </div>
-                                    <div style={{ display:"flex", gap:4, alignItems:"center" }}>
-                                      {r.statut === "pending" ? (
-                                        <button onClick={async () => { await sb.from("reservations_natation").update({statut:"confirmed"}).eq("id",r.id); refreshResas(); }}
-                                          style={{ background:C.green, border:"none", color:"#fff", borderRadius:8, padding:"3px 8px", cursor:"pointer", fontWeight:900, fontSize:10, fontFamily:"inherit" }}>✅</button>
-                                      ) : <span style={{ fontSize:10, color:C.green, fontWeight:800 }}>✓</span>}
-                                      <button onClick={() => setModifierResa({ resa: r, type:"natation" })}
-                                        style={{ background:`${C.ocean}15`, border:"none", color:C.ocean, borderRadius:8, width:24, height:24, cursor:"pointer", fontSize:11, fontFamily:"inherit" }}>✏️</button>
-                                      <button onClick={() => { if(window.confirm("Supprimer ?")) supprimerResaNatation(r.id); }}
-                                        style={{ background:"#FFF0F0", border:"none", color:C.sunset, borderRadius:8, width:24, height:24, cursor:"pointer", fontSize:11, fontFamily:"inherit" }}>🗑</button>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-
-                            {/* Club */}
-                            {g.club.length > 0 && (
-                              <div>
-                                <div style={{ fontSize:10, fontWeight:900, color:C.coral, textTransform:"uppercase", marginBottom:6 }}>🏖️ Club de Plage</div>
-                                {g.club.map(r => {
-                                  const isLiberte = !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6;
-                                  const isLib = (r.label_jour||"").startsWith("[LIBERTE]");
-                                  return (
-                                    <div key={r.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", background:`${C.coral}08`, borderRadius:10, padding:"7px 10px", marginBottom:4, borderLeft:`3px solid ${r.statut==="pending"?C.sun:C.coral}` }}>
-                                      <div>
-                                        <span style={{ fontWeight:800, color:C.dark, fontSize:12 }}>
-                                          {isLiberte ? `🎟️ Carte ${r.enfants[0]} demi-j.` : isLib ? "🎟️ Liberté" : r.session==="matin"?"☀️ Matin":"🌊 Après-midi"}
-                                        </span>
-                                        <span style={{ color:"#aaa", fontSize:11, marginLeft:6 }}>{r.date_reservation ? new Date(r.date_reservation).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}) : "—"}</span>
-                                        {r.enfants?.length > 0 && !isLiberte && <span style={{ color:C.coral, fontSize:10, marginLeft:6, fontWeight:700 }}>{r.enfants.join(", ")}</span>}
-                                      </div>
-                                      <div style={{ display:"flex", gap:4, alignItems:"center" }}>
-                                        {r.statut === "pending" ? (
-                                          <button onClick={async () => { await sb.from("reservations_club").update({statut:"confirmed"}).eq("id",r.id); refreshResas(); }}
-                                            style={{ background:C.green, border:"none", color:"#fff", borderRadius:8, padding:"3px 8px", cursor:"pointer", fontWeight:900, fontSize:10, fontFamily:"inherit" }}>✅</button>
-                                        ) : <span style={{ fontSize:10, color:C.green, fontWeight:800 }}>✓</span>}
-                                        <button onClick={() => setModifierResa({ resa: r, type:"club" })}
-                                          style={{ background:`${C.coral}15`, border:"none", color:C.coral, borderRadius:8, width:24, height:24, cursor:"pointer", fontSize:11, fontFamily:"inherit" }}>✏️</button>
-                                        <button onClick={() => { if(window.confirm("Supprimer ?")) supprimerResaClub(r.id); }}
-                                          style={{ background:"#FFF0F0", border:"none", color:C.sunset, borderRadius:8, width:24, height:24, cursor:"pointer", fontSize:11, fontFamily:"inherit" }}>🗑</button>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </>
-              );
-            })()}
+            <ResasMembreView
+              dbResas={dbResas}
+              dbResasClub={dbResasClub}
+              refreshResas={refreshResas}
+              setModifierResa={setModifierResa}
+              supprimerResaNatation={supprimerResaNatation}
+              supprimerResaClub={supprimerResaClub}
+            />
 
             {/* Si aucune donnée Supabase, afficher mock */}
             {dbResas.length === 0 && dbResasClub.length === 0 && allResas.map(r => (
@@ -7610,4 +7610,4 @@ export default function App() {
     </div>
   );
 }
-// resas par membre semaine Wed Apr  1 22:07:20 CEST 2026
+// ResasMembreView composant Wed Apr  1 22:12:49 CEST 2026
