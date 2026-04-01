@@ -3912,32 +3912,75 @@ const ALL_PAYMENTS = [
 function PaiementsTab() {
   const [resas, setResas]     = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter]   = useState("tous"); // tous | pending | confirmed
+  const [filter, setFilter]   = useState("tous");
 
-  useEffect(() => {
-    const loadAll = async () => {
-      const [{ data: nat }, { data: club }] = await Promise.all([
-        sb.from("reservations_natation").select("*, membres(prenom, nom, email)").order("date_seance"),
-        sb.from("reservations_club").select("*, membres(prenom, nom, email)").order("date_reservation"),
-      ]);
-      const natFmt  = (nat  || []).map(r => ({ ...r, _type: "natation", _date: r.date_seance,      _label: `🏊 ${r.heure}` }));
-      const clubFmt = (club || []).map(r => ({ ...r, _type: "club",     _date: r.date_reservation, _label: `🏖️ ${r.session === "matin" ? "Matin" : "Après-midi"}` }));
-      setResas([...natFmt, ...clubFmt].sort((a,b) => (a._date||"").localeCompare(b._date||"")));
-      setLoading(false);
-    };
-    loadAll().catch(() => setLoading(false));
-  }, []);
-
-  const validerPaiement = async (r) => {
-    const table = r._type === "natation" ? "reservations_natation" : "reservations_club";
-    await sb.from(table).update({ statut: "confirmed" }).eq("id", r.id);
-    setResas(prev => prev.map(x => x.id === r.id && x._type === r._type ? { ...x, statut: "confirmed" } : x));
+  const loadAll = async () => {
+    const [{ data: nat }, { data: club }] = await Promise.all([
+      sb.from("reservations_natation").select("*, membres(prenom, nom, email)").order("created_at"),
+      sb.from("reservations_club").select("*, membres(prenom, nom, email)").order("created_at"),
+    ]);
+    const natFmt  = (nat  || []).map(r => ({ ...r, _type:"natation", _date:r.date_seance,      _label:`🏊 ${r.heure}` }));
+    const clubFmt = (club || []).map(r => ({ ...r, _type:"club",     _date:r.date_reservation, _label:`🏖️ ${r.session==="matin"?"Matin":"Après-midi"}` }));
+    setResas([...natFmt, ...clubFmt].sort((a,b) => (a.created_at||"").localeCompare(b.created_at||"")));
+    setLoading(false);
   };
 
-  const filtered = filter === "tous" ? resas : resas.filter(r => r.statut === filter);
-  const pending   = resas.filter(r => r.statut === "pending").length;
-  const confirmed = resas.filter(r => r.statut === "confirmed").length;
-  const CAT_COLOR = { natation: C.ocean, club: C.coral };
+  useEffect(() => { loadAll().catch(() => setLoading(false)); }, []);
+
+  const toggleStatut = async (groupe) => {
+    const table    = groupe.type === "natation" ? "reservations_natation" : "reservations_club";
+    const newStatut = groupe.statut === "pending" ? "confirmed" : "pending";
+    await Promise.all(groupe.resas.map(r => sb.from(table).update({ statut: newStatut }).eq("id", r.id)));
+    await loadAll();
+  };
+
+  // Grouper par membre + type + bloc temporel (créés le même jour)
+  const grouper = (liste) => {
+    const groups = {};
+    liste.forEach(r => {
+      const dateCreation = (r.created_at||"").slice(0,10);
+      const key = `${r.membre_id}-${r._type}-${dateCreation}`;
+      if (!groups[key]) groups[key] = {
+        key, membre: r.membres, type: r._type, statut: r.statut,
+        created_at: r.created_at, resas: [],
+      };
+      groups[key].resas.push(r);
+    });
+    return Object.values(groups).sort((a,b) => (a.created_at||"").localeCompare(b.created_at||""));
+  };
+
+  const allGroups    = grouper(resas);
+  const pending      = allGroups.filter(g => g.statut === "pending").length;
+  const confirmed    = allGroups.filter(g => g.statut === "confirmed").length;
+  const CAT_COLOR    = { natation: C.ocean, club: C.coral };
+
+  // Label forfait selon nb séances natation
+  const getForfaitLabel = (g) => {
+    if (g.type === "natation") {
+      const n = g.resas.length;
+      if (n === 1)  return "Formule 1 leçon";
+      if (n === 5)  return "Formule 5 leçons";
+      if (n === 6)  return "Formule 6 leçons";
+      if (n === 10) return "Formule 10 leçons";
+      return `${n} séances`;
+    }
+    return `${g.resas.length} demi-journée${g.resas.length>1?"s":""}`;
+  };
+
+  // Montant total du groupe
+  const getMontant = (g) => {
+    if (g.type === "natation") {
+      const n = g.resas.length;
+      if (n === 1)  return "20 €";
+      if (n === 5)  return "95 €";
+      if (n === 6)  return "113 €";
+      if (n === 10) return "170 €";
+      return `${g.resas.reduce((s,r) => s + Number(r.montant||0), 0)} €`;
+    }
+    return `${g.resas.reduce((s,r) => s + Number(r.montant||0), 0)} €`;
+  };
+
+  const filtered = filter === "tous" ? allGroups : allGroups.filter(g => g.statut === filter);
 
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
@@ -3947,7 +3990,7 @@ function PaiementsTab() {
         {[
           { label:"En attente", value: pending,   color: C.sun   },
           { label:"Confirmées", value: confirmed, color: C.green },
-          { label:"Total",      value: resas.length, color: C.ocean },
+          { label:"Total",      value: allGroups.length, color: C.ocean },
         ].map(k => (
           <div key={k.label} style={{ flex:1, background:"#fff", borderRadius:16, padding:"12px 8px", textAlign:"center", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
             <div style={{ fontWeight:900, fontSize:20, color:k.color }}>{k.value}</div>
@@ -3958,7 +4001,7 @@ function PaiementsTab() {
 
       {/* Filtres */}
       <div style={{ display:"flex", gap:6, background:"#fff", borderRadius:14, padding:5, boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
-        {[["tous","Toutes"],["pending","⏳ En attente"],["confirmed","✓ Confirmées"]].map(([k,l]) => (
+        {[["tous","Toutes"],["pending","⏳ En attente"],["confirmed","✓ Payées"]].map(([k,l]) => (
           <button key={k} onClick={() => setFilter(k)} style={{
             flex:1, background: filter===k ? `linear-gradient(135deg,${C.ocean},${C.sea})` : "transparent",
             color: filter===k?"#fff":"#888", border:"none", borderRadius:10,
@@ -3967,45 +4010,70 @@ function PaiementsTab() {
         ))}
       </div>
 
-      {/* Liste */}
+      {/* Liste groupée */}
       {loading ? (
         <div style={{ textAlign:"center", padding:"32px 0", color:"#bbb" }}>Chargement…</div>
       ) : filtered.length === 0 ? (
         <div style={{ textAlign:"center", padding:"32px 0", color:"#bbb", fontSize:14 }}>Aucune réservation</div>
       ) : (
         <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-          {filtered.map((r, i) => (
-            <div key={`${r._type}-${r.id}`} style={{
-              background:"#fff", borderRadius:16, padding:"12px 14px",
-              boxShadow:"0 2px 8px rgba(0,0,0,0.05)",
-              borderLeft: `4px solid ${r.statut==="pending" ? C.sun : CAT_COLOR[r._type]}`,
-            }}>
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
-                <div style={{ fontWeight:900, color:C.dark, fontSize:13 }}>
-                  {r.membres ? `${r.membres.prenom} ${NOM(r.membres.nom)}` : "—"}
+          {filtered.map(g => {
+            const color   = CAT_COLOR[g.type];
+            const isPaid  = g.statut === "confirmed";
+            const enfants = [...new Set(g.resas.flatMap(r => r.enfants||[]))];
+            return (
+              <div key={g.key} style={{
+                background:"#fff", borderRadius:16, padding:"14px 16px",
+                boxShadow:"0 2px 8px rgba(0,0,0,0.05)",
+                borderLeft:`4px solid ${isPaid ? color : C.sun}`,
+              }}>
+                {/* Header membre */}
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:6 }}>
+                  <div>
+                    <div style={{ fontWeight:900, color:C.dark, fontSize:14 }}>
+                      {g.membre ? `${g.membre.prenom} ${NOM(g.membre.nom)}` : "—"}
+                    </div>
+                    {enfants.length > 0 && (
+                      <div style={{ fontSize:12, color:"#888", marginTop:1 }}>{enfants.join(", ")}</div>
+                    )}
+                  </div>
+                  <div style={{ fontWeight:900, fontSize:16, color: isPaid ? C.green : "#b45309", marginLeft:8 }}>
+                    {getMontant(g)}
+                  </div>
                 </div>
-                {r.statut === "pending" ? (
-                  <button onClick={() => validerPaiement(r)} style={{
-                    background:`linear-gradient(135deg,${C.sun},${C.coral})`, border:"none",
-                    color:"#fff", borderRadius:50, padding:"5px 14px",
-                    cursor:"pointer", fontWeight:900, fontSize:12, fontFamily:"inherit",
-                    boxShadow:`0 3px 10px ${C.sun}44`,
-                  }}>⏳ En attente → Payé</button>
-                ) : (
-                  <span style={{ background:`${C.green}15`, color:C.green, borderRadius:50, padding:"4px 12px", fontSize:11, fontWeight:800 }}>✓ Payé</span>
-                )}
-              </div>
-              <div style={{ fontSize:12, color: CAT_COLOR[r._type], fontWeight:700 }}>
-                {r._label} · {r._date ? new Date(r._date).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}) : "—"}
-              </div>
-              {r.enfants?.length > 0 && (
-                <div style={{ display:"flex", gap:4, marginTop:5, flexWrap:"wrap" }}>
-                  {r.enfants.map((e,i) => <span key={i} style={{ background:`${CAT_COLOR[r._type]}15`, color:CAT_COLOR[r._type], borderRadius:50, padding:"2px 8px", fontSize:11, fontWeight:700 }}>{e}</span>)}
+
+                {/* Forfait label */}
+                <div style={{ fontSize:13, color, fontWeight:700, marginBottom:10 }}>
+                  {getForfaitLabel(g)}
                 </div>
-              )}
-              {r.membres?.email && <div style={{ fontSize:11, color:"#bbb", marginTop:3 }}>{r.membres.email}</div>}
-            </div>
-          ))}
+
+                {/* Créneaux */}
+                <div style={{ display:"flex", flexWrap:"wrap", gap:5, marginBottom:12 }}>
+                  {g.resas.map((r,i) => {
+                    const date = r._date?.slice(0,10);
+                    return (
+                      <div key={i} style={{ background:`${color}12`, color, borderRadius:8, padding:"3px 10px", fontSize:11, fontWeight:700 }}>
+                        {r._label} · {date ? new Date(date).toLocaleDateString("fr-FR",{day:"numeric",month:"short"}) : "—"}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Bouton toggle */}
+                <button onClick={() => toggleStatut(g)} style={{
+                  width:"100%", border:"none", borderRadius:12, padding:"9px",
+                  cursor:"pointer", fontWeight:900, fontSize:13, fontFamily:"inherit",
+                  background: isPaid
+                    ? "#f0f0f0"
+                    : `linear-gradient(135deg,${C.green},#1E8449)`,
+                  color: isPaid ? "#888" : "#fff",
+                  boxShadow: isPaid ? "none" : `0 4px 14px ${C.green}44`,
+                }}>
+                  {isPaid ? "↩ Remettre en attente" : "✅ Marquer comme payé"}
+                </button>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
