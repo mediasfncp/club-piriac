@@ -1032,22 +1032,56 @@ function FormulesEveilScreen({ onNav, user }) {
 }
 
 // ── FORMULES NATATION ─────────────────────────────────────
-function FormulesNatationScreen({ onNav, user }) {
-  const [selected, setSelected]       = useState(null);
+function FormulesNatationScreen({ onNav, user, allSeasonSessions }) {
+  const [selected, setSelected]             = useState(null);
   const [selectedEnfant, setSelectedEnfant] = useState(null);
-  const [done, setDone]               = useState(false);
-  const [enfantsDB, setEnfantsDB]     = useState([]);
+  const [done, setDone]                     = useState(false);
+  const [enfantsDB, setEnfantsDB]           = useState([]);
+  const [step, setStep]                     = useState("formule"); // formule | creneaux
+  const [selectedCreneaux, setSelectedCreneaux] = useState([]); // [{day, time, dayISO}]
+  const [dbResasNat, setDbResasNat]         = useState([]);
+  const [weekIdx, setWeekIdx]               = useState(0);
+  const [moisFilter, setMoisFilter]         = useState("juil");
 
   useEffect(() => {
     if (user?.supabaseId) {
       sb.from("enfants").select("*").eq("membre_id", user.supabaseId)
         .then(({ data }) => setEnfantsDB(data || [])).catch(() => {});
     }
+    sb.from("reservations_natation").select("date_seance, heure")
+      .then(({ data }) => setDbResasNat(data || [])).catch(() => {});
   }, [user?.supabaseId]);
 
   const enfantsNat = enfantsDB.length > 0
     ? enfantsDB.filter(e => e.activite === "natation" || e.activite === "les deux")
     : (user?.enfants || []).filter(e => e.activite === "natation" || e.activite === "les deux");
+
+  const nbLecons = selected?.qty || 1;
+
+  // Calcul places réelles par créneau
+  const getSpots = (dayISO, time) => {
+    const taken = dbResasNat.filter(r => r.date_seance?.slice(0,10) === dayISO && r.heure === time).length;
+    return Math.max(0, 2 - taken);
+  };
+
+  const toggleCreneau = (dayISO, time, dayId) => {
+    const key = `${dayISO}-${time}`;
+    setSelectedCreneaux(prev => {
+      const exists = prev.find(c => c.key === key);
+      if (exists) return prev.filter(c => c.key !== key);
+      if (prev.length >= nbLecons) return prev; // bloqué au max
+      return [...prev, { key, dayISO, time, dayId }];
+    });
+  };
+
+  // Construire semaines
+  const weeks = [];
+  let wk = [];
+  ALL_SEASON_DAYS.forEach((d, i) => {
+    wk.push(d);
+    if (d.label === "Sam" || i === ALL_SEASON_DAYS.length - 1) { weeks.push([...wk]); wk = []; }
+  });
+  const currentWeek = weeks[Math.min(weekIdx, weeks.length - 1)] || [];
 
   if (done) return (
     <div style={{ padding:32, textAlign:"center", background:C.shell, minHeight:"100%" }}>
@@ -1055,7 +1089,8 @@ function FormulesNatationScreen({ onNav, user }) {
       <h2 style={{ color:C.ocean }}>Demande envoyée ! 🎉</h2>
       <div style={{ background:"#fff", borderRadius:20, padding:20, margin:"16px 0", boxShadow:"0 4px 16px rgba(0,0,0,0.06)" }}>
         <p style={{ color:"#666", fontSize:14, lineHeight:1.8 }}>
-          Formule <strong>{selected?.label}</strong> ({selected?.price} €){selectedEnfant ? ` pour ${selectedEnfant}` : ""} enregistrée.<br/>
+          Formule <strong>{selected?.label}</strong> ({selected?.price} €){selectedEnfant ? ` pour ${selectedEnfant}` : ""}.<br/>
+          {selectedCreneaux.length > 0 && <>{selectedCreneaux.length} créneau{selectedCreneaux.length>1?"x":""} sélectionné{selectedCreneaux.length>1?"s":""}.<br/></>}
           L'équipe FNCP vous contactera pour le paiement.<br/>
           🏦 Virement · ✉️ Chèque · 🎫 Chèques vacances
         </p>
@@ -1146,43 +1181,106 @@ function FormulesNatationScreen({ onNav, user }) {
         )}
 
         {selected && selectedEnfant && (
-          <Card style={{ background: `linear-gradient(135deg, ${selected.color}15, ${selected.color}05)`, border: `2px solid ${selected.color}40` }}>
-            <div style={{ fontSize:30, marginBottom:6, textAlign:"center" }}>{selected.emoji}</div>
-            <div style={{ fontWeight:900, color:C.dark, marginBottom:2, textAlign:"center" }}>Formule : {selected.label}</div>
-            <div style={{ background:`${C.ocean}15`, borderRadius:10, padding:"6px 12px", marginBottom:8, textAlign:"center", fontSize:13, color:C.ocean, fontWeight:800 }}>
-              🏊 Pour {selectedEnfant}
-            </div>
-            <div style={{ fontSize:26, fontWeight:900, color:selected.color, marginBottom:10, textAlign:"center" }}>{selected.price} €</div>
-            <div style={{ background:"#F8FBFF", borderRadius:12, padding:"10px 12px", marginBottom:14 }}>
-              <div style={{ fontWeight:900, color:C.dark, fontSize:12, marginBottom:6 }}>💳 Modes de paiement acceptés</div>
-              {[["🏦","Virement bancaire"],["✉️","Chèque"],["🎫","Chèques vacances"]].map(([icon,label]) => (
-                <div key={label} style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4, fontSize:12, color:"#555" }}>
-                  <span>{icon}</span>{label}
-                </div>
-              ))}
-              <div style={{ fontSize:11, color:"#aaa", marginTop:6, fontStyle:"italic" }}>Votre accès sera activé à réception du paiement.</div>
-            </div>
-            <SunBtn color={enfantsNat.length > 0 && !selectedEnfant ? "#bbb" : selected.color} full
-              onClick={async () => {
-                if (enfantsNat.length > 0 && !selectedEnfant) return;
-                try {
-                  if (user?.supabaseId) {
-                    await sb.from("reservations_natation").insert([{
-                      membre_id:   user.supabaseId,
-                      heure:       "—",
-                      date_seance: new Date().toISOString().slice(0,10),
-                      enfants:     selectedEnfant ? [selectedEnfant] : [],
-                      statut:      "pending",
-                      montant:     selected.price,
-                      jour:        `Formule ${selected.label}`,
-                    }]);
-                  }
-                } catch(e) { console.warn(e); }
-                setDone(true);
-              }}>
-              {enfantsNat.length > 0 && !selectedEnfant ? "👆 Sélectionnez un enfant" : `📨 Envoyer la demande · ${selected?.price} €`}
+          {/* Étape 1 — bouton Choisir mes créneaux */}
+          {selected && selectedEnfant && step === "formule" && (
+            <SunBtn color={selected.color} full onClick={() => { setStep("creneaux"); setSelectedCreneaux([]); }}>
+              Choisir mes {nbLecons} créneau{nbLecons>1?"x":""} →
             </SunBtn>
-          </Card>
+          )}
+        </div>
+
+        {/* Étape 2 — Sélection des créneaux */}
+        {selected && selectedEnfant && step === "creneaux" && (
+          <div style={{ background:"#fff", borderRadius:20, padding:16, boxShadow:"0 4px 16px rgba(0,0,0,0.06)" }}>
+            <div style={{ fontWeight:900, color:C.dark, fontSize:14, marginBottom:4 }}>
+              🕐 Choisissez {nbLecons} créneau{nbLecons>1?"x":""}
+            </div>
+            <div style={{ fontSize:12, color:"#888", marginBottom:12 }}>
+              {selectedCreneaux.length}/{nbLecons} sélectionné{selectedCreneaux.length>1?"s":""}
+            </div>
+
+            {/* Navigation semaine */}
+            <div style={{ display:"flex", alignItems:"center", gap:10, background:"#F8FBFF", borderRadius:12, padding:"8px 12px", marginBottom:10 }}>
+              <button onClick={() => setWeekIdx(Math.max(0,weekIdx-1))} disabled={weekIdx===0}
+                style={{ background:weekIdx===0?"#eee":C.ocean, border:"none", color:weekIdx===0?"#bbb":"#fff", borderRadius:"50%", width:26, height:26, cursor:weekIdx===0?"not-allowed":"pointer", fontWeight:900, fontFamily:"inherit", fontSize:14 }}>‹</button>
+              <div style={{ flex:1, textAlign:"center", fontWeight:800, color:C.dark, fontSize:12 }}>
+                {currentWeek[0]?.num} {currentWeek[0]?.month} – {currentWeek[currentWeek.length-1]?.num} {currentWeek[currentWeek.length-1]?.month} 2026
+              </div>
+              <button onClick={() => setWeekIdx(Math.min(weeks.length-1,weekIdx+1))} disabled={weekIdx>=weeks.length-1}
+                style={{ background:weekIdx>=weeks.length-1?"#eee":C.ocean, border:"none", color:weekIdx>=weeks.length-1?"#bbb":"#fff", borderRadius:"50%", width:26, height:26, cursor:weekIdx>=weeks.length-1?"not-allowed":"pointer", fontWeight:900, fontFamily:"inherit", fontSize:14 }}>›</button>
+            </div>
+
+            {/* Créneaux par jour */}
+            {currentWeek.map(d => {
+              const dayISO = `${d.date.getFullYear()}-${String(d.date.getMonth()+1).padStart(2,"0")}-${String(d.date.getDate()).padStart(2,"0")}`;
+              const daySlots = ALL_SEASON_SLOTS_INIT.filter(s => s.day === d.id);
+              if (!daySlots.length) return null;
+              return (
+                <div key={d.id} style={{ marginBottom:12 }}>
+                  <div style={{ fontSize:11, fontWeight:900, color:C.ocean, textTransform:"uppercase", marginBottom:6 }}>
+                    {d.label} {d.num} {d.month}
+                  </div>
+                  <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+                    {daySlots.map(slot => {
+                      const spots = getSpots(dayISO, slot.time);
+                      const key = `${dayISO}-${slot.time}`;
+                      const sel = selectedCreneaux.find(c => c.key === key);
+                      const blocked = !sel && selectedCreneaux.length >= nbLecons;
+                      const full = spots === 0;
+                      return (
+                        <div key={slot.id} onClick={() => !full && !blocked && toggleCreneau(dayISO, slot.time, d.id)} style={{
+                          background: sel ? `linear-gradient(135deg,${C.ocean},${C.sea})` : full ? "#f5f5f5" : blocked ? "#f8f8f8" : "#F0F4F8",
+                          color: sel ? "#fff" : full ? "#ccc" : blocked ? "#ccc" : C.dark,
+                          borderRadius:10, padding:"6px 12px", cursor: full || blocked ? "not-allowed" : "pointer",
+                          fontWeight:800, fontSize:12, opacity: full ? 0.5 : 1,
+                          boxShadow: sel ? `0 3px 10px ${C.ocean}44` : "none",
+                          border: `1.5px solid ${sel ? C.ocean : full ? "#e0e0e0" : "#e0e8f0"}`,
+                        }}>
+                          {slot.time}
+                          {!full && <span style={{ fontSize:9, marginLeft:4, opacity:.7 }}>{spots}/2</span>}
+                          {full && <span style={{ fontSize:9, marginLeft:4 }}>Complet</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Récap sélection */}
+            {selectedCreneaux.length > 0 && (
+              <div style={{ background:`${C.ocean}10`, borderRadius:12, padding:"8px 12px", marginBottom:12, fontSize:12, color:C.ocean, fontWeight:700 }}>
+                ✓ {selectedCreneaux.map(c => `${c.time} (${new Date(c.dayISO).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"})})`).join(" · ")}
+              </div>
+            )}
+
+            <div style={{ display:"flex", gap:8 }}>
+              <button onClick={() => setStep("formule")} style={{ flex:1, background:"#f0f0f0", border:"none", color:"#888", borderRadius:14, padding:"11px", cursor:"pointer", fontWeight:800, fontFamily:"inherit" }}>← Retour</button>
+              <SunBtn color={selectedCreneaux.length === nbLecons ? C.ocean : "#bbb"}
+                disabled={selectedCreneaux.length < nbLecons}
+                onClick={async () => {
+                  if (selectedCreneaux.length < nbLecons) return;
+                  try {
+                    if (user?.supabaseId) {
+                      for (const c of selectedCreneaux) {
+                        await sb.from("reservations_natation").insert([{
+                          membre_id:   user.supabaseId,
+                          heure:       c.time,
+                          date_seance: c.dayISO,
+                          enfants:     selectedEnfant ? [selectedEnfant] : [],
+                          statut:      "pending",
+                          montant:     Math.round(selected.price / nbLecons),
+                          jour:        new Date(c.dayISO).toLocaleDateString("fr-FR",{weekday:"short"}),
+                        }]);
+                      }
+                    }
+                  } catch(e) { console.warn(e); }
+                  setDone(true);
+                }}>
+                📨 Envoyer · {selected.price} €
+              </SunBtn>
+            </div>
+          </div>
         )}
       </div>
     </div>
