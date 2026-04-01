@@ -2892,15 +2892,16 @@ function LoginScreen({ onNav, setUser }) {
 // ── INSCRIPTION ───────────────────────────────────────────
 function InscriptionScreen({ onNav, setUser }) {
   const [step, setStep] = useState(1);
-  const [form, setForm] = useState({ prenom: "", nom: "", email: "", tel: "", tel2: "", adresse: "", ville: "", cp: "", enfants: [], droitImage: false, droitDiffusion: false });
+  const [form, setForm] = useState({ prenom: "", nom: "", email: "", tel: "", tel2: "", adresse: "", ville: "", cp: "", adresse_vac: "", ville_vac: "", cp_vac: "", enfants: [], droitImage: false, droitDiffusion: false });
   const [newEnfant, setNewEnfant] = useState({ prenom: "", nom: "", naissance: "", activite: "club", niveau: "debutant", allergies: "" });
   const [done, setDone] = useState(false);
   const [step1Error, setStep1Error] = useState(false);
   const f = k => v => setForm(p => ({ ...p, [k]: v }));
 
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email);
-  const cpValid = /^\d{5}$/.test(form.cp);
-  const step1Valid = form.prenom && form.nom && form.email && emailValid && form.tel && form.adresse && form.ville && form.cp && cpValid;
+  const cpValid    = /^\d{5}$/.test(form.cp);
+  const cpVacValid = /^\d{5}$/.test(form.cp_vac);
+  const step1Valid = form.prenom && form.nom && form.email && emailValid && form.tel && form.adresse && form.ville && form.cp && cpValid && form.adresse_vac && form.ville_vac && form.cp_vac && cpVacValid;
 
   const goToStep2 = () => {
     if (!step1Valid) { setStep1Error(true); return; }
@@ -2953,24 +2954,43 @@ function InscriptionScreen({ onNav, setUser }) {
             {form.email && !emailValid && <div style={{ fontSize: 12, color: C.sunset, fontWeight: 700, marginTop: -10, marginBottom: 12 }}>⚠️ Format invalide — ex : prenom@exemple.fr</div>}
             <FInput label="Téléphone" type="tel" value={form.tel} onChange={f("tel")} required />
             <FInput label="Téléphone 2" type="tel" value={form.tel2} onChange={f("tel2")} placeholder="Autre numéro (optionnel)" />
-            <FInput label="Adresse" value={form.adresse} onChange={f("adresse")} required />
+
+            {/* Adresse principale */}
+            <div style={{ fontSize:12, fontWeight:900, color:C.ocean, textTransform:"uppercase", letterSpacing:0.5, marginBottom:-4 }}>🏠 Adresse principale</div>
+            <FInput label="Adresse *" value={form.adresse} onChange={f("adresse")} required />
             {step1Error && !form.adresse && <div style={{ fontSize: 12, color: C.sunset, fontWeight: 700, marginTop: -10, marginBottom: 12 }}>⚠️ L'adresse est obligatoire</div>}
             <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "0 12px" }}>
               <div>
-                <FInput label="Ville" value={form.ville} onChange={f("ville")} required />
+                <FInput label="Ville *" value={form.ville} onChange={f("ville")} required />
                 {step1Error && !form.ville && <div style={{ fontSize: 12, color: C.sunset, fontWeight: 700, marginTop: -10, marginBottom: 12 }}>⚠️ Obligatoire</div>}
               </div>
               <div>
-                <FInput label="Code postal" value={form.cp} onChange={f("cp")} required />
+                <FInput label="Code postal *" value={form.cp} onChange={f("cp")} required />
                 {form.cp && !cpValid && <div style={{ fontSize: 12, color: C.sunset, fontWeight: 700, marginTop: -10, marginBottom: 12 }}>⚠️ 5 chiffres</div>}
               </div>
             </div>
+
+            {/* Adresse vacances */}
+            <div style={{ fontSize:12, fontWeight:900, color:C.coral, textTransform:"uppercase", letterSpacing:0.5, marginBottom:-4 }}>🏖️ Adresse de vacances</div>
+            <FInput label="Adresse *" value={form.adresse_vac} onChange={f("adresse_vac")} required />
+            {step1Error && !form.adresse_vac && <div style={{ fontSize: 12, color: C.sunset, fontWeight: 700, marginTop: -10, marginBottom: 12 }}>⚠️ L'adresse de vacances est obligatoire</div>}
+            <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "0 12px" }}>
+              <div>
+                <FInput label="Ville *" value={form.ville_vac} onChange={f("ville_vac")} required />
+                {step1Error && !form.ville_vac && <div style={{ fontSize: 12, color: C.sunset, fontWeight: 700, marginTop: -10, marginBottom: 12 }}>⚠️ Obligatoire</div>}
+              </div>
+              <div>
+                <FInput label="Code postal *" value={form.cp_vac} onChange={f("cp_vac")} required />
+                {form.cp_vac && !cpVacValid && <div style={{ fontSize: 12, color: C.sunset, fontWeight: 700, marginTop: -10, marginBottom: 12 }}>⚠️ 5 chiffres</div>}
+              </div>
+            </div>
+
             {step1Error && (
               <div style={{ background: `${C.sunset}18`, border: `2px solid ${C.sunset}`, borderRadius: 14, padding: "10px 14px", marginBottom: 14, display: "flex", alignItems: "center", gap: 10 }}>
                 <span style={{ fontSize: 20 }}>⚠️</span>
                 <span style={{ fontSize: 13, fontWeight: 700, color: C.sunset }}>
                   {form.email && !emailValid ? "L'adresse email n'est pas valide (ex : prenom@exemple.fr)"
-                    : form.cp && !cpValid ? "Le code postal doit contenir 5 chiffres (ex : 44500)"
+                    : (form.cp && !cpValid) || (form.cp_vac && !cpVacValid) ? "Le code postal doit contenir 5 chiffres (ex : 44500)"
                     : "Merci de remplir tous les champs obligatoires (✦) avant de continuer."}
                 </span>
               </div>
@@ -3640,8 +3660,19 @@ function FicheModal({ membre, onClose }) {
         <div style={{ overflowY: "auto", padding: "0 16px 24px", display: "flex", flexDirection: "column", gap: 12 }}>
           {/* Adresse */}
           <div style={{ background: "#fff", borderRadius: 16, padding: "12px 16px", boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}>
-            <div style={{ fontWeight: 800, color: "#2C3E50", fontSize: 12, marginBottom: 4 }}>📍 ADRESSE</div>
-            <div style={{ fontSize: 14, color: "#555" }}>{membre.adresse}</div>
+            <div style={{ fontWeight: 800, color: "#2C3E50", fontSize: 12, marginBottom: 8 }}>📍 ADRESSES</div>
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ fontSize:10, fontWeight:900, color:C.ocean, textTransform:"uppercase", marginBottom:3 }}>🏠 Domicile</div>
+              <div style={{ fontSize: 13, color: "#555" }}>{membre.adresse || "—"}</div>
+              {(membre.ville || membre.cp) && <div style={{ fontSize: 12, color: "#888" }}>{membre.cp} {membre.ville}</div>}
+            </div>
+            {(membre.adresse_vac || membre.ville_vac) && (
+              <div style={{ borderTop:"1px solid #f0f0f0", paddingTop:8 }}>
+                <div style={{ fontSize:10, fontWeight:900, color:C.coral, textTransform:"uppercase", marginBottom:3 }}>🏖️ Vacances</div>
+                <div style={{ fontSize: 13, color: "#555" }}>{membre.adresse_vac || "—"}</div>
+                {(membre.ville_vac || membre.cp_vac) && <div style={{ fontSize: 12, color: "#888" }}>{membre.cp_vac} {membre.ville_vac}</div>}
+              </div>
+            )}
           </div>
           {/* Enfants */}
           <div style={{ background: "#fff", borderRadius: 16, padding: "12px 16px", boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}>
@@ -3734,13 +3765,15 @@ function FicheModal({ membre, onClose }) {
 
 // ── CRÉER MEMBRE MANUELLEMENT ─────────────────────────────
 function CreerMembreModal({ onClose, onSaved }) {
-  const [form, setForm] = useState({ prenom:"", nom:"", email:"", tel:"", tel2:"", adresse:"", ville:"", cp:"", droitImage:false, droitDiffusion:false });
+  const [form, setForm] = useState({ prenom:"", nom:"", email:"", tel:"", tel2:"", adresse:"", ville:"", cp:"", adresse_vac:"", ville_vac:"", cp_vac:"", droitImage:false, droitDiffusion:false });
   const [saving, setSaving] = useState(false);
   const [error, setError]   = useState("");
   const f = k => v => setForm(prev => ({ ...prev, [k]: v }));
 
   const handleSave = async () => {
     if (!form.prenom || !form.nom || !form.email || !form.tel) { setError("Prénom, nom, email et téléphone sont obligatoires."); return; }
+    if (!form.adresse || !form.ville || !form.cp) { setError("L'adresse principale (rue, ville, CP) est obligatoire."); return; }
+    if (!form.adresse_vac || !form.ville_vac || !form.cp_vac) { setError("L'adresse de vacances (rue, ville, CP) est obligatoire."); return; }
     setSaving(true);
     try {
       await creerMembre({ ...form, enfants: [], cgvAccepted: true });
@@ -3748,6 +3781,10 @@ function CreerMembreModal({ onClose, onSaved }) {
       onClose();
     } catch(e) { setError("Erreur : " + e.message); setSaving(false); }
   };
+
+  const SectionTitle = ({ icon, label }) => (
+    <div style={{ fontSize:11, fontWeight:900, color:C.ocean, textTransform:"uppercase", letterSpacing:0.5, marginTop:4 }}>{icon} {label}</div>
+  );
 
   return (
     <div style={{ position:"fixed", inset:0, zIndex:1100, display:"flex", flexDirection:"column" }}>
@@ -3767,13 +3804,25 @@ function CreerMembreModal({ onClose, onSaved }) {
             <div><label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:4 }}>Nom *</label><FInput value={form.nom} onChange={f("nom")} required /></div>
           </div>
           <div><label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:4 }}>Email *</label><FInput type="email" value={form.email} onChange={f("email")} required /></div>
-          <div><label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:4 }}>Téléphone *</label><FInput type="tel" value={form.tel} onChange={f("tel")} required /></div>
-          <div><label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:4 }}>Téléphone 2</label><FInput type="tel" value={form.tel2} onChange={f("tel2")} /></div>
-          <div><label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:4 }}>Adresse</label><FInput value={form.adresse} onChange={f("adresse")} /></div>
-          <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr", gap:10 }}>
-            <div><label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:4 }}>Ville</label><FInput value={form.ville} onChange={f("ville")} /></div>
-            <div><label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:4 }}>CP</label><FInput value={form.cp} onChange={f("cp")} /></div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+            <div><label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:4 }}>Téléphone *</label><FInput type="tel" value={form.tel} onChange={f("tel")} required /></div>
+            <div><label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:4 }}>Téléphone 2</label><FInput type="tel" value={form.tel2} onChange={f("tel2")} /></div>
           </div>
+
+          <SectionTitle icon="🏠" label="Adresse principale *" />
+          <div><FInput placeholder="Rue, numéro..." value={form.adresse} onChange={f("adresse")} required /></div>
+          <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr", gap:10 }}>
+            <div><FInput placeholder="Ville" value={form.ville} onChange={f("ville")} required /></div>
+            <div><FInput placeholder="CP" value={form.cp} onChange={f("cp")} required /></div>
+          </div>
+
+          <SectionTitle icon="🏖️" label="Adresse de vacances *" />
+          <div><FInput placeholder="Rue, numéro..." value={form.adresse_vac} onChange={f("adresse_vac")} required /></div>
+          <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr", gap:10 }}>
+            <div><FInput placeholder="Ville" value={form.ville_vac} onChange={f("ville_vac")} required /></div>
+            <div><FInput placeholder="CP" value={form.cp_vac} onChange={f("cp_vac")} required /></div>
+          </div>
+
           <div style={{ display:"flex", gap:10 }}>
             {[["droitImage","📸 Droit photo"],["droitDiffusion","📡 Droit diffusion"]].map(([k,l]) => (
               <div key={k} onClick={() => setForm(prev => ({...prev, [k]:!prev[k]}))}
@@ -3801,9 +3850,12 @@ function ModifierMembreModal({ membre, onClose, onSaved }) {
     email:  membre.email  || "",
     tel:    membre.phone  || membre.tel || "",
     tel2:   membre.tel2   || "",
-    adresse:membre.adresse|| "",
-    ville:  membre.ville  || "",
-    cp:     membre.cp     || "",
+    adresse:     membre.adresse     || "",
+    ville:       membre.ville       || "",
+    cp:          membre.cp          || "",
+    adresse_vac: membre.adresse_vac || "",
+    ville_vac:   membre.ville_vac   || "",
+    cp_vac:      membre.cp_vac      || "",
     droitImage:     membre.droitImage     || false,
     droitDiffusion: membre.droitDiffusion || false,
   });
@@ -3813,18 +3865,25 @@ function ModifierMembreModal({ membre, onClose, onSaved }) {
 
   const handleSave = async () => {
     if (!form.prenom || !form.nom || !form.email || !form.tel) { setError("Prénom, nom, email et téléphone sont obligatoires."); return; }
+    if (!form.adresse || !form.ville || !form.cp) { setError("L'adresse principale (rue, ville, CP) est obligatoire."); return; }
+    if (!form.adresse_vac || !form.ville_vac || !form.cp_vac) { setError("L'adresse de vacances (rue, ville, CP) est obligatoire."); return; }
     setSaving(true);
     try {
       await sb.from("membres").update({
         prenom: form.prenom, nom: form.nom, email: form.email,
-        tel: form.tel, tel2: form.tel2, adresse: form.adresse,
-        ville: form.ville, cp: form.cp,
+        tel: form.tel, tel2: form.tel2,
+        adresse: form.adresse, ville: form.ville, cp: form.cp,
+        adresse_vac: form.adresse_vac, ville_vac: form.ville_vac, cp_vac: form.cp_vac,
         droit_image: form.droitImage, droit_diffusion: form.droitDiffusion,
       }).eq("id", membre.id);
       onSaved();
       onClose();
     } catch(e) { setError("Erreur : " + e.message); setSaving(false); }
   };
+
+  const SectionTitle = ({ icon, label }) => (
+    <div style={{ fontSize:11, fontWeight:900, color:C.coral, textTransform:"uppercase", letterSpacing:0.5, marginTop:4 }}>{icon} {label}</div>
+  );
 
   return (
     <div style={{ position:"fixed", inset:0, zIndex:1100, display:"flex", flexDirection:"column" }}>
@@ -3840,17 +3899,29 @@ function ModifierMembreModal({ membre, onClose, onSaved }) {
         </div>
         <div style={{ overflowY:"auto", padding:"16px 16px 28px", display:"flex", flexDirection:"column", gap:10 }}>
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
-            <div><label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:4 }}>Prénom *</label><FInput value={form.prenom} onChange={f("prenom")} required /></div>
-            <div><label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:4 }}>Nom *</label><FInput value={form.nom} onChange={f("nom")} required /></div>
+            <div><label style={{ fontSize:11, fontWeight:900, color:C.coral, display:"block", marginBottom:4 }}>Prénom *</label><FInput value={form.prenom} onChange={f("prenom")} required /></div>
+            <div><label style={{ fontSize:11, fontWeight:900, color:C.coral, display:"block", marginBottom:4 }}>Nom *</label><FInput value={form.nom} onChange={f("nom")} required /></div>
           </div>
-          <div><label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:4 }}>Email *</label><FInput type="email" value={form.email} onChange={f("email")} required /></div>
-          <div><label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:4 }}>Téléphone *</label><FInput type="tel" value={form.tel} onChange={f("tel")} required /></div>
-          <div><label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:4 }}>Téléphone 2</label><FInput type="tel" value={form.tel2} onChange={f("tel2")} /></div>
-          <div><label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:4 }}>Adresse</label><FInput value={form.adresse} onChange={f("adresse")} /></div>
+          <div><label style={{ fontSize:11, fontWeight:900, color:C.coral, display:"block", marginBottom:4 }}>Email *</label><FInput type="email" value={form.email} onChange={f("email")} required /></div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+            <div><label style={{ fontSize:11, fontWeight:900, color:C.coral, display:"block", marginBottom:4 }}>Téléphone *</label><FInput type="tel" value={form.tel} onChange={f("tel")} required /></div>
+            <div><label style={{ fontSize:11, fontWeight:900, color:C.coral, display:"block", marginBottom:4 }}>Téléphone 2</label><FInput type="tel" value={form.tel2} onChange={f("tel2")} /></div>
+          </div>
+
+          <SectionTitle icon="🏠" label="Adresse principale *" />
+          <div><FInput placeholder="Rue, numéro..." value={form.adresse} onChange={f("adresse")} required /></div>
           <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr", gap:10 }}>
-            <div><label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:4 }}>Ville</label><FInput value={form.ville} onChange={f("ville")} /></div>
-            <div><label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:4 }}>CP</label><FInput value={form.cp} onChange={f("cp")} /></div>
+            <div><FInput placeholder="Ville" value={form.ville} onChange={f("ville")} required /></div>
+            <div><FInput placeholder="CP" value={form.cp} onChange={f("cp")} required /></div>
           </div>
+
+          <SectionTitle icon="🏖️" label="Adresse de vacances *" />
+          <div><FInput placeholder="Rue, numéro..." value={form.adresse_vac} onChange={f("adresse_vac")} required /></div>
+          <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr", gap:10 }}>
+            <div><FInput placeholder="Ville" value={form.ville_vac} onChange={f("ville_vac")} required /></div>
+            <div><FInput placeholder="CP" value={form.cp_vac} onChange={f("cp_vac")} required /></div>
+          </div>
+
           <div style={{ display:"flex", gap:10 }}>
             {[["droitImage","📸 Droit photo"],["droitDiffusion","📡 Droit diffusion"]].map(([k,l]) => (
               <div key={k} onClick={() => setForm(prev => ({...prev, [k]:!prev[k]}))}
@@ -7612,4 +7683,4 @@ export default function App() {
     </div>
   );
 }
-// resas 2col Wed Apr  1 22:17:36 CEST 2026
+// adresse vacances Wed Apr  1 22:32:13 CEST 2026
