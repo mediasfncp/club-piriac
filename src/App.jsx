@@ -5883,14 +5883,13 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
   const [modifierResa, setModifierResa]         = useState(null); // { resa, type }
 
   const refreshResas = () => {
-    getAllReservations().then(d => {
+    sb.from("reservations_natation").select("*, membres(id, prenom, nom, email, tel)").order("date_seance", { ascending: true })
+      .then(({ data: d }) => {
       setDbResas(d || []);
-      // Reconstruire allSeasonSessions depuis zéro + décrémenter selon résas réelles
       const next = ALL_SEASON_SLOTS_INIT.map(s => ({ ...s, spots: 2 }));
       (d || []).forEach(r => {
         if (!r.date_seance || !r.heure) return;
         const dateResa = r.date_seance.slice(0, 10);
-        // Trouver tous les slots qui matchent heure + date
         for (let i = 0; i < next.length; i++) {
           if (next[i].time !== r.heure || next[i].spots <= 0) continue;
           const dayObj = ALL_SEASON_DAYS.find(d2 => d2.id === next[i].day);
@@ -6171,50 +6170,45 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
               </div>
             </div>
 
-            {/* 💳 Paiements */}
+            {/* 💳 Paiements du jour */}
             <div style={{ background: "#fff", borderRadius: 20, padding: 18, boxShadow: "0 4px 16px rgba(0,0,0,0.06)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-                <div style={{ fontWeight: 800, color: "#2C3E50", fontSize: 14 }}>💳 Paiements</div>
+                <div style={{ fontWeight: 800, color: "#2C3E50", fontSize: 14 }}>💳 Paiements du jour</div>
                 <div style={{ background: `${C.green}18`, color: C.green, borderRadius: 50, padding: "4px 14px", fontWeight: 900, fontSize: 13 }}>
-                  {realTotal} € encaissés
+                  {realTotal} €
                 </div>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 14 }}>
-                {[
-                  { label: "Confirmées", value: confirmedNat.length + confirmedClub.length, color: C.green },
-                  { label: "En attente", value: pendingCount, color: C.sun },
-                  { label: "Total résas", value: dbResas.length + dbResasClub.length, color: C.ocean },
-                ].map(k => (
-                  <div key={k.label} style={{ background: `${k.color}12`, borderRadius: 14, padding: "10px 8px", textAlign: "center" }}>
-                    <div style={{ fontWeight: 900, color: k.color, fontSize: 16 }}>{k.value}</div>
-                    <div style={{ fontSize: 10, color: "#aaa", marginTop: 2 }}>{k.label}</div>
-                  </div>
-                ))}
-              </div>
-              {/* Dernières résas confirmées */}
-              {[...confirmedNat.slice(-3), ...confirmedClub.slice(-3)]
-                .sort((a,b) => (b.date_seance||b.date_reservation||"").localeCompare(a.date_seance||a.date_reservation||""))
-                .slice(0, 5)
-                .map((r, i, arr) => {
-                  const isNat = !!r.date_seance;
-                  const color = isNat ? C.ocean : C.coral;
-                  const label = isNat ? `🏊 ${r.heure}` : `🏖️ ${r.session === "matin" ? "Matin" : "Après-midi"}`;
-                  const date  = (r.date_seance || r.date_reservation)?.slice(0,10);
-                  return (
-                    <div key={`${isNat?"n":"c"}-${r.id}`} style={{ display:"flex", alignItems:"center", gap:10, padding:"9px 0", borderBottom: i < arr.length-1 ? "1px solid #F0F4F8" : "none" }}>
-                      <div style={{ width:34, height:34, borderRadius:12, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, background:`${color}18`, color, fontWeight:900 }}>✓</div>
-                      <div style={{ flex:1, minWidth:0 }}>
-                        <div style={{ fontWeight:800, fontSize:13, color:"#2C3E50", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-                          {r.membres ? `${r.membres.prenom} ${NOM(r.membres.nom)}` : "—"}
+
+              {confirmedNatToday.length + confirmedClubToday.length === 0 ? (
+                <div style={{ textAlign:"center", padding:"16px 0", color:"#bbb", fontSize:13 }}>Aucun paiement encaissé aujourd'hui</div>
+              ) : (
+                <div style={{ display:"flex", flexDirection:"column", gap:0 }}>
+                  {[...confirmedNatToday, ...confirmedClubToday]
+                    .sort((a,b) => (b.updated_at||b.created_at||"").localeCompare(a.updated_at||a.created_at||""))
+                    .map((r, i, arr) => {
+                      const isNat = !!r.date_seance;
+                      const isLib = !isNat && Array.isArray(r.enfants) && Number(r.enfants[0]) >= 6;
+                      const color = isNat ? C.ocean : C.coral;
+                      const label = isNat ? `🏊 ${r.heure}` : isLib ? `🎟️ Carte Liberté · ${r.enfants[0]} demi-j.` : `🏖️ ${r.session==="matin"?"Matin":"Après-midi"}`;
+                      const date  = (r.date_seance || r.date_reservation)?.slice(0,10);
+                      // Montant
+                      let montant = "";
+                      if (isNat) montant = `${r.montant || 20} €`;
+                      else if (isLib) { const LIBP = {6:96,12:180,18:252,24:288,30:330}; montant = `${LIBP[Number(r.enfants[0])]||"—"} €`; }
+                      return (
+                        <div key={`${isNat?"n":"c"}-${r.id}`} style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 0", borderBottom: i < arr.length-1 ? "1px solid #F0F4F8" : "none" }}>
+                          <div style={{ width:34, height:34, borderRadius:12, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, background:`${color}18`, color, fontWeight:900 }}>✓</div>
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <div style={{ fontWeight:800, fontSize:13, color:"#2C3E50", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                              {r.membres ? `${r.membres.prenom} ${NOM(r.membres.nom)}` : "—"}
+                            </div>
+                            <div style={{ fontSize:11, color:"#aaa" }}>{label}{date && !isLib ? ` · ${new Date(date).toLocaleDateString("fr-FR")}` : ""}</div>
+                          </div>
+                          <div style={{ fontWeight:900, fontSize:13, color:C.green, flexShrink:0 }}>{montant}</div>
                         </div>
-                        <div style={{ fontSize:11, color:"#aaa" }}>{label} · {date ? new Date(date).toLocaleDateString("fr-FR") : "—"}</div>
-                      </div>
-                      <div style={{ fontWeight:900, fontSize:13, color:C.green, flexShrink:0 }}>✓ Payé</div>
-                    </div>
-                  );
-                })}
-              {confirmedNat.length + confirmedClub.length === 0 && (
-                <div style={{ textAlign:"center", padding:"12px 0", color:"#bbb", fontSize:13 }}>Aucun paiement confirmé</div>
+                      );
+                    })}
+                </div>
               )}
             </div>
 
@@ -6889,4 +6883,4 @@ export default function App() {
     </div>
   );
 }
-// dashboard paiements fix Wed Apr  1 12:52:42 CEST 2026
+// dashboard paiements jour Wed Apr  1 12:56:24 CEST 2026
