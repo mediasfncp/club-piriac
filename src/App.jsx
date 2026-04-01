@@ -3935,7 +3935,7 @@ function PaiementsTab({ onValidate }) {
     await Promise.all(groupe.resas.map(r => sb.from(table).update({ statut: newStatut }).eq("id", r.id)));
 
     // Si c'est une Carte Liberté → créditer ou décréditer le solde
-    if (groupe.type === "club" && groupe.resas.some(r => r.session === "liberte")) {
+    if (groupe.type === "club" && groupe.resas.some(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) > 0)) {
       const r = groupe.resas[0];
       const credit = Number(r.enfants?.[0]) || 0; // nb stocké dans enfants[0]
       if (credit > 0 && r.membre_id) {
@@ -3985,7 +3985,7 @@ function PaiementsTab({ onValidate }) {
       return `${n} séances`;
     }
     // Carte Liberté
-    if (g.resas.some(r => r.session === "liberte")) {
+    if (g.resas.some(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) > 0)) {
       const nb = Number(g.resas[0]?.enfants?.[0]) || 0;
       return `🎟️ Carte Liberté · ${nb} demi-journées`;
     }
@@ -4002,7 +4002,7 @@ function PaiementsTab({ onValidate }) {
       if (n === 10) return "170 €";
       return `${g.resas.reduce((s,r) => s + Number(r.montant||0), 0)} €`;
     }
-    if (g.resas.some(r => r.session === "liberte")) return "—";
+    if (g.resas.some(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) > 0)) return "—";
     return `${g.resas.reduce((s,r) => s + Number(r.montant||0), 0)} €`;
   };
 
@@ -5388,7 +5388,7 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
           const { error: insertError } = await sb.from("reservations_club").insert([{
             membre_id:        membreId || null,
             date_reservation: new Date().toISOString().slice(0,10),
-            session:          "liberte",
+            session:          "matin", // valeur par défaut, label_jour indique Liberté
             statut:           statutResa,
             enfants:          [String(nbLiberte)],
           }]);
@@ -5901,7 +5901,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                               const table = g.type === "natation" ? "reservations_natation" : "reservations_club";
                               await Promise.all(g.resas.map(r => sb.from(table).update({ statut:"confirmed" }).eq("id", r.id)));
                               // Carte Liberté : créditer le solde
-                              if (g.type === "club" && g.resas.some(r => r.session === "liberte")) {
+                              if (g.type === "club" && g.resas.some(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) > 0)) {
                                 const r0 = g.resas[0];
                                 const credit = Number(r0.enfants?.[0]) || 0; // nb demi-j stocké dans enfants[0]
                                 if (credit > 0 && r0.membre_id) {
@@ -6133,7 +6133,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                               const table = g.type === "natation" ? "reservations_natation" : "reservations_club";
                               await Promise.all(g.resas.map(r => sb.from(table).update({ statut:"confirmed" }).eq("id", r.id)));
                               // Carte Liberté : créditer le solde
-                              if (g.type === "club" && g.resas.some(r => r.session === "liberte")) {
+                              if (g.type === "club" && g.resas.some(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) > 0)) {
                                 const r0 = g.resas[0];
                                 const credit = Number(r0.enfants?.[0]) || 0; // nb demi-j stocké dans enfants[0]
                                 if (credit > 0 && r0.membre_id) {
@@ -6668,4 +6668,4 @@ export default function App() {
     </div>
   );
 }
-// fix
+// fix liberté constraint
