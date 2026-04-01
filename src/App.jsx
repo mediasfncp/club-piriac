@@ -1136,18 +1136,20 @@ const SEASON_WEEKS = (() => {
 })();
 
 function ReservationClubScreen({ onNav, user, setUser, clubPlaces, setClubPlaces }) {
-  const [selectedDayId, setSelectedDayId] = useState(CLUB_SEASON_DAYS[0]?.id);
+  const [selectedDayId, setSelectedDayId]     = useState(CLUB_SEASON_DAYS[0]?.id);
   const [selectedSession, setSelectedSession] = useState(null);
-  const [done, setDone] = useState(null);
-  const [weekIdx, setWeekIdx] = useState(0);
-  const [resasClubDB, setResasClubDB] = useState([]);
+  const [done, setDone]                       = useState(null);
+  const [weekIdx, setWeekIdx]                 = useState(0);
+  const [resasClubDB, setResasClubDB]         = useState([]);
+  const [selectedEnfants, setSelectedEnfants] = useState([]);
 
-  // Charger les résas club pour calculer les places par date
   useEffect(() => {
     sb.from("reservations_club").select("date_reservation, session")
-      .then(({ data }) => setResasClubDB(data || []))
-      .catch(() => {});
+      .then(({ data }) => setResasClubDB(data || [])).catch(() => {});
   }, []);
+
+  const enfantsClub = (user?.enfants || []).filter(e => e.activite === "club" || e.activite === "les deux");
+  const toggleEnfant = (prenom) => setSelectedEnfants(prev => prev.includes(prenom) ? prev.filter(x => x !== prenom) : [...prev, prenom]);
 
   // Calculer places restantes pour la date et session sélectionnées
   const getPlacesForDate = (dateISO, session) => {
@@ -1245,7 +1247,7 @@ function ReservationClubScreen({ onNav, user, setUser, clubPlaces, setClubPlaces
           session:          selectedSession,
           labelJour:        `${selectedDay?.label} ${selectedDay?.num} ${selectedDay?.month}`,
           rappelDate:       rappelDate,
-          enfants:          (user?.enfants || []).filter(e => e.activite === "club" || e.activite === "les deux").map(e => e.prenom),
+          enfants:          selectedEnfants.length > 0 ? selectedEnfants : (user?.enfants || []).filter(e => e.activite === "club" || e.activite === "les deux").map(e => e.prenom),
         });
         const newBalance = Math.max(0, (user?.liberteBalance||0) - 1);
         if (user?.supabaseId) await updateLiberte(user.supabaseId, newBalance, user.liberteTotal || newBalance);
@@ -1344,14 +1346,35 @@ function ReservationClubScreen({ onNav, user, setUser, clubPlaces, setClubPlaces
 
         {/* Recap + confirm */}
         {selectedSession && selectedDay && (
-          <Card style={{ background:`linear-gradient(135deg,${C.coral}12,${C.sun}08)`,border:`2px solid ${C.coral}30`,textAlign:"center" }}>
+          <Card style={{ background:`linear-gradient(135deg,${C.coral}12,${C.sun}08)`,border:`2px solid ${C.coral}30` }}>
             <div style={{ fontWeight:900,color:C.dark,marginBottom:2 }}>
               {SESSIONS.find(s=>s.id===selectedSession)?.emoji} {SESSIONS.find(s=>s.id===selectedSession)?.label}
             </div>
-            <div style={{ fontWeight:800,color:"#888",fontSize:13,marginBottom:8 }}>
+            <div style={{ fontWeight:800,color:"#888",fontSize:13,marginBottom:10 }}>
               {selectedDay.label} {selectedDay.num} {selectedDay.month} 2026
             </div>
-            <div style={{ background:`${C.coral}15`,borderRadius:12,padding:"8px",marginBottom:14,fontSize:13,color:C.coral,fontWeight:700 }}>
+            {/* Sélection enfants */}
+            {enfantsClub.length > 0 && (
+              <div style={{ marginBottom:12 }}>
+                <div style={{ fontSize:12, fontWeight:800, color:C.dark, marginBottom:8 }}>👧 Enfant(s) participants</div>
+                <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
+                  {enfantsClub.map(e => {
+                    const sel = selectedEnfants.includes(e.prenom);
+                    return (
+                      <div key={e.prenom} onClick={() => toggleEnfant(e.prenom)} style={{
+                        background: sel ? C.coral : "#f0f0f0",
+                        color: sel ? "#fff" : "#888",
+                        borderRadius:50, padding:"7px 16px", cursor:"pointer",
+                        fontWeight:800, fontSize:13, transition:"all .15s",
+                      }}>
+                        {sel ? "✓ " : ""}{e.prenom}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            <div style={{ background:`${C.coral}15`,borderRadius:12,padding:"8px",marginBottom:14,fontSize:13,color:C.coral,fontWeight:700,textAlign:"center" }}>
               🎟️ Décomptera 1 demi-journée · il restera {balance-1} après
             </div>
             <SunBtn color={C.coral} full onClick={handleConfirm}>✓ Confirmer la réservation</SunBtn>
@@ -4840,6 +4863,7 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
   const [selectedEnfants, setSelectedEnfants] = useState([]);
   const [saving, setSaving]             = useState(false);
   const [error, setError]               = useState("");
+  const [statutResa, setStatutResa]     = useState("pending"); // pending | confirmed
 
   // Natation
   const [forfaitNat, setForfaitNat]     = useState("unite"); // unite | forfait5 | forfait10
@@ -4867,7 +4891,7 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
   const handleMembreChange = (id) => { setMembreId(id); setSelectedEnfants([]); };
 
   // Natation : nombre de séances selon forfait
-  const nbSeancesNat = forfaitNat === "unite" ? 1 : forfaitNat === "forfait5" ? 5 : 10;
+  const nbSeancesNat = forfaitNat === "unite" ? 1 : forfaitNat === "forfait5" ? 5 : forfaitNat === "forfait6" ? 6 : 10;
 
   const updateSeanceNat = (idx, field, val) => {
     const next = [...seancesNat];
@@ -4899,7 +4923,8 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
             dateSeance: s.date,
             enfants: selectedEnfants,
             rappelDate: getRappelDate(s.date),
-            montant: forfaitNat === "unite" ? 20 : forfaitNat === "forfait5" ? 95 : 170,
+            montant: forfaitNat === "unite" ? 20 : forfaitNat === "forfait5" ? 95 : forfaitNat === "forfait6" ? 113 : 170,
+            statut: statutResa,
           });
           // Décrémenter 1 place dans allSeasonSessions
           if (setAllSeasonSessions) {
@@ -4939,6 +4964,7 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
                   labelJour: day.date.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }),
                   rappelDate: getRappelDate(dateStr),
                   enfants: selectedEnfants,
+                  statut: statutResa,
                 });
                 if (setClubPlaces) setClubPlaces(prev => ({ ...prev, [sess]: Math.max(0, (prev[sess]||45) - 1) }));
               }
@@ -4958,6 +4984,7 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
               labelJour: new Date(s.date).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }),
               rappelDate: getRappelDate(s.date),
               enfants: selectedEnfants,
+              statut: statutResa,
             });
             if (setClubPlaces) setClubPlaces(prev => ({ ...prev, [s.session]: Math.max(0, (prev[s.session]||45) - 1) }));
           }
@@ -5006,6 +5033,20 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
             </select>
           </div>
 
+          {/* Statut paiement */}
+          <div>
+            <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, textTransform:"uppercase" }}>Statut paiement</label>
+            <div style={{ display:"flex", gap:8 }}>
+              {[["pending","⏳ En attente"],["confirmed","✅ Payé"]].map(([k,l]) => (
+                <button key={k} onClick={() => setStatutResa(k)} style={{
+                  flex:1, background: statutResa===k ? (k==="confirmed" ? C.green : C.sun) : "#f0f0f0",
+                  color: statutResa===k ? "#fff" : "#888", border:"none", borderRadius:12,
+                  padding:"10px", cursor:"pointer", fontWeight:900, fontSize:13, fontFamily:"inherit",
+                }}>{l}</button>
+              ))}
+            </div>
+          </div>
+
           {/* Enfants */}
           {enfantsDuMembre.length > 0 && (
             <div>
@@ -5040,9 +5081,9 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
             <>
               <div>
                 <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, textTransform:"uppercase" }}>Formule</label>
-                <div style={{ display:"flex", gap:6 }}>
-                  {[["unite","1 séance · 20€"],["forfait5","5 séances · 95€"],["forfait10","10 séances · 170€"]].map(([k,l]) => (
-                    <button key={k} onClick={() => { setForfaitNat(k); const n = k==="unite"?1:k==="forfait5"?5:10; setSeancesNat(Array.from({length:n},()=>({date:"",heure:""})));  }} style={{ flex:1, background: forfaitNat===k ? C.ocean : "#f0f0f0", color: forfaitNat===k ? "#fff" : "#888", border:"none", borderRadius:12, padding:"8px 4px", cursor:"pointer", fontWeight:800, fontSize:10, fontFamily:"inherit" }}>{l}</button>
+                <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+                  {[["unite","1 · 20€"],["forfait5","5 · 95€"],["forfait6","6 · 113€"],["forfait10","10 · 170€"]].map(([k,l]) => (
+                    <button key={k} onClick={() => { setForfaitNat(k); const n = k==="unite"?1:k==="forfait5"?5:k==="forfait6"?6:10; setSeancesNat(Array.from({length:n},()=>({date:"",heure:""}))); }} style={{ flex:1, background: forfaitNat===k ? C.ocean : "#f0f0f0", color: forfaitNat===k ? "#fff" : "#888", border:"none", borderRadius:12, padding:"8px 4px", cursor:"pointer", fontWeight:800, fontSize:10, fontFamily:"inherit" }}>{l}</button>
                   ))}
                 </div>
               </div>
@@ -5296,11 +5337,14 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
     session: `${r.time} - ${DAYS.find(d=>d.id===r.day)?.label} ${DAYS.find(d=>d.id===r.day)?.num}`, status: "confirmed"
   }))];
 
-  // Total encaissé = résas confirmées uniquement
+  // Total encaissé = résas confirmées aujourd'hui
+  const todayISO = new Date().toISOString().slice(0,10);
   const confirmedNat  = dbResas.filter(r => r.statut === "confirmed");
   const confirmedClub = dbResasClub.filter(r => r.statut === "confirmed");
-  const realTotal = confirmedNat.reduce((s, r) => s + Number(r.montant || 20), 0)
-                  + confirmedClub.reduce((s, r) => s + Number(r.montant || 0), 0);
+  const confirmedNatToday  = dbResas.filter(r => r.statut === "confirmed" && (r.created_at||"").slice(0,10) === todayISO);
+  const confirmedClubToday = dbResasClub.filter(r => r.statut === "confirmed" && (r.created_at||"").slice(0,10) === todayISO);
+  const realTotal = confirmedNatToday.reduce((s, r) => s + Number(r.montant || 20), 0)
+                  + confirmedClubToday.reduce((s, r) => s + Number(r.montant || 0), 0);
   const pendingCount = dbResas.filter(r => r.statut === "pending").length + dbResasClub.filter(r => r.statut === "pending").length;
 
   // Taux de remplissage natation — toute la saison
