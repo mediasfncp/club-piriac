@@ -867,7 +867,7 @@ function FormulesEveilScreen({ onNav, user, panier, setPanier }) {
         <p style={{ color:"#666", fontSize:14, lineHeight:1.8 }}>
           🌊 Éveil Aquatique · <strong>{done.sunday}</strong> à {done.slot}{done.enfant ? ` · pour ${done.enfant}` : ""}<br/>
           L'équipe FNCP vous contactera pour le paiement.<br/>
-          🏦 Virement · ✉️ Chèque · 🎫 Chèques vacances
+          🏦 Virement · ✉️ Chèque · 💶 Espèces · 🎫 Chèques vacances
         </p>
         <div style={{ background:"#F3E8FF", borderRadius:12, padding:"10px 14px", fontSize:13, color:"#9B59B6", fontWeight:700 }}>
           ⏳ Votre accès sera activé à réception du paiement
@@ -932,7 +932,7 @@ function FormulesEveilScreen({ onNav, user, panier, setPanier }) {
           </div>
           <div style={{ background:"#F8FBFF", borderRadius:14, padding:"12px 14px", marginBottom:8 }}>
             <div style={{ fontWeight:900, color:C.dark, fontSize:12, marginBottom:8 }}>💳 Modes de paiement acceptés</div>
-            {[["🏦","Virement bancaire"],["✉️","Chèque"],["🎫","Chèques vacances"]].map(([icon,label]) => (
+            {[["🏦","Virement bancaire"],["✉️","Chèque"],["💶","Espèces"],["🎫","Chèques vacances"]].map(([icon,label]) => (
               <div key={label} style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4, fontSize:12, color:"#555" }}>
                 <span>{icon}</span>{label}
               </div>
@@ -1058,14 +1058,13 @@ function FormulesEveilScreen({ onNav, user, panier, setPanier }) {
 // ── FORMULES NATATION ─────────────────────────────────────
 function FormulesNatationScreen({ onNav, user, allSeasonSessions, panier, setPanier }) {
   const [selected, setSelected]             = useState(null);
-  const [selectedEnfant, setSelectedEnfant] = useState(null);
+  const [selectedEnfants, setSelectedEnfants] = useState([]); // enfants sélectionnés (partagés entre créneaux)
   const [done, setDone]                     = useState(false);
   const [enfantsDB, setEnfantsDB]           = useState([]);
-  const [step, setStep]                     = useState("formule"); // formule | creneaux
-  const [selectedCreneaux, setSelectedCreneaux] = useState([]); // [{day, time, dayISO}]
+  const [step, setStep]                     = useState("formule");
+  const [selectedCreneaux, setSelectedCreneaux] = useState([]);
   const [dbResasNat, setDbResasNat]         = useState([]);
   const [weekIdx, setWeekIdx]               = useState(0);
-  const [moisFilter, setMoisFilter]         = useState("juil");
 
   useEffect(() => {
     if (user?.supabaseId) {
@@ -1083,23 +1082,35 @@ function FormulesNatationScreen({ onNav, user, allSeasonSessions, panier, setPan
 
   const nbLecons = selected?.qty || 1;
 
-  // Calcul places réelles par créneau
+  // Places réelles par créneau
   const getSpots = (dayISO, time) => {
-    const taken = dbResasNat.filter(r => r.date_seance?.slice(0,10) === dayISO && r.heure === time && r.statut === "confirmed").length;
+    const taken = dbResasNat.filter(r => r.date_seance?.slice(0,10) === dayISO && r.heure === time).length;
     return Math.max(0, 2 - taken);
+  };
+
+  const toggleEnfant = (prenom) => {
+    setSelectedEnfants(prev => prev.includes(prenom) ? prev.filter(e => e !== prenom) : [...prev, prenom]);
+    setSelectedCreneaux([]); // reset créneaux si changement d'enfants
   };
 
   const toggleCreneau = (dayISO, time, dayId) => {
     const key = `${dayISO}-${time}`;
+    const spots = getSpots(dayISO, time);
+    // Ne pas sélectionner si plus de places que d'enfants
+    if (selectedEnfants.length > spots && !selectedCreneaux.find(c => c.key === key)) return;
     setSelectedCreneaux(prev => {
       const exists = prev.find(c => c.key === key);
       if (exists) return prev.filter(c => c.key !== key);
-      if (prev.length >= nbLecons) return prev; // bloqué au max
+      if (prev.length >= nbLecons) return prev;
       return [...prev, { key, dayISO, time, dayId }];
     });
   };
 
-  // Construire semaines
+  // Prix total = prix forfait × nb enfants
+  const prixTotal = selected ? selected.price * Math.max(1, selectedEnfants.length) : 0;
+  const prixParLecon = selected ? (selected.price / selected.qty) : 20;
+
+  // Semaines
   const weeks = [];
   let wk = [];
   ALL_SEASON_DAYS.forEach((d, i) => {
@@ -1114,10 +1125,10 @@ function FormulesNatationScreen({ onNav, user, allSeasonSessions, panier, setPan
       <h2 style={{ color:C.ocean }}>Demande envoyée ! 🎉</h2>
       <div style={{ background:"#fff", borderRadius:20, padding:20, margin:"16px 0", boxShadow:"0 4px 16px rgba(0,0,0,0.06)" }}>
         <p style={{ color:"#666", fontSize:14, lineHeight:1.8 }}>
-          Formule <strong>{selected?.label}</strong> ({selected?.price} €){selectedEnfant ? ` pour ${selectedEnfant}` : ""}.<br/>
+          Formule <strong>{selected?.label}</strong> ({prixTotal} €){selectedEnfants.length > 0 ? ` pour ${selectedEnfants.join(", ")}` : ""}.<br/>
           {selectedCreneaux.length > 0 && <>{selectedCreneaux.length} créneau{selectedCreneaux.length>1?"x":""} sélectionné{selectedCreneaux.length>1?"s":""}.<br/></>}
           L'équipe FNCP vous contactera pour le paiement.<br/>
-          🏦 Virement · ✉️ Chèque · 🎫 Chèques vacances
+          🏦 Virement · ✉️ Chèque · 💶 Espèces · 🎫 Chèques vacances
         </p>
         <div style={{ background:`${C.ocean}10`, borderRadius:12, padding:"10px 14px", fontSize:13, color:C.ocean, fontWeight:700 }}>
           ⏳ Votre accès sera activé à réception du paiement
@@ -1138,15 +1149,18 @@ function FormulesNatationScreen({ onNav, user, allSeasonSessions, panier, setPan
       </div>
       <div style={{ padding: "10px 18px 24px" }}>
 
-        {/* Sélection de l'enfant — en premier */}
+        {/* Sélection des enfants */}
         {enfantsNat.length > 0 && (
           <div style={{ background:"#fff", borderRadius:18, padding:16, marginBottom:16, boxShadow:"0 2px 10px rgba(0,0,0,0.05)" }}>
-            <div style={{ fontWeight:800, color:C.dark, fontSize:14, marginBottom:10 }}>🏊 Pour quel enfant ?</div>
+            <div style={{ fontWeight:800, color:C.dark, fontSize:14, marginBottom:6 }}>🏊 Pour quels enfants ?</div>
+            <div style={{ fontSize:12, color:"#888", marginBottom:10 }}>
+              Chaque enfant = 1 place par créneau. Max 2 places disponibles par créneau.
+            </div>
             <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
               {enfantsNat.map(e => {
-                const sel = selectedEnfant === e.prenom;
+                const sel = selectedEnfants.includes(e.prenom);
                 return (
-                  <div key={e.prenom} onClick={() => setSelectedEnfant(sel ? null : e.prenom)} style={{
+                  <div key={e.prenom} onClick={() => toggleEnfant(e.prenom)} style={{
                     background: sel ? `linear-gradient(135deg,${C.ocean},${C.sea})` : "#F0F4F8",
                     color: sel ? "#fff" : "#888",
                     borderRadius:50, padding:"9px 20px", cursor:"pointer",
@@ -1158,69 +1172,73 @@ function FormulesNatationScreen({ onNav, user, allSeasonSessions, panier, setPan
                 );
               })}
             </div>
-            {selectedEnfant && (
+            {selectedEnfants.length > 0 && (
               <div style={{ fontSize:12, color:C.ocean, marginTop:8, fontWeight:700 }}>
-                ✓ Forfait nominatif pour {selectedEnfant}
+                ✓ {selectedEnfants.length} enfant{selectedEnfants.length>1?"s":""} · {selectedEnfants.join(", ")}
+                {selected && <span style={{ color:C.coral }}> · {prixTotal} €</span>}
               </div>
             )}
           </div>
         )}
 
-        {/* Formules */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 13, marginBottom: 18 }}>
+        {/* Formules — affiche prix × nb enfants */}
+        <div style={{ display:"flex", flexDirection:"column", gap:13, marginBottom:18 }}>
           {FORMULES_NAT.map(f => {
             const sel = selected?.id === f.id;
-            const disabled = enfantsNat.length > 0 && !selectedEnfant;
+            const nbEnf = Math.max(1, selectedEnfants.length);
+            const prixAffiche = f.price * nbEnf;
             return (
-              <div key={f.id} onClick={() => !disabled && setSelected(sel ? null : f)} style={{
-                background: disabled ? "#fafafa" : sel ? `linear-gradient(135deg, ${f.color}18, ${f.color}08)` : "#fff",
-                border: `3px solid ${sel ? f.color : "#f0f0f0"}`,
-                borderRadius: 22, padding: "16px 18px", cursor: disabled ? "not-allowed" : "pointer",
-                display: "flex", alignItems: "center", justifyContent: "space-between",
+              <div key={f.id} onClick={() => { setSelected(sel ? null : f); setSelectedCreneaux([]); }} style={{
+                background: sel ? `linear-gradient(135deg,${f.color}18,${f.color}08)` : "#fff",
+                border:`3px solid ${sel ? f.color : "#f0f0f0"}`,
+                borderRadius:22, padding:"16px 18px", cursor:"pointer",
+                display:"flex", alignItems:"center", justifyContent:"space-between",
                 boxShadow: sel ? `0 8px 28px ${f.color}33` : "0 4px 14px rgba(0,0,0,0.06)",
-                opacity: disabled ? 0.5 : 1,
-                transform: sel ? "scale(1.02)" : "scale(1)", transition: "all .2s",
+                transform: sel ? "scale(1.02)" : "scale(1)", transition:"all .2s",
               }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                  <div style={{ width: 58, height: 58, borderRadius: 18, background: `linear-gradient(135deg, ${f.color}, ${f.color}aa)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, flexShrink: 0 }}>{f.emoji}</div>
+                <div style={{ display:"flex", alignItems:"center", gap:14 }}>
+                  <div style={{ width:58, height:58, borderRadius:18, background:`linear-gradient(135deg,${f.color},${f.color}aa)`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:28, flexShrink:0 }}>{f.emoji}</div>
                   <div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
-                      <span style={{ fontWeight: 900, fontSize: 17, color: C.dark }}>{f.label}</span>
+                    <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4, flexWrap:"wrap" }}>
+                      <span style={{ fontWeight:900, fontSize:17, color:C.dark }}>{f.label}</span>
                       <Pill color={f.color}>{f.badge}</Pill>
                     </div>
-                    <div style={{ fontSize: 22, fontWeight: 900, color: f.color }}>{f.price} €</div>
-                    {f.saving && <div style={{ fontSize: 12, color: C.green, fontWeight: 800 }}>🎁 {f.saving}</div>}
-                    <div style={{ fontSize: 11, color: "#bbb", marginTop: 1 }}>soit {(f.price / f.qty).toFixed(1)} €/leçon</div>
+                    <div style={{ fontSize:22, fontWeight:900, color:f.color }}>
+                      {prixAffiche} €
+                      {nbEnf > 1 && <span style={{ fontSize:13, color:"#aaa", marginLeft:6 }}>({f.price} € × {nbEnf} enfants)</span>}
+                    </div>
+                    {f.saving && <div style={{ fontSize:12, color:C.green, fontWeight:800 }}>🎁 {f.saving}</div>}
+                    <div style={{ fontSize:11, color:"#bbb", marginTop:1 }}>soit {(f.price/f.qty).toFixed(1)} €/leçon/enfant</div>
                   </div>
                 </div>
-                <div style={{ width: 26, height: 26, borderRadius: "50%", border: `3px solid ${sel ? f.color : "#ddd"}`, background: sel ? f.color : "transparent", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 900, fontSize: 13, transition: "all .2s", flexShrink: 0 }}>{sel ? "✓" : ""}</div>
+                <div style={{ width:26, height:26, borderRadius:"50%", border:`3px solid ${sel ? f.color : "#ddd"}`, background:sel ? f.color : "transparent", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontWeight:900, fontSize:13, flexShrink:0 }}>{sel?"✓":""}</div>
               </div>
             );
           })}
         </div>
 
-        {enfantsNat.length > 0 && !selectedEnfant && (
-          <div style={{ background:`${C.ocean}10`, borderRadius:14, padding:"12px 16px", marginBottom:14, fontSize:13, color:C.ocean, fontWeight:700, textAlign:"center" }}>
-            👆 Sélectionnez d'abord un enfant pour choisir une formule
-          </div>
-        )}
-
-        {/* Étape 1 — bouton Choisir mes créneaux */}
-        {selected && selectedEnfant && step === "formule" && (
+        {/* Bouton vers créneaux */}
+        {selected && step === "formule" && (
           <SunBtn color={selected.color} full onClick={() => { setStep("creneaux"); setSelectedCreneaux([]); }}>
             Choisir mes {nbLecons} créneau{nbLecons>1?"x":""} →
           </SunBtn>
         )}
 
         {/* Étape 2 — Sélection des créneaux */}
-        {selected && selectedEnfant && step === "creneaux" && (
+        {selected && step === "creneaux" && (
           <div style={{ background:"#fff", borderRadius:20, padding:16, boxShadow:"0 4px 16px rgba(0,0,0,0.06)" }}>
             <div style={{ fontWeight:900, color:C.dark, fontSize:14, marginBottom:4 }}>
               🕐 Choisissez {nbLecons} créneau{nbLecons>1?"x":""}
             </div>
-            <div style={{ fontSize:12, color:"#888", marginBottom:12 }}>
+            <div style={{ fontSize:12, color:"#888", marginBottom:4 }}>
               {selectedCreneaux.length}/{nbLecons} sélectionné{selectedCreneaux.length>1?"s":""}
+              {selectedEnfants.length > 1 && <span style={{ color:C.ocean, fontWeight:700 }}> · {selectedEnfants.length} enfants → max {selectedEnfants.length} place(s)/créneau</span>}
             </div>
+            {selectedEnfants.length > 1 && (
+              <div style={{ background:`${C.sun}15`, borderRadius:10, padding:"6px 10px", marginBottom:10, fontSize:11, color:"#b45309", fontWeight:700 }}>
+                ⚠️ Si un créneau n'a qu'1 place dispo, il ne pourra accueillir qu'un seul enfant
+              </div>
+            )}
 
             {/* Navigation semaine */}
             <div style={{ display:"flex", alignItems:"center", gap:10, background:"#F8FBFF", borderRadius:12, padding:"8px 12px", marginBottom:10 }}>
@@ -1246,22 +1264,26 @@ function FormulesNatationScreen({ onNav, user, allSeasonSessions, panier, setPan
                   <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
                     {daySlots.map(slot => {
                       const spots = getSpots(dayISO, slot.time);
+                      const nbEnf = Math.max(1, selectedEnfants.length);
+                      // Si pas assez de places pour tous les enfants, on peut quand même réserver mais avec avertissement
                       const key = `${dayISO}-${slot.time}`;
                       const sel = selectedCreneaux.find(c => c.key === key);
                       const blocked = !sel && selectedCreneaux.length >= nbLecons;
                       const full = spots === 0;
+                      const partiel = spots > 0 && spots < nbEnf; // 1 place pour 2 enfants
                       return (
                         <div key={slot.id} onClick={() => !full && !blocked && toggleCreneau(dayISO, slot.time, d.id)} style={{
-                          background: sel ? `linear-gradient(135deg,${C.ocean},${C.sea})` : full ? "#f5f5f5" : blocked ? "#f8f8f8" : "#F0F4F8",
-                          color: sel ? "#fff" : full ? "#ccc" : blocked ? "#ccc" : C.dark,
-                          borderRadius:10, padding:"6px 12px", cursor: full || blocked ? "not-allowed" : "pointer",
-                          fontWeight:800, fontSize:12, opacity: full ? 0.5 : 1,
-                          boxShadow: sel ? `0 3px 10px ${C.ocean}44` : "none",
-                          border: `1.5px solid ${sel ? C.ocean : full ? "#e0e0e0" : "#e0e8f0"}`,
+                          background: sel ? `linear-gradient(135deg,${C.ocean},${C.sea})` : full ? "#f5f5f5" : blocked ? "#f8f8f8" : partiel ? `${C.sun}20` : "#F0F4F8",
+                          color: sel ? "#fff" : full ? "#ccc" : blocked ? "#ccc" : partiel ? "#b45309" : C.dark,
+                          borderRadius:10, padding:"6px 12px", cursor:full||blocked?"not-allowed":"pointer",
+                          fontWeight:800, fontSize:12, opacity:full?0.5:1,
+                          boxShadow:sel?`0 3px 10px ${C.ocean}44`:"none",
+                          border:`1.5px solid ${sel?C.ocean:partiel?C.sun:full?"#e0e0e0":"#e0e8f0"}`,
                         }}>
                           {slot.time}
-                          {!full && <span style={{ fontSize:9, marginLeft:4, opacity:.7 }}>{spots}/2</span>}
-                          {full && <span style={{ fontSize:9, marginLeft:4 }}>Complet</span>}
+                          <span style={{ fontSize:9, marginLeft:4, opacity:.8 }}>
+                            {full ? "Complet" : `${spots}/2`}
+                          </span>
                         </div>
                       );
                     })}
@@ -1270,10 +1292,16 @@ function FormulesNatationScreen({ onNav, user, allSeasonSessions, panier, setPan
               );
             })}
 
-            {/* Récap sélection */}
+            {/* Récap + prix total */}
             {selectedCreneaux.length > 0 && (
-              <div style={{ background:`${C.ocean}10`, borderRadius:12, padding:"8px 12px", marginBottom:12, fontSize:12, color:C.ocean, fontWeight:700 }}>
-                ✓ {selectedCreneaux.map(c => `${c.time} (${new Date(c.dayISO).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"})})`).join(" · ")}
+              <div style={{ background:`${C.ocean}10`, borderRadius:12, padding:"10px 12px", marginBottom:12 }}>
+                <div style={{ fontSize:12, color:C.ocean, fontWeight:700, marginBottom:4 }}>
+                  ✓ {selectedCreneaux.map(c => `${c.time} · ${new Date(c.dayISO).toLocaleDateString("fr-FR",{day:"numeric",month:"short"})}`).join("  ·  ")}
+                </div>
+                <div style={{ fontSize:14, fontWeight:900, color:C.coral }}>
+                  Total : {prixTotal} €
+                  {selectedEnfants.length > 1 && ` (${selected.price} € × ${selectedEnfants.length} enfants)`}
+                </div>
               </div>
             )}
 
@@ -1285,34 +1313,37 @@ function FormulesNatationScreen({ onNav, user, allSeasonSessions, panier, setPan
                   setPanier(prev => [...prev, {
                     id: `nat-${Date.now()}`,
                     type: "natation",
-                    label: `${selected.label} · ${selectedEnfant || ""}`,
+                    label: `${selected.label}${selectedEnfants.length > 0 ? " · " + selectedEnfants.join(", ") : ""}`,
                     emoji: selected.emoji,
                     color: C.ocean,
-                    prix: selected.price,
-                    enfant: selectedEnfant,
+                    prix: prixTotal,
+                    enfants: selectedEnfants,
                     creneaux: selectedCreneaux,
-                    details: `${nbLecons} leçon${nbLecons>1?"s":""}`,
+                    details: `${nbLecons} leçon${nbLecons>1?"s":""} · ${Math.max(1,selectedEnfants.length)} enfant${selectedEnfants.length>1?"s":""}`,
                   }]);
                   setDone(true);
                 }} disabled={selectedCreneaux.length < nbLecons}
-                style={{ flex:1, background: selectedCreneaux.length < nbLecons ? "#bbb" : `linear-gradient(135deg,${C.sun},${C.coral})`, border:"none", color:"#fff", borderRadius:14, padding:"11px", cursor: selectedCreneaux.length < nbLecons ? "not-allowed":"pointer", fontWeight:900, fontSize:13, fontFamily:"inherit" }}>
-                  🛒 Panier
+                style={{ flex:1, background:selectedCreneaux.length < nbLecons?"#bbb":`linear-gradient(135deg,${C.sun},${C.coral})`, border:"none", color:"#fff", borderRadius:14, padding:"11px", cursor:selectedCreneaux.length<nbLecons?"not-allowed":"pointer", fontWeight:900, fontSize:13, fontFamily:"inherit" }}>
+                  🛒 Panier · {prixTotal} €
                 </button>
               )}
               <SunBtn color={selectedCreneaux.length === nbLecons ? C.ocean : "#bbb"}
                 disabled={selectedCreneaux.length < nbLecons}
                 onClick={async () => {
                   if (selectedCreneaux.length < nbLecons) return;
+                  const enfantsAInserer = selectedEnfants.length > 0 ? selectedEnfants : [];
                   try {
                     if (user?.supabaseId) {
                       for (const c of selectedCreneaux) {
+                        const spotsDispos = getSpots(c.dayISO, c.time);
+                        const enfantsCreneau = enfantsAInserer.slice(0, spotsDispos);
                         await sb.from("reservations_natation").insert([{
                           membre_id:   user.supabaseId,
                           heure:       c.time,
                           date_seance: c.dayISO,
-                          enfants:     selectedEnfant ? [selectedEnfant] : [],
+                          enfants:     enfantsCreneau,
                           statut:      "pending",
-                          montant:     Math.round(selected.price / nbLecons),
+                          montant:     Math.round(prixTotal / nbLecons),
                           jour:        new Date(c.dayISO).toLocaleDateString("fr-FR",{weekday:"short"}),
                         }]);
                       }
@@ -1320,7 +1351,7 @@ function FormulesNatationScreen({ onNav, user, allSeasonSessions, panier, setPan
                   } catch(e) { console.warn(e); }
                   setDone(true);
                 }}>
-                📨 Envoyer
+                📨 Envoyer · {prixTotal} €
               </SunBtn>
             </div>
           </div>
@@ -1738,7 +1769,7 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser, pa
         <div style={{ fontSize:14, color:"#555", lineHeight:1.8 }}>
           Votre demande de <strong>Carte Liberté · {selectedLiberte.label}</strong> est enregistrée.<br/>
           <strong>L'équipe FNCP va vous contacter</strong> pour le paiement :<br/>
-          🏦 Virement · ✉️ Chèque · 🎫 Chèques vacances
+          🏦 Virement · ✉️ Chèque · 💶 Espèces · 🎫 Chèques vacances
         </div>
         <div style={{ marginTop:12, background:`${C.coral}10`, borderRadius:12, padding:"10px 14px", fontSize:13, color:C.coral, fontWeight:700 }}>
           ⏳ Vos demi-journées seront créditées à réception du paiement
@@ -1759,7 +1790,7 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser, pa
         <div style={{ fontSize:14, color:"#555", lineHeight:1.8 }}>
           Votre demande de réservation a bien été enregistrée.<br/>
           <strong>L'équipe FNCP va vous contacter</strong> pour finaliser le paiement par :<br/>
-          🏦 Virement · ✉️ Chèque · 🎫 Chèques vacances
+          🏦 Virement · ✉️ Chèque · 💶 Espèces · 🎫 Chèques vacances
         </div>
         <div style={{ marginTop:12, background:`${C.coral}10`, borderRadius:12, padding:"10px 14px", fontSize:13, color:C.coral, fontWeight:700 }}>
           ⏳ Votre accès sera activé à réception du paiement
@@ -2053,7 +2084,7 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser, pa
                 {/* Modes de paiement */}
                 <div style={{ background:"#F8FBFF", borderRadius:14, padding:"12px 14px", marginBottom:14, textAlign:"left" }}>
                   <div style={{ fontWeight:900, color:C.dark, fontSize:13, marginBottom:8 }}>💳 Modes de paiement acceptés</div>
-                  {[["🏦","Virement bancaire"],["✉️","Chèque"],["🎫","Chèques vacances"]].map(([icon,label]) => (
+                  {[["🏦","Virement bancaire"],["✉️","Chèque"],["💶","Espèces"],["🎫","Chèques vacances"]].map(([icon,label]) => (
                     <div key={label} style={{ display:"flex", alignItems:"center", gap:8, marginBottom:5, fontSize:13, color:"#555" }}>
                       <span style={{ fontSize:16 }}>{icon}</span>{label}
                     </div>
@@ -2150,7 +2181,7 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser, pa
                 {/* Modes de paiement */}
                 <div style={{ background:"#F8FBFF", borderRadius:12, padding:"10px 12px", marginBottom:14 }}>
                   <div style={{ fontWeight:900, color:C.dark, fontSize:12, marginBottom:6 }}>💳 Modes de paiement acceptés</div>
-                  {[["🏦","Virement bancaire"],["✉️","Chèque"],["🎫","Chèques vacances"]].map(([icon,label]) => (
+                  {[["🏦","Virement bancaire"],["✉️","Chèque"],["💶","Espèces"],["🎫","Chèques vacances"]].map(([icon,label]) => (
                     <div key={label} style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4, fontSize:12, color:"#555" }}>
                       <span>{icon}</span>{label}
                     </div>
@@ -2316,7 +2347,7 @@ function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSession
         <div style={{ fontSize:14, color:"#555", lineHeight:1.8, marginBottom:12 }}>
           Votre demande est enregistrée.<br/>
           <strong>L'équipe FNCP va vous contacter</strong> pour le paiement :<br/>
-          🏦 Virement · ✉️ Chèque · 🎫 Chèques vacances
+          🏦 Virement · ✉️ Chèque · 💶 Espèces · 🎫 Chèques vacances
         </div>
         <div style={{ background:`${C.ocean}10`, borderRadius:12, padding:"10px 14px", fontSize:13, color:C.ocean, fontWeight:700 }}>
           ⏳ Votre accès sera activé à réception du paiement
@@ -2361,7 +2392,7 @@ function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSession
         )}
         <div style={{ background:"#F8FBFF", borderRadius:14, padding:"12px 14px", marginBottom:8, textAlign:"left" }}>
           <div style={{ fontWeight:900, color:C.dark, fontSize:13, marginBottom:8 }}>💳 Modes de paiement acceptés</div>
-          {[["🏦","Virement bancaire"],["✉️","Chèque"],["🎫","Chèques vacances"]].map(([icon,label]) => (
+          {[["🏦","Virement bancaire"],["✉️","Chèque"],["💶","Espèces"],["🎫","Chèques vacances"]].map(([icon,label]) => (
             <div key={label} style={{ display:"flex", alignItems:"center", gap:8, marginBottom:5, fontSize:13, color:"#555" }}>
               <span style={{ fontSize:16 }}>{icon}</span>{label}
             </div>
@@ -4238,8 +4269,11 @@ function PaiementsTab({ onValidate }) {
   const getMontant = (g) => {
     if (g.type === "natation") {
       const n = g.resas.length;
+      // Nb enfants = max enfants dans une résa du groupe
+      const nbEnfants = Math.max(1, ...g.resas.map(r => (r.enfants||[]).length));
       const PRIX_NAT = { 1:20, 2:40, 3:60, 4:80, 5:95, 6:113, 7:131, 8:147, 9:162, 10:170 };
-      return PRIX_NAT[n] ? `${PRIX_NAT[n]} €` : `${n * 20} €`;
+      const prixForfait = PRIX_NAT[n] || n * 20;
+      return `${prixForfait * nbEnfants} €`;
     }
     return getClubMontant(g);
   };
@@ -6887,7 +6921,7 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
                 <div style={{ fontWeight:900, fontSize:24 }}>{total} €</div>
               </div>
               <div style={{ fontSize:12, color:"rgba(255,255,255,0.7)" }}>
-                🏦 Virement · ✉️ Chèque · 🎫 Chèques vacances
+                🏦 Virement · ✉️ Chèque · 💶 Espèces · 🎫 Chèques vacances
               </div>
             </div>
 
@@ -7255,4 +7289,4 @@ export default function App() {
     </div>
   );
 }
-// delete pending Wed Apr  1 16:59:15 CEST 2026
+// multi-enfants nat Wed Apr  1 17:11:23 CEST 2026
