@@ -2088,12 +2088,12 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser, pa
                       setPanier(prev => [...prev, {
                         id: `club-${Date.now()}`,
                         type: "club",
-                        label: `Club · ${formulType==="journee"?"Journée":formulType==="matin"?"Matin":"Après-midi"} · ${selectedRow?.label||""}`,
+                        label: `Club · ${formulType==="journee"?"Journée":formulType==="matin"?"☀️ Matin":"🌊 Après-midi"} · ${selectedRow?.label||""}`,
                         emoji: "🏖️",
                         color: C.coral,
                         prix: selectedRow?.price || 0,
                         enfants: selectedEnfantsClub,
-                        session: formulType,
+                        session: formulType, // journee | matin | apmidi
                         dates: selectedDates,
                         details: `${selectedDates.length} jour${selectedDates.length>1?"s":""}`,
                       }]);
@@ -6693,11 +6693,12 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
     if (!panier.length) return;
     if (!user?.supabaseId) { setError("Vous devez être connecté."); return; }
     setSending(true);
+    setError("");
     try {
       for (const item of panier) {
         if (item.type === "natation") {
           for (const c of (item.creneaux || [])) {
-            await sb.from("reservations_natation").insert([{
+            const { error: e } = await sb.from("reservations_natation").insert([{
               membre_id:   user.supabaseId,
               heure:       c.time,
               date_seance: c.dayISO,
@@ -6706,9 +6707,10 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
               montant:     Math.round(item.prix / (item.creneaux?.length || 1)),
               jour:        new Date(c.dayISO).toLocaleDateString("fr-FR", {weekday:"short"}),
             }]);
+            if (e) throw e;
           }
         } else if (item.type === "eveil") {
-          await sb.from("reservations_natation").insert([{
+          const { error: e } = await sb.from("reservations_natation").insert([{
             membre_id:   user.supabaseId,
             heure:       item.heure,
             date_seance: item.date,
@@ -6717,24 +6719,32 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
             montant:     20,
             jour:        item.jour || "",
           }]);
+          if (e) throw e;
         } else if (item.type === "club") {
+          const sessions = item.session === "journee" ? ["matin","apmidi"] : [item.session || "matin"];
           for (const iso of (item.dates || [])) {
-            await sb.from("reservations_club").insert([{
-              membre_id:        user.supabaseId,
-              date_reservation: iso,
-              session:          item.session || "matin",
-              statut:           "pending",
-              enfants:          item.enfants || [],
-            }]);
+            for (const sess of sessions) {
+              const { error: e } = await sb.from("reservations_club").insert([{
+                membre_id:        user.supabaseId,
+                date_reservation: iso,
+                session:          sess,
+                statut:           "pending",
+                enfants:          item.enfants || [],
+                label_jour:       new Date(iso).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"}),
+              }]);
+              if (e) throw e;
+            }
           }
         } else if (item.type === "liberte") {
-          await sb.from("reservations_club").insert([{
+          const { error: e } = await sb.from("reservations_club").insert([{
             membre_id:        user.supabaseId,
             date_reservation: new Date().toISOString().slice(0,10),
             session:          "matin",
             statut:           "pending",
             enfants:          [String(item.nbDemiJ)],
+            label_jour:       `Carte Liberté · ${item.nbDemiJ} demi-journées`,
           }]);
+          if (e) throw e;
         }
       }
       setPanier([]);
@@ -7182,4 +7192,4 @@ export default function App() {
     </div>
   );
 }
-// fix BottomNav Wed Apr  1 16:26:02 CEST 2026
+// fix panier inserts Wed Apr  1 16:32:54 CEST 2026
