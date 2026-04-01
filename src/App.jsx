@@ -5801,9 +5801,10 @@ function CartesLiberteTab({ dbMembres }) {
       {filtered.map((c, i) => {
         const balance  = c.membre?.liberte_balance || 0;
         const total    = c.membre?.liberte_total   || 0;
-        const used     = total - balance;
+        const used     = Math.max(0, total - balance);
         const pct      = total > 0 ? Math.round((used / total) * 100) : 0;
-        const nbAchete = c.achats.reduce((s, r) => s + (Number(Array.isArray(r.enfants) ? r.enfants[0] : 0)||0), 0);
+        // Afficher chaque achat séparément
+        const achatsLabels = c.achats.map(r => Number(Array.isArray(r.enfants) ? r.enfants[0] : 0)).filter(n => n >= 6);
 
         const enfantsClub = c.enfantsClub || [];
 
@@ -5838,7 +5839,7 @@ function CartesLiberteTab({ dbMembres }) {
             {/* Barre progression */}
             <div style={{ marginBottom:10 }}>
               <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, color:"#888", marginBottom:4 }}>
-                <span>{nbAchete} demi-j. achetées</span>
+                <span>{achatsLabels.map(n => `${n} demi-j.`).join(" + ")} achetées</span>
                 <span>{used} utilisées · {balance} restantes</span>
               </div>
               <div style={{ background:"#F0F4F8", borderRadius:50, height:10, overflow:"hidden" }}>
@@ -6866,4 +6867,4 @@ export default function App() {
     </div>
   );
 }
-// fix liberté query Wed Apr  1 12:37:36 CEST 2026
+// fix liberté 36 Wed Apr  1 12:45:15 CEST 2026
