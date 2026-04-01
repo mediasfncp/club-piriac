@@ -5954,14 +5954,36 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
     session: `${r.time} - ${DAYS.find(d=>d.id===r.day)?.label} ${DAYS.find(d=>d.id===r.day)?.num}`, status: "confirmed"
   }))];
 
-  // Total encaissé = résas confirmées aujourd'hui (basé sur updated_at ou created_at)
   const todayISO = new Date().toISOString().slice(0,10);
   const confirmedNat  = dbResas.filter(r => r.statut === "confirmed");
   const confirmedClub = dbResasClub.filter(r => r.statut === "confirmed");
   const confirmedNatToday  = dbResas.filter(r => r.statut === "confirmed" && ((r.updated_at||r.created_at||"").slice(0,10) === todayISO));
   const confirmedClubToday = dbResasClub.filter(r => r.statut === "confirmed" && ((r.updated_at||r.created_at||"").slice(0,10) === todayISO));
-  const realTotal = confirmedNatToday.reduce((s, r) => s + Number(r.montant || 20), 0)
-                  + confirmedClubToday.reduce((s, r) => s + Number(r.montant || 0), 0);
+
+  // Montant natation selon forfait (groupé par membre+date_creation)
+  const montantNat = (resas) => {
+    const groups = {};
+    resas.forEach(r => {
+      const key = `${r.membre_id}-${(r.created_at||"").slice(0,10)}`;
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(r);
+    });
+    return Object.values(groups).reduce((total, g) => {
+      const n = g.length;
+      const prix = n >= 10 ? 170 : n >= 6 ? 113 : n >= 5 ? 95 : n * 20;
+      return total + prix;
+    }, 0);
+  };
+
+  // Montant club — Carte Liberté selon nb demi-j, sinon 0 (formule semaine payée globalement)
+  const LIBERTE_PRIX = { 6:96, 12:180, 18:252, 24:288, 30:330 };
+  const montantClub = (resas) => resas.reduce((s, r) => {
+    const nb = Number(Array.isArray(r.enfants) ? r.enfants[0] : 0);
+    if (nb >= 6 && LIBERTE_PRIX[nb]) return s + LIBERTE_PRIX[nb]; // carte liberté
+    return s + Number(r.montant || 0);
+  }, 0);
+
+  const realTotal = montantNat(confirmedNatToday) + montantClub(confirmedClubToday);
   const pendingCount = dbResas.filter(r => r.statut === "pending").length + dbResasClub.filter(r => r.statut === "pending").length;
 
   // Taux de remplissage natation — toute la saison
@@ -6867,4 +6889,4 @@ export default function App() {
     </div>
   );
 }
-// liberté tag Wed Apr  1 12:49:26 CEST 2026
+// dashboard paiements fix Wed Apr  1 12:52:42 CEST 2026
