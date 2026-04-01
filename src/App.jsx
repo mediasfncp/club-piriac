@@ -3937,7 +3937,7 @@ function PaiementsTab({ onValidate }) {
     // Si c'est une Carte Liberté → créditer ou décréditer le solde
     if (groupe.type === "club" && groupe.resas.some(r => r.session === "liberte")) {
       const r = groupe.resas[0];
-      const credit = r.liberte_credit || 0;
+      const credit = Number(r.enfants?.[0]) || 0; // nb stocké dans enfants[0]
       if (credit > 0 && r.membre_id) {
         const { data: m } = await sb.from("membres").select("liberte_balance, liberte_total").eq("id", r.membre_id).single();
         if (m) {
@@ -5379,16 +5379,13 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
             }
           }
         } else if (forfaitClub === "liberte") {
-          // Créer une entrée unique en base — pas de dates, juste le crédit
-          const montantLib = nbLiberte === 6 ? 0 : nbLiberte === 12 ? 0 : nbLiberte === 18 ? 0 : nbLiberte === 24 ? 0 : 0;
           await sb.from("reservations_club").insert([{
-            membre_id: membreId || null,
+            membre_id:        membreId || null,
             date_reservation: new Date().toISOString().slice(0,10),
-            session: "liberte",
-            label_jour: `Carte Liberté · ${nbLiberte} demi-journées`,
-            statut: statutResa,
-            enfants: [],
-            liberte_credit: nbLiberte, // colonnes pour traçabilité
+            session:          "liberte",
+            label_jour:       `Carte Liberté · ${nbLiberte} demi-journées`,
+            statut:           statutResa,
+            enfants:          [String(nbLiberte)], // stocke nb dans enfants pour récupération
           }]);
           // Si directement confirmé (payé), créditer le solde immédiatement
           if (statutResa === "confirmed" && membreId) {
@@ -5901,7 +5898,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                               // Carte Liberté : créditer le solde
                               if (g.type === "club" && g.resas.some(r => r.session === "liberte")) {
                                 const r0 = g.resas[0];
-                                const credit = r0.liberte_credit || 0;
+                                const credit = Number(r0.enfants?.[0]) || 0; // nb demi-j stocké dans enfants[0]
                                 if (credit > 0 && r0.membre_id) {
                                   const { data: m } = await sb.from("membres").select("liberte_balance, liberte_total").eq("id", r0.membre_id).single();
                                   if (m) await sb.from("membres").update({ liberte_balance: (m.liberte_balance||0)+credit, liberte_total: (m.liberte_total||0)+credit }).eq("id", r0.membre_id);
@@ -6133,7 +6130,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                               // Carte Liberté : créditer le solde
                               if (g.type === "club" && g.resas.some(r => r.session === "liberte")) {
                                 const r0 = g.resas[0];
-                                const credit = r0.liberte_credit || 0;
+                                const credit = Number(r0.enfants?.[0]) || 0; // nb demi-j stocké dans enfants[0]
                                 if (credit > 0 && r0.membre_id) {
                                   const { data: m } = await sb.from("membres").select("liberte_balance, liberte_total").eq("id", r0.membre_id).single();
                                   if (m) await sb.from("membres").update({ liberte_balance: (m.liberte_balance||0)+credit, liberte_total: (m.liberte_total||0)+credit }).eq("id", r0.membre_id);
