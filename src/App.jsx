@@ -2297,10 +2297,13 @@ function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSession
 
   // Prix unitaire × nb enfants sélectionnés × forfait
   const FORFAITS_RESA = [
-    { qty:1,  price:20,  label:"1 leçon",   badge:"Unité" },
-    { qty:5,  price:95,  label:"5 leçons",  badge:"Forfait" },
-    { qty:6,  price:113, label:"6 leçons",  badge:"Forfait" },
-    { qty:10, price:170, label:"10 leçons", badge:"⭐ Meilleur tarif" },
+    { qty:1,  price:20,  priceUnit:20,  label:"À l'unité",   badge:"20 €/leçon" },
+    { qty:5,  price:95,  priceUnit:19,  label:"Forfait 5",   badge:"19 €/leçon 🎁" },
+    { qty:6,  price:113, priceUnit:18.8,label:"Forfait 6",   badge:"18,8 €/leçon 🎁" },
+    { qty:7,  price:131, priceUnit:18.7,label:"Forfait 7",   badge:"18,7 €/leçon 🎁" },
+    { qty:8,  price:147, priceUnit:18.4,label:"Forfait 8",   badge:"18,4 €/leçon 🎁" },
+    { qty:9,  price:162, priceUnit:18,  label:"Forfait 9",   badge:"18 €/leçon 🎁" },
+    { qty:10, price:170, priceUnit:17,  label:"Forfait 10",  badge:"⭐ 17 €/leçon" },
   ];
   const [selectedForfait, setSelectedForfait] = useState(FORFAITS_RESA[0]);
   const nbEnf = Math.max(1, selectedEnfants.length);
@@ -2446,32 +2449,35 @@ function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSession
 
         {/* Forfait */}
         <Card>
-          <h3 style={{ color:C.dark, margin:"0 0 10px", fontSize:15 }}>🎟️ Forfait</h3>
-          <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+          <h3 style={{ color:C.dark, margin:"0 0 6px", fontSize:15 }}>🎟️ Choisir un forfait</h3>
+          <div style={{ fontSize:12, color:"#888", marginBottom:10 }}>Le prix forfait s'applique à l'ensemble des séances de la saison.</div>
+          <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
             {FORFAITS_RESA.map(f => {
               const sel = selectedForfait.qty === f.qty;
+              const prixTotal = f.price * nbEnf;
               return (
                 <div key={f.qty} onClick={() => setSelectedForfait(f)} style={{
                   display:"flex", justifyContent:"space-between", alignItems:"center",
-                  background: sel ? `${C.ocean}15` : "#f8f8f8",
-                  border:`2px solid ${sel ? C.ocean : "#e0e0e0"}`,
+                  background: sel ? `linear-gradient(135deg,${C.ocean}18,${C.sea}10)` : "#f8f8f8",
+                  border:`2px solid ${sel ? C.ocean : "#e8e8e8"}`,
                   borderRadius:14, padding:"10px 14px", cursor:"pointer",
+                  transform: sel ? "scale(1.01)" : "scale(1)", transition:"all .15s",
                 }}>
                   <div>
                     <span style={{ fontWeight:900, color:sel?C.ocean:C.dark, fontSize:14 }}>{f.label}</span>
-                    {f.badge && <span style={{ marginLeft:8, background:sel?C.ocean:"#e0e0e0", color:sel?"#fff":"#888", borderRadius:50, padding:"1px 8px", fontSize:10, fontWeight:800 }}>{f.badge}</span>}
+                    <span style={{ marginLeft:8, background:sel?C.ocean:"#e0e0e0", color:sel?"#fff":"#888", borderRadius:50, padding:"1px 8px", fontSize:10, fontWeight:800 }}>{f.badge}</span>
                   </div>
-                  <div style={{ fontWeight:900, fontSize:16, color:sel?C.ocean:"#888" }}>
-                    {f.price} €{nbEnf > 1 ? ` × ${nbEnf}` : ""}
-                    {nbEnf > 1 && <span style={{ fontSize:11, color:C.coral, marginLeft:4 }}>= {f.price * nbEnf} €</span>}
+                  <div style={{ textAlign:"right" }}>
+                    <div style={{ fontWeight:900, fontSize:15, color:sel?C.ocean:"#555" }}>{f.price} €</div>
+                    {nbEnf > 1 && <div style={{ fontSize:11, color:C.coral, fontWeight:700 }}>{prixTotal} € × {nbEnf} enf.</div>}
                   </div>
                 </div>
               );
             })}
           </div>
-          <div style={{ marginTop:10, display:"flex", justifyContent:"space-between", alignItems:"center", background:`${C.ocean}08`, borderRadius:10, padding:"8px 12px" }}>
-            <span style={{ fontSize:13, color:"#888", fontWeight:700 }}>Total · {nbEnf} enfant{nbEnf>1?"s":""}</span>
-            <span style={{ fontSize:18, fontWeight:900, color:C.coral }}>{prixSeance} €</span>
+          <div style={{ marginTop:10, display:"flex", justifyContent:"space-between", alignItems:"center", background:`linear-gradient(135deg,${C.ocean}15,${C.sea}08)`, borderRadius:12, padding:"10px 14px", border:`1.5px solid ${C.ocean}30` }}>
+            <span style={{ fontSize:13, color:C.ocean, fontWeight:800 }}>💰 Total · {nbEnf} enfant{nbEnf>1?"s":""}</span>
+            <span style={{ fontSize:20, fontWeight:900, color:C.coral }}>{prixSeance} €</span>
           </div>
         </Card>
 
@@ -4111,6 +4117,7 @@ function MembresTab({ allResas, dbMembres, onRefresh }) {
     id: m.id, name: `${m.prenom} ${m.nom}`, prenom: m.prenom, nom: m.nom,
     email: m.email, phone: m.tel, tel: m.tel, tel2: m.tel2,
     adresse: m.adresse, ville: m.ville, cp: m.cp,
+    adresse_vac: m.adresse_vac, ville_vac: m.ville_vac, cp_vac: m.cp_vac,
     color: C.ocean, av: "👤", enfants: m.enfants || [], resa: 0,
     droitImage: m.droit_image, droitDiffusion: m.droit_diffusion, supabase: true,
   }));
@@ -4178,6 +4185,8 @@ function RechercheTab({ allResas, sessions, dbMembres }) {
   const membresData = (dbMembres || []).map(m => ({
     id: m.id, name: `${m.prenom} ${m.nom}`, prenom: m.prenom, nom: m.nom,
     email: m.email, phone: m.tel, color: C.ocean, av: "👤",
+    adresse: m.adresse, ville: m.ville, cp: m.cp,
+    adresse_vac: m.adresse_vac, ville_vac: m.ville_vac, cp_vac: m.cp_vac,
     enfants: m.enfants || [], droitImage: m.droit_image, droitDiffusion: m.droit_diffusion,
     supabase: true,
   }));
@@ -4583,8 +4592,8 @@ function PaiementsTab({ onValidate }) {
         ))}
       </div>
       <div style={{ display:"flex", gap:8, alignItems:"center" }}>
-        <div style={{ fontSize:11, fontWeight:900, color:"#888", whiteSpace:"nowrap" }}>📅 Filtrer par date :</div>
-        <input type="month" value={dateFilter} onChange={e => setDateFilter(e.target.value)}
+        <div style={{ fontSize:11, fontWeight:900, color:"#888", whiteSpace:"nowrap" }}>📅 Date :</div>
+        <input type="date" value={dateFilter} onChange={e => setDateFilter(e.target.value)}
           style={{ flex:1, border:"2px solid #e0e8f0", borderRadius:10, padding:"7px 10px", fontSize:13, fontFamily:"inherit", outline:"none" }} />
         {dateFilter && <button onClick={() => setDateFilter("")} style={{ background:"#f0f0f0", border:"none", borderRadius:8, padding:"7px 10px", cursor:"pointer", fontSize:12, fontWeight:800, fontFamily:"inherit", color:"#888" }}>✕</button>}
       </div>
@@ -5266,13 +5275,13 @@ th{background:#1A8FE3;color:#fff;padding:10px 12px;text-align:left}
           <div style={{ display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:10 }}>
           {currentWeek.map(d => {
             const slots = getNataSlots(d.id);
-            const taken = slots.reduce((acc, s) => acc + (2 - s.spots), 0);
-            const avail = slots.reduce((acc, s) => acc + s.spots, 0);
-            const total = slots.length * 2;
-            const rate  = total > 0 ? Math.round((taken / total) * 100) : 0;
-            // Enfants inscrits ce jour depuis Supabase
             const dateISO = d.date ? `${d.date.getFullYear()}-${String(d.date.getMonth()+1).padStart(2,"0")}-${String(d.date.getDate()).padStart(2,"0")}` : "";
+            // Compter les vraies places prises depuis Supabase (confirmed)
             const resasJour = dbResasNat.filter(r => r.date_seance?.slice(0,10) === dateISO);
+            const taken = resasJour.reduce((acc, r) => acc + Math.max(1, (r.enfants||[]).length), 0);
+            const total = slots.length * 2;
+            const avail = Math.max(0, total - taken);
+            const rate  = total > 0 ? Math.round((taken / total) * 100) : 0;
             const enfantsJour = resasJour.flatMap(r => r.enfants || []);
             return (
               <div key={d.id} onClick={() => { setModalDay(d); setModalSession(null); }} style={{ background: "#fff", borderRadius: 18, padding: "14px 16px", boxShadow: "0 2px 10px rgba(0,0,0,0.05)", cursor: "pointer", transition: "transform .15s" }}
@@ -6925,8 +6934,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                   { label: "Résas club",      value: dbResasClub.length,    emoji: "🏖️", bg: `linear-gradient(135deg,${C.coral},${C.sun})`,  sh: C.coral },
                   { label: "Encaissé auj.",   value: `${realTotal} €`,      emoji: "💶",  bg: `linear-gradient(135deg,${C.green},#00B894)`,   sh: C.green },
                 ].map(s => (
-                  <div key={s.label} style={{ background: s.bg, borderRadius: 22, padding: "18px 16px", boxShadow: `0 8px 24px ${s.sh}55`, position:"relative", overflow:"hidden" }}>
-                    <div style={{ position:"absolute", top:-10, right:-10, fontSize:52, opacity:.15 }}>{s.emoji}</div>
+                  <div key={s.label} style={{ background: s.bg, borderRadius: 22, padding: "18px 16px", boxShadow: `0 8px 24px ${s.sh}55` }}>
                     <div style={{ fontSize: 32, marginBottom: 6 }}>{s.emoji}</div>
                     <div style={{ fontSize: 30, fontWeight: 900, color: "#fff", lineHeight: 1 }}>{s.value}</div>
                     <div style={{ fontSize: 11, color: "rgba(255,255,255,0.85)", fontWeight: 700, marginTop: 6, textTransform:"uppercase", letterSpacing:0.5 }}>{s.label}</div>
@@ -7842,4 +7850,4 @@ export default function App() {
     </div>
   );
 }
-// multi updates Thu Apr  2 21:50:58 CEST 2026
+// 5 fixes Thu Apr  2 22:09:33 CEST 2026
