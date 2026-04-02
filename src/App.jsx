@@ -2296,18 +2296,8 @@ function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSession
   };
 
   // Prix unitaire × nb enfants sélectionnés × forfait
-  const FORFAITS_RESA = [
-    { qty:1,  price:20,  priceUnit:20,  label:"À l'unité",   badge:"20 €/leçon" },
-    { qty:5,  price:95,  priceUnit:19,  label:"Forfait 5",   badge:"19 €/leçon 🎁" },
-    { qty:6,  price:113, priceUnit:18.8,label:"Forfait 6",   badge:"18,8 €/leçon 🎁" },
-    { qty:7,  price:131, priceUnit:18.7,label:"Forfait 7",   badge:"18,7 €/leçon 🎁" },
-    { qty:8,  price:147, priceUnit:18.4,label:"Forfait 8",   badge:"18,4 €/leçon 🎁" },
-    { qty:9,  price:162, priceUnit:18,  label:"Forfait 9",   badge:"18 €/leçon 🎁" },
-    { qty:10, price:170, priceUnit:17,  label:"Forfait 10",  badge:"⭐ 17 €/leçon" },
-  ];
-  const [selectedForfait, setSelectedForfait] = useState(FORFAITS_RESA[0]);
   const nbEnf = Math.max(1, selectedEnfants.length);
-  const prixSeance = selectedForfait.price * nbEnf;
+  const prixSeance = 20 * nbEnf;
 
   const handleConfirm = async () => {
     if (setAllSeasonSessions) setAllSeasonSessions(prev => prev.map(s => s.id === booking.id ? { ...s, spots: Math.max(0, s.spots-1) } : s));
@@ -2447,39 +2437,11 @@ function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSession
           </Card>
         )}
 
-        {/* Forfait */}
-        <Card>
-          <h3 style={{ color:C.dark, margin:"0 0 6px", fontSize:15 }}>🎟️ Choisir un forfait</h3>
-          <div style={{ fontSize:12, color:"#888", marginBottom:10 }}>Le prix forfait s'applique à l'ensemble des séances de la saison.</div>
-          <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
-            {FORFAITS_RESA.map(f => {
-              const sel = selectedForfait.qty === f.qty;
-              const prixTotal = f.price * nbEnf;
-              return (
-                <div key={f.qty} onClick={() => setSelectedForfait(f)} style={{
-                  display:"flex", justifyContent:"space-between", alignItems:"center",
-                  background: sel ? `linear-gradient(135deg,${C.ocean}18,${C.sea}10)` : "#f8f8f8",
-                  border:`2px solid ${sel ? C.ocean : "#e8e8e8"}`,
-                  borderRadius:14, padding:"10px 14px", cursor:"pointer",
-                  transform: sel ? "scale(1.01)" : "scale(1)", transition:"all .15s",
-                }}>
-                  <div>
-                    <span style={{ fontWeight:900, color:sel?C.ocean:C.dark, fontSize:14 }}>{f.label}</span>
-                    <span style={{ marginLeft:8, background:sel?C.ocean:"#e0e0e0", color:sel?"#fff":"#888", borderRadius:50, padding:"1px 8px", fontSize:10, fontWeight:800 }}>{f.badge}</span>
-                  </div>
-                  <div style={{ textAlign:"right" }}>
-                    <div style={{ fontWeight:900, fontSize:15, color:sel?C.ocean:"#555" }}>{f.price} €</div>
-                    {nbEnf > 1 && <div style={{ fontSize:11, color:C.coral, fontWeight:700 }}>{prixTotal} € × {nbEnf} enf.</div>}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          <div style={{ marginTop:10, display:"flex", justifyContent:"space-between", alignItems:"center", background:`linear-gradient(135deg,${C.ocean}15,${C.sea}08)`, borderRadius:12, padding:"10px 14px", border:`1.5px solid ${C.ocean}30` }}>
-            <span style={{ fontSize:13, color:C.ocean, fontWeight:800 }}>💰 Total · {nbEnf} enfant{nbEnf>1?"s":""}</span>
-            <span style={{ fontSize:20, fontWeight:900, color:C.coral }}>{prixSeance} €</span>
-          </div>
-        </Card>
+        {/* Prix */}
+        <div style={{ background:`${C.ocean}08`, borderRadius:14, padding:"12px 16px", display:"flex", justifyContent:"space-between", alignItems:"center", border:`1.5px solid ${C.ocean}20` }}>
+          <span style={{ fontSize:13, color:C.ocean, fontWeight:800 }}>💰 20 € × {nbEnf} enfant{nbEnf>1?"s":""} = <strong>{prixSeance} €</strong></span>
+          <span style={{ fontSize:11, color:"#aaa" }}>Forfait appliqué dans le panier</span>
+        </div>
 
         <div style={{ background:"#F8FBFF", borderRadius:14, padding:"12px 14px", textAlign:"left" }}>
           <div style={{ fontWeight:900, color:C.dark, fontSize:13, marginBottom:8 }}>💳 Modes de paiement acceptés</div>
@@ -7298,7 +7260,31 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
 
   const removeItem = (id) => setPanier(prev => prev.filter(item => item.id !== id));
 
-  const total = panier.reduce((s, item) => s + (item.prix || 0), 0);
+  // Grille tarifaire natation
+  const PRIX_NAT_FORFAIT = { 1:20, 2:40, 3:60, 4:80, 5:95, 6:113, 7:131, 8:147, 9:162, 10:170 };
+  const getPrixNat = (nbSeances) => PRIX_NAT_FORFAIT[Math.min(nbSeances, 10)] || nbSeances * 20;
+
+  // Calculer le prix natation par enfant selon le total de séances dans le panier
+  const natItems = panier.filter(i => i.type === "natation");
+  const prixNatParEnfant = (() => {
+    // Compter les séances par enfant
+    const seancesParEnfant = {};
+    natItems.forEach(item => {
+      const enfants = item.enfants?.length > 0 ? item.enfants : (item.enfant ? [item.enfant] : ["_"]);
+      const nbCreneaux = item.creneaux?.length || 1;
+      enfants.forEach(e => {
+        seancesParEnfant[e] = (seancesParEnfant[e] || 0) + nbCreneaux;
+      });
+    });
+    // Prix forfait pour chaque enfant
+    const prix = {};
+    Object.entries(seancesParEnfant).forEach(([e, nb]) => { prix[e] = getPrixNat(nb); });
+    return prix;
+  })();
+
+  const totalNat = Object.values(prixNatParEnfant).reduce((s, p) => s + p, 0);
+  const totalAutres = panier.filter(i => i.type !== "natation").reduce((s, i) => s + (i.prix || 0), 0);
+  const total = totalNat + totalAutres;
 
   const handleEnvoyer = async () => {
     if (!panier.length) return;
@@ -7306,21 +7292,35 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
     setSending(true);
     setError("");
     try {
-      for (const item of panier) {
-        if (item.type === "natation") {
-          for (const c of (item.creneaux || [])) {
-            const { error: e } = await sb.from("reservations_natation").insert([{
-              membre_id:   user.supabaseId,
-              heure:       c.time,
-              date_seance: c.dayISO,
-              enfants:     item.enfant ? [item.enfant] : [],
-              statut:      "pending",
-              montant:     Math.round(item.prix / (item.creneaux?.length || 1)),
-              jour:        new Date(c.dayISO).toLocaleDateString("fr-FR", {weekday:"short"}),
-            }]);
-            if (e) throw e;
-          }
-        } else if (item.type === "eveil") {
+      // Regrouper natation par enfant pour appliquer forfait
+      const natItemsAll = panier.filter(i => i.type === "natation");
+      const natGroupes = {};
+      natItemsAll.forEach(item => {
+        const enfants = item.enfants?.length > 0 ? item.enfants : (item.enfant ? [item.enfant] : ["_"]);
+        const key = enfants.join("+");
+        if (!natGroupes[key]) natGroupes[key] = { enfants, creneaux: [] };
+        natGroupes[key].creneaux.push(...(item.creneaux || []));
+      });
+      for (const [, groupe] of Object.entries(natGroupes)) {
+        const nbSeances = groupe.creneaux.length;
+        const prixForfait = getPrixNat(nbSeances);
+        const montantParSeance = Math.round(prixForfait / nbSeances);
+        for (const c of groupe.creneaux) {
+          const { error: e } = await sb.from("reservations_natation").insert([{
+            membre_id:   user.supabaseId,
+            heure:       c.time,
+            date_seance: c.dayISO,
+            enfants:     groupe.enfants.filter(e => e !== "_"),
+            statut:      "pending",
+            montant:     montantParSeance,
+            jour:        new Date(c.dayISO).toLocaleDateString("fr-FR", {weekday:"short"}),
+          }]);
+          if (e) throw e;
+        }
+      }
+
+      for (const item of panier.filter(i => i.type !== "natation")) {
+        if (item.type === "eveil") {
           const { error: e } = await sb.from("reservations_natation").insert([{
             membre_id:   user.supabaseId,
             heure:       item.heure,
@@ -7359,6 +7359,61 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
         }
       }
       setPanier([]);
+
+      // Générer l'email de confirmation
+      const lignesNat = Object.entries(natGroupes).map(([, g]) => {
+        const nb = g.creneaux.length;
+        const prix = getPrixNat(nb);
+        const creneauxStr = g.creneaux.map(c => `${c.time} – ${new Date(c.dayISO).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}`).join("<br/>      ");
+        const enfantsStr = g.enfants.filter(e => e !== "_").join(", ") || "—";
+        return `<tr><td style="padding:8px 12px;font-weight:700;color:#1A8FE3">🏊 Natation</td><td style="padding:8px 12px">${enfantsStr}</td><td style="padding:8px 12px;font-size:12px;color:#555">${creneauxStr}</td><td style="padding:8px 12px;font-weight:900;color:#FF8E53;text-align:right">${prix} €</td></tr>`;
+      }).join("");
+
+      const lignesAutres = panier.filter(i => i.type !== "natation").map(item => {
+        const detail = item.dates?.length > 0
+          ? item.dates.map(d => new Date(d).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"})).join(", ")
+          : item.details || "";
+        const typeLabel = item.type === "club" ? "🏖️ Club" : item.type === "liberte" ? "🎟️ Liberté" : item.type === "eveil" ? "🌊 Éveil" : item.type;
+        return `<tr><td style="padding:8px 12px;font-weight:700;color:#FF8E53">${typeLabel}</td><td style="padding:8px 12px">${item.enfants?.join(", ") || "—"}</td><td style="padding:8px 12px;font-size:12px;color:#555">${detail}</td><td style="padding:8px 12px;font-weight:900;color:#FF8E53;text-align:right">${item.prix} €</td></tr>`;
+      }).join("");
+
+      const nomMembre = `${user.prenom || ""} ${(user.nom || "").toUpperCase()}`.trim();
+      const emailHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Confirmation FNCP</title>
+<style>body{font-family:Arial,sans-serif;color:#2C3E50;margin:0;padding:20px;background:#f0f4f8}
+.card{background:#fff;border-radius:16px;padding:28px;max-width:600px;margin:0 auto;box-shadow:0 4px 20px rgba(0,0,0,0.1)}
+h1{color:#1A8FE3;margin:0 0 4px;font-size:22px}
+.sub{color:#888;font-size:13px;margin:0 0 20px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:linear-gradient(135deg,#1A8FE3,#4ECDC4);color:#fff;padding:10px 12px;text-align:left;font-size:11px;text-transform:uppercase}
+tr:nth-child(even){background:#f8fbff}
+.total{background:linear-gradient(135deg,#1A8FE3,#4ECDC4);color:#fff;padding:12px 16px;border-radius:12px;display:flex;justify-content:space-between;align-items:center;margin-top:16px;font-weight:900;font-size:16px}
+.footer{margin-top:20px;padding:16px;background:#FFF9F0;border-radius:12px;font-size:12px;color:#888;text-align:center}
+.badge{display:inline-block;background:#FF8E5320;color:#FF8E53;border-radius:50px;padding:2px 10px;font-size:11px;font-weight:700;margin-left:6px}
+</style></head><body>
+<div class="card">
+<h1>🏖️ Confirmation de commande</h1>
+<p class="sub">Club de Plage FNCP · Saison 2026</p>
+<p style="font-size:14px;margin-bottom:16px">Bonjour <strong>${nomMembre}</strong>,<br/>Votre demande de réservation a bien été enregistrée. Voici le récapitulatif :</p>
+<table>
+<thead><tr><th>Prestation</th><th>Enfant(s)</th><th>Détails</th><th style="text-align:right">Prix</th></tr></thead>
+<tbody>${lignesNat}${lignesAutres}</tbody>
+</table>
+<div class="total"><span>Total</span><span>${total} €</span></div>
+<div style="margin-top:16px;padding:12px 16px;background:#FFF3CD;border-radius:12px;font-size:13px;color:#856404;font-weight:700">
+⏳ Votre accès sera activé à réception du paiement
+</div>
+<div class="footer">
+  <strong>Modes de paiement acceptés :</strong><br/>
+  🏦 Virement bancaire &nbsp;·&nbsp; ✉️ Chèque &nbsp;·&nbsp; 💶 Espèces &nbsp;·&nbsp; 🎫 Chèques vacances<br/><br/>
+  Club de Plage FNCP · La Baule · Saison 2026<br/>
+  <em>Cet email est généré automatiquement depuis l'application FNCP.</em>
+</div>
+</div></body></html>`;
+
+      // Ouvrir l'email dans une nouvelle fenêtre pour impression/copie
+      const win = window.open("", "_blank");
+      if (win) { win.document.write(emailHtml); win.document.close(); }
+
       setDone(true);
     } catch(e) { setError("Erreur : " + e.message); }
     setSending(false);
@@ -7372,7 +7427,10 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
         Toutes vos prestations ont été enregistrées.<br/>
         L'équipe FNCP vous contactera pour le paiement.
       </p>
-      <div style={{ background:`${C.ocean}10`, borderRadius:14, padding:"12px 20px", margin:"16px 0 24px", fontSize:13, color:C.ocean, fontWeight:700 }}>
+      <div style={{ background:`${C.green}10`, borderRadius:14, padding:"12px 20px", margin:"12px 0", fontSize:13, color:C.green, fontWeight:700 }}>
+        📄 Un récapitulatif s'est ouvert dans un nouvel onglet
+      </div>
+      <div style={{ background:`${C.ocean}10`, borderRadius:14, padding:"12px 20px", margin:"0 0 24px", fontSize:13, color:C.ocean, fontWeight:700 }}>
         ⏳ Vos accès seront activés à réception du paiement
       </div>
       <SunBtn color={C.ocean} onClick={() => { setDone(false); onNav("home"); }}>Retour à l'accueil</SunBtn>
@@ -7421,14 +7479,22 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
                   {/* Items natation groupés par enfant */}
                   {Object.entries(natParEnfant).map(([key, groupe]) => {
                     const totalCreneaux = groupe.items.flatMap(i => i.creneaux || []);
-                    const totalPrix = groupe.items.reduce((s, i) => s + i.prix, 0);
                     const enfantLabel = groupe.enfants.length > 0 ? groupe.enfants.join(", ") : "Sans nom";
+                    const nbSeances = totalCreneaux.length;
+                    const prixForfait = getPrixNat(nbSeances);
+                    const prixBase = nbSeances * 20;
+                    const economie = prixBase - prixForfait;
+                    const forfaitLabel = nbSeances === 1 ? "Tarif unitaire" : `Forfait ${nbSeances} leçons`;
                     return (
                       <div key={key} style={{ background:"#fff", borderRadius:18, padding:16, boxShadow:"0 4px 14px rgba(0,0,0,0.06)", borderLeft:`4px solid ${C.ocean}` }}>
                         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
                           <div style={{ flex:1 }}>
                             <div style={{ fontWeight:900, color:C.dark, fontSize:14 }}>🏊 Natation · {enfantLabel}</div>
-                            <div style={{ fontSize:12, color:C.ocean, fontWeight:700, marginTop:2 }}>{totalCreneaux.length} créneau{totalCreneaux.length>1?"x":""}</div>
+                            <div style={{ display:"flex", gap:6, alignItems:"center", marginTop:4 }}>
+                              <span style={{ fontSize:12, color:C.ocean, fontWeight:700 }}>{nbSeances} créneau{nbSeances>1?"x":""}</span>
+                              <span style={{ background:`${C.ocean}15`, color:C.ocean, borderRadius:50, padding:"1px 8px", fontSize:10, fontWeight:800 }}>{forfaitLabel}</span>
+                              {economie > 0 && <span style={{ background:`${C.green}15`, color:C.green, borderRadius:50, padding:"1px 8px", fontSize:10, fontWeight:800 }}>🎁 -{economie} €</span>}
+                            </div>
                             <div style={{ display:"flex", flexWrap:"wrap", gap:4, marginTop:6 }}>
                               {totalCreneaux.map((c,i) => (
                                 <span key={i} style={{ background:`${C.ocean}15`, color:C.ocean, borderRadius:8, padding:"2px 8px", fontSize:10, fontWeight:700 }}>
@@ -7438,7 +7504,8 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
                             </div>
                           </div>
                           <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:6 }}>
-                            <div style={{ fontWeight:900, fontSize:16, color:C.ocean }}>{totalPrix} €</div>
+                            <div style={{ fontWeight:900, fontSize:16, color:C.ocean }}>{prixForfait} €</div>
+                            {economie > 0 && <div style={{ fontSize:11, color:"#aaa", textDecoration:"line-through" }}>{prixBase} €</div>}
                             <button onClick={() => groupe.items.forEach(i => removeItem(i.id))} style={{ background:"#fff0f0", border:"none", color:"#e74c3c", borderRadius:8, padding:"4px 10px", cursor:"pointer", fontSize:12, fontWeight:800, fontFamily:"inherit" }}>✕ Retirer</button>
                           </div>
                         </div>
@@ -7746,10 +7813,13 @@ export default function App() {
         }
       });
 
-      // Auto-refresh de session toutes les 10 min
+      // Auto-refresh de session toutes les 5 min
       const refreshInterval = setInterval(() => {
         sb.auth.refreshSession().catch(() => {});
-      }, 10 * 60 * 1000);
+      }, 5 * 60 * 1000);
+
+      // Refresh immédiat au démarrage
+      sb.auth.refreshSession().catch(() => {});
 
       // Écouter les connexions (magic link cliqué)
       const { data: { subscription } } = sb.auth.onAuthStateChange((event, session) => {
@@ -7850,4 +7920,4 @@ export default function App() {
     </div>
   );
 }
-// 5 fixes Thu Apr  2 22:09:33 CEST 2026
+// forfait panier + session Thu Apr  2 22:27:28 CEST 2026

@@ -1,15 +1,19 @@
 // src/supabase.js
-// Client Supabase pour l'app FNCP
-
 import { createClient } from '@supabase/supabase-js'
 
 const SUPABASE_URL = 'https://rnaosrftcntomehaepjh.supabase.co'
 const SUPABASE_KEY = 'sb_publishable_n9m3QjIKt9OnyN_d8n9cAQ_VQpUpnOu'
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
+export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    storage: localStorage,
+  }
+})
 
 // ── MEMBRES ───────────────────────────────────────────────
-
 export async function creerMembre(form) {
   const { data, error } = await supabase
     .from('membres')
@@ -72,7 +76,6 @@ export async function updateLiberte(membreId, balance, total) {
 }
 
 // ── RÉSERVATIONS NATATION ─────────────────────────────────
-
 export async function creerReservationNatation({ membreId, jour, heure, dateSeance, enfants, rappelDate, montant, statut }) {
   const { data, error } = await supabase
     .from('reservations_natation')
@@ -103,7 +106,6 @@ export async function getReservationsNatation(membreId) {
 }
 
 // ── RÉSERVATIONS CLUB ─────────────────────────────────────
-
 export async function creerReservationClub({ membreId, dateReservation, session, labelJour, rappelDate, enfants, statut }) {
   const { data, error } = await supabase
     .from('reservations_club')
@@ -134,7 +136,6 @@ export async function getReservationsClub(membreId) {
 }
 
 // ── PAIEMENTS ─────────────────────────────────────────────
-
 export async function enregistrerPaiement({ membreId, montant, type, label, transactionWero }) {
   const { data, error } = await supabase
     .from('paiements')
@@ -171,7 +172,6 @@ export async function getTotalPaiements() {
 }
 
 // ── ADMIN ─────────────────────────────────────────────────
-
 export async function getAllMembres() {
   const { data, error } = await supabase
     .from('membres')
