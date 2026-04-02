@@ -4141,6 +4141,7 @@ function RechercheTab({ allResas, sessions, dbMembres }) {
   const [filterType, setFilterType] = useState("tous");
   const [selectedMembre, setSelectedMembre] = useState(null);
   const [selectedEnfant, setSelectedEnfant] = useState(null);
+  const [sansPhoto, setSansPhoto] = useState(false);
   const q = query.toLowerCase().trim();
 
   // Construire les données depuis Supabase
@@ -4154,15 +4155,24 @@ function RechercheTab({ allResas, sessions, dbMembres }) {
   }));
   const tousLesMembres = membresData.length > 0 ? membresData : MEMBRES;
 
-  // Tous les enfants avec leur parent
+  // Tous les enfants avec leur parent + adresses
   const tousLesEnfants = tousLesMembres.flatMap(m =>
-    (m.enfants || []).map(e => ({ ...e, parent: m.name || `${m.prenom} ${m.nom}`, parentId: m.id, parentColor: m.color || C.ocean, parentPhone: m.phone || m.tel,
-      adresse: m.adresse, ville: m.ville, cp: m.cp, adresse_vac: m.adresse_vac, ville_vac: m.ville_vac, cp_vac: m.cp_vac }))
+    (m.enfants || []).map(e => ({ ...e,
+      parent: m.name || `${m.prenom} ${m.nom}`, parentId: m.id,
+      parentColor: m.color || C.ocean, parentPhone: m.phone || m.tel,
+      adresse: m.adresse, ville: m.ville, cp: m.cp,
+      adresse_vac: m.adresse_vac, ville_vac: m.ville_vac, cp_vac: m.cp_vac,
+      droitImage: m.droitImage, droitDiffusion: m.droitDiffusion,
+    }))
   );
 
-  // Résultats filtrés
-  const resMembres = (filterType === "tous" || filterType === "membre") && q
-    ? tousLesMembres.filter(m =>
+  // Appliquer filtre sans-photo
+  const membresFiltres = sansPhoto ? tousLesMembres.filter(m => !m.droitImage) : tousLesMembres;
+  const enfantsFiltres  = sansPhoto ? tousLesEnfants.filter(e => !e.droitImage)  : tousLesEnfants;
+
+  // Résultats filtrés par recherche
+  const resMembres = (filterType === "tous" || filterType === "membre") && (q || sansPhoto)
+    ? membresFiltres.filter(m => !q ||
         m.name?.toLowerCase().includes(q) ||
         m.email?.toLowerCase().includes(q) ||
         m.phone?.includes(q) ||
@@ -4170,8 +4180,8 @@ function RechercheTab({ allResas, sessions, dbMembres }) {
       )
     : [];
 
-  const resEnfants = (filterType === "tous" || filterType === "enfant") && q
-    ? tousLesEnfants.filter(e =>
+  const resEnfants = (filterType === "tous" || filterType === "enfant") && (q || sansPhoto)
+    ? enfantsFiltres.filter(e => !q ||
         `${e.prenom} ${e.nom}`.toLowerCase().includes(q) ||
         e.activite?.toLowerCase().includes(q) ||
         e.niveau?.toLowerCase().includes(q) ||
@@ -4203,7 +4213,7 @@ function RechercheTab({ allResas, sessions, dbMembres }) {
         {query && <button onClick={() => setQuery("")} style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)", background:"#eee", border:"none", borderRadius:"50%", width:24, height:24, cursor:"pointer", fontSize:12, fontWeight:900 }}>✕</button>}
       </div>
 
-      {/* Filtres */}
+      {/* Filtres type */}
       <div style={{ display:"flex", gap:8 }}>
         {[["tous","🔍 Tout"],["membre","👤 Membres"],["enfant","👧 Enfants"],["activite","🏊 Activités"]].map(([k,l]) => (
           <button key={k} onClick={() => setFilterType(k)}
@@ -4211,6 +4221,22 @@ function RechercheTab({ allResas, sessions, dbMembres }) {
             {l}
           </button>
         ))}
+      </div>
+
+      {/* Filtre sans autorisation photo */}
+      <div onClick={() => setSansPhoto(v => !v)} style={{
+        display:"flex", alignItems:"center", gap:10, cursor:"pointer",
+        background: sansPhoto ? `${C.sunset}15` : "#f8f8f8",
+        border: `2px solid ${sansPhoto ? C.sunset : "#e0e0e0"}`,
+        borderRadius:12, padding:"10px 14px",
+      }}>
+        <div style={{ width:20, height:20, borderRadius:6, background: sansPhoto ? C.sunset : "#ddd", display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, color:"#fff", fontWeight:900, flexShrink:0 }}>
+          {sansPhoto ? "✓" : ""}
+        </div>
+        <div>
+          <div style={{ fontWeight:800, fontSize:13, color: sansPhoto ? C.sunset : "#555" }}>📵 Sans autorisation photo</div>
+          {sansPhoto && <div style={{ fontSize:11, color:"#aaa" }}>{resMembres.length + resEnfants.length} résultat{resMembres.length + resEnfants.length > 1 ? "s" : ""}</div>}
+        </div>
       </div>
 
       {/* Stats rapides */}
@@ -4508,7 +4534,7 @@ function PaiementsTab({ onValidate }) {
       // Nb enfants = max enfants dans une résa du groupe
       const nbEnfants = Math.max(1, ...g.resas.map(r => (r.enfants||[]).length));
       const PRIX_NAT = { 1:20, 2:40, 3:60, 4:80, 5:95, 6:113, 7:131, 8:147, 9:162, 10:170 };
-      const prixForfait = PRIX_NAT[n] || n * 20;
+      const prixForfait = n <= 10 ? (PRIX_NAT[n] || n*20) : 170 + (n-10)*17;
       return `${prixForfait * nbEnfants} €`;
     }
     return getClubMontant(g);
@@ -4662,6 +4688,8 @@ function DayDetailModal({ day, activity, session, onClose, dbResasNat = [], dbRe
             parent: r.membres ? `${r.membres.prenom} ${r.membres.nom}` : "—",
             parentColor: C.ocean, parentAv: "👤",
             phone: r.membres?.tel || "—",
+            adresse: r.membres?.adresse || "", ville: r.membres?.ville || "", cp: r.membres?.cp || "",
+            adresse_vac: r.membres?.adresse_vac || "", ville_vac: r.membres?.ville_vac || "", cp_vac: r.membres?.cp_vac || "",
             heure: r.heure,
             _ficheEnfant: ficheEnfant || null,
           });
@@ -4697,6 +4725,8 @@ function DayDetailModal({ day, activity, session, onClose, dbResasNat = [], dbRe
               parentColor: C.coral,
               parentAv: "👤",
               phone: r.membres?.tel || "—",
+              adresse: r.membres?.adresse || "", ville: r.membres?.ville || "", cp: r.membres?.cp || "",
+              adresse_vac: r.membres?.adresse_vac || "", ville_vac: r.membres?.ville_vac || "", cp_vac: r.membres?.cp_vac || "",
               session: r.session,
               _ficheEnfant: ficheEnfant || null,
             });
@@ -4851,6 +4881,13 @@ function DayDetailModal({ day, activity, session, onClose, dbResasNat = [], dbRe
                     parent: e.parent || "",
                     parentPhone: e.phone || "",
                     ...(e._ficheEnfant || {}),
+                    // Adresses parent — toujours depuis la résa, pas depuis _ficheEnfant
+                    adresse: e.adresse || "",
+                    ville: e.ville || "",
+                    cp: e.cp || "",
+                    adresse_vac: e.adresse_vac || "",
+                    ville_vac: e.ville_vac || "",
+                    cp_vac: e.cp_vac || "",
                   });
                 }}
                   style={{
@@ -4919,7 +4956,7 @@ function PlanningTab({ allSeasonSessions, clubPlaces, reservations = [] }) {
 
   // Charger résas natation + club + enfants depuis Supabase
   useEffect(() => {
-    sb.from("reservations_natation").select("*, membres(id, prenom, nom, tel)")
+    sb.from("reservations_natation").select("*, membres(id, prenom, nom, tel, adresse, ville, cp, adresse_vac, ville_vac, cp_vac)")
       .eq("statut", "confirmed")
       .then(async ({ data: resasData }) => {
         if (!resasData?.length) { setDbResasNat([]); return; }
@@ -4938,7 +4975,7 @@ function PlanningTab({ allSeasonSessions, clubPlaces, reservations = [] }) {
       })
       .catch(() => {});
     // Charger résas club + enfants séparément
-    sb.from("reservations_club").select("*, membres(id, prenom, nom, tel)")
+    sb.from("reservations_club").select("*, membres(id, prenom, nom, tel, adresse, ville, cp, adresse_vac, ville_vac, cp_vac)")
       .eq("statut", "confirmed")
       .then(async ({ data: resasData }) => {
         if (!resasData?.length) { setDbResasClub([]); return; }
@@ -5451,7 +5488,10 @@ function AgeGroupCard({ dbMembres = [] }) {
       const key = `${e.prenom}-${e.nom}-${e.naissance}`;
       if (!seenEnfants.has(key)) {
         seenEnfants.add(key);
-        allEnfants.push({ ...e, age: calcAge(e.naissance), parent: `${m.prenom} ${NOM(m.nom)}`, parentColor: C.ocean, phone: m.tel });
+        allEnfants.push({ ...e, age: calcAge(e.naissance), parent: `${m.prenom} ${NOM(m.nom)}`, parentColor: C.ocean, phone: m.tel,
+          adresse: m.adresse, ville: m.ville, cp: m.cp,
+          adresse_vac: m.adresse_vac, ville_vac: m.ville_vac, cp_vac: m.cp_vac,
+        });
       }
     });
   });
@@ -6783,7 +6823,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
     return Object.values(groups).reduce((total, g) => {
       const n = g.length;
       const PRIX_NAT = { 1:20, 2:40, 3:60, 4:80, 5:95, 6:113, 7:131, 8:147, 9:162, 10:170 };
-      const prix = PRIX_NAT[n] || n * 20;
+      const prix = n <= 10 ? (PRIX_NAT[n] || n*20) : 170 + (n-10)*17;
       return total + prix;
     }, 0);
   };
@@ -7262,7 +7302,10 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
 
   // Grille tarifaire natation
   const PRIX_NAT_FORFAIT = { 1:20, 2:40, 3:60, 4:80, 5:95, 6:113, 7:131, 8:147, 9:162, 10:170 };
-  const getPrixNat = (nbSeances) => PRIX_NAT_FORFAIT[Math.min(nbSeances, 10)] || nbSeances * 20;
+  const getPrixNat = (nbSeances) => {
+    if (nbSeances <= 10) return PRIX_NAT_FORFAIT[nbSeances] || nbSeances * 20;
+    return 170 + (nbSeances - 10) * 17; // forfait 10 + 17€ par séance supplémentaire
+  };
 
   // Calculer le prix natation par enfant selon le total de séances dans le panier
   const natItems = panier.filter(i => i.type === "natation");
@@ -7920,4 +7963,4 @@ export default function App() {
     </div>
   );
 }
-// fix selectedForfait Thu Apr  2 22:31:06 CEST 2026
+// adresses + prix nat + filtre photo Thu Apr  2 22:56:54 CEST 2026
