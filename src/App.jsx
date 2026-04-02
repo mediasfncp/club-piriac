@@ -2326,13 +2326,13 @@ function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSession
     setPanier(prev => [...prev, {
       id: `res-${Date.now()}`,
       type: "natation",
-      label: `${selectedForfait.label} · ${booking.time} · ${selectedDay?.label} ${selectedDay?.num} ${selectedDay?.month}`,
+      label: `Séance ${booking.time} · ${selectedDay?.label} ${selectedDay?.num} ${selectedDay?.month}`,
       emoji: "🏊",
       color: C.ocean,
       prix: prixSeance,
       enfants: selectedEnfants,
       creneaux: [{ key: `${resaDateISO}-${booking.time}`, dayISO: resaDateISO, time: booking.time, dayId: effectiveDayId }],
-      details: `${selectedForfait.label} · ${nbEnf} enfant${nbEnf>1?"s":""}`,
+      details: `${nbEnf} enfant${nbEnf>1?"s":""} · forfait appliqué`,
     }]);
     setBooking(null);
     setSelectedEnfants([]);
@@ -7920,4 +7920,4 @@ export default function App() {
     </div>
   );
 }
-// email + forfait + session Thu Apr  2 22:27:55 CEST 2026
+// fix selectedForfait Thu Apr  2 22:31:06 CEST 2026
