@@ -1083,7 +1083,9 @@ function FormulesNatationScreen({ onNav, user, allSeasonSessions, panier, setPan
   const nbLecons = selected?.qty || 1;
 
   // Places réelles par créneau
+  const getTodayISO = () => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}-${String(t.getDate()).padStart(2,"0")}`; };
   const getSpots = (dayISO, time) => {
+    if (dayISO === getTodayISO()) return 0;
     const taken = dbResasNat.filter(r => r.date_seance?.slice(0,10) === dayISO && r.heure === time).length;
     return Math.max(0, 2 - taken);
   };
@@ -1468,6 +1470,8 @@ function ReservationClubScreen({ onNav, user, setUser, clubPlaces, setClubPlaces
   const toggleEnfant = (prenom) => setSelectedEnfants(prev => prev.includes(prenom) ? prev.filter(x => x !== prenom) : [...prev, prenom]);
 
   const getPlacesForDate = (dateISO, session) => {
+    const t = new Date(); const todayISO = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}-${String(t.getDate()).padStart(2,"0")}`;
+    if (dateISO === todayISO) return 0;
     const taken = resasClubDB.filter(r => r.date_reservation?.slice(0,10) === dateISO && r.session === session).length;
     return Math.max(0, 45 - taken);
   };
@@ -6743,7 +6747,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
   const tabs = [
     { id: "dashboard",    emoji: "📊", label: "Dashboard"  },
     { id: "seances",      emoji: "🏊", label: "Séances"    },
-    { id: "reservations", emoji: "📋", label: "Résas"      },
+    { id: "reservations", emoji: "📋", label: "Réservations" },
     { id: "membres",      emoji: "👥", label: "Membres"    },
     { id: "planning",     emoji: "🗓️", label: "Planning"   },
     { id: "paiements",    emoji: "💳", label: "Paiements"  },
@@ -7282,31 +7286,78 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
           </div>
         ) : (
           <>
-            {panier.map(item => (
-              <div key={item.id} style={{ background:"#fff", borderRadius:18, padding:16, boxShadow:"0 4px 14px rgba(0,0,0,0.06)", borderLeft:`4px solid ${item.color || C.ocean}` }}>
-                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontWeight:900, color:C.dark, fontSize:14 }}>{item.emoji} {item.label}</div>
-                    {item.enfant && <div style={{ fontSize:12, color:"#888", marginTop:2 }}>👤 {item.enfant}</div>}
-                    {item.enfants?.length > 0 && <div style={{ fontSize:12, color:"#888", marginTop:2 }}>👤 {item.enfants.join(", ")}</div>}
-                    {item.details && <div style={{ fontSize:11, color:"#aaa", marginTop:4 }}>{item.details}</div>}
-                    {item.creneaux?.length > 0 && (
-                      <div style={{ display:"flex", flexWrap:"wrap", gap:4, marginTop:6 }}>
-                        {item.creneaux.map((c,i) => (
-                          <span key={i} style={{ background:`${item.color||C.ocean}15`, color:item.color||C.ocean, borderRadius:8, padding:"2px 8px", fontSize:10, fontWeight:700 }}>
-                            {c.time} · {new Date(c.dayISO).toLocaleDateString("fr-FR",{day:"numeric",month:"short"})}
-                          </span>
-                        ))}
+            {/* Regrouper les items natation par enfant */}
+            {(() => {
+              // Séparer nat et non-nat
+              const natItems = panier.filter(i => i.type === "natation");
+              const autresItems = panier.filter(i => i.type !== "natation");
+
+              // Regrouper natation par enfant
+              const natParEnfant = {};
+              natItems.forEach(item => {
+                const enfantKey = (item.enfants?.length > 0 ? item.enfants.join("+") : item.enfant || "sans");
+                if (!natParEnfant[enfantKey]) natParEnfant[enfantKey] = { enfants: item.enfants || (item.enfant ? [item.enfant] : []), items: [] };
+                natParEnfant[enfantKey].items.push(item);
+              });
+
+              return (
+                <>
+                  {/* Items natation groupés par enfant */}
+                  {Object.entries(natParEnfant).map(([key, groupe]) => {
+                    const totalCreneaux = groupe.items.flatMap(i => i.creneaux || []);
+                    const totalPrix = groupe.items.reduce((s, i) => s + i.prix, 0);
+                    const enfantLabel = groupe.enfants.length > 0 ? groupe.enfants.join(", ") : "Sans nom";
+                    return (
+                      <div key={key} style={{ background:"#fff", borderRadius:18, padding:16, boxShadow:"0 4px 14px rgba(0,0,0,0.06)", borderLeft:`4px solid ${C.ocean}` }}>
+                        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
+                          <div style={{ flex:1 }}>
+                            <div style={{ fontWeight:900, color:C.dark, fontSize:14 }}>🏊 Natation · {enfantLabel}</div>
+                            <div style={{ fontSize:12, color:C.ocean, fontWeight:700, marginTop:2 }}>{totalCreneaux.length} créneau{totalCreneaux.length>1?"x":""}</div>
+                            <div style={{ display:"flex", flexWrap:"wrap", gap:4, marginTop:6 }}>
+                              {totalCreneaux.map((c,i) => (
+                                <span key={i} style={{ background:`${C.ocean}15`, color:C.ocean, borderRadius:8, padding:"2px 8px", fontSize:10, fontWeight:700 }}>
+                                  {c.time} · {new Date(c.dayISO).toLocaleDateString("fr-FR",{day:"numeric",month:"short"})}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                          <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:6 }}>
+                            <div style={{ fontWeight:900, fontSize:16, color:C.ocean }}>{totalPrix} €</div>
+                            <button onClick={() => groupe.items.forEach(i => removeItem(i.id))} style={{ background:"#fff0f0", border:"none", color:"#e74c3c", borderRadius:8, padding:"4px 10px", cursor:"pointer", fontSize:12, fontWeight:800, fontFamily:"inherit" }}>✕ Retirer</button>
+                          </div>
+                        </div>
                       </div>
-                    )}
-                  </div>
-                  <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:6 }}>
-                    <div style={{ fontWeight:900, fontSize:16, color:item.color||C.ocean }}>{item.prix} €</div>
-                    <button onClick={() => removeItem(item.id)} style={{ background:"#fff0f0", border:"none", color:"#e74c3c", borderRadius:8, padding:"4px 10px", cursor:"pointer", fontSize:12, fontWeight:800, fontFamily:"inherit" }}>✕ Retirer</button>
-                  </div>
-                </div>
-              </div>
-            ))}
+                    );
+                  })}
+
+                  {/* Autres items */}
+                  {autresItems.map(item => (
+                    <div key={item.id} style={{ background:"#fff", borderRadius:18, padding:16, boxShadow:"0 4px 14px rgba(0,0,0,0.06)", borderLeft:`4px solid ${item.color || C.coral}` }}>
+                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
+                        <div style={{ flex:1 }}>
+                          <div style={{ fontWeight:900, color:C.dark, fontSize:14 }}>{item.emoji} {item.label}</div>
+                          {item.enfants?.length > 0 && <div style={{ fontSize:12, color:"#888", marginTop:2 }}>👤 {item.enfants.join(", ")}</div>}
+                          {item.details && <div style={{ fontSize:11, color:"#aaa", marginTop:4 }}>{item.details}</div>}
+                          {item.dates?.length > 0 && (
+                            <div style={{ display:"flex", flexWrap:"wrap", gap:4, marginTop:6 }}>
+                              {item.dates.map((d,i) => (
+                                <span key={i} style={{ background:`${item.color||C.coral}15`, color:item.color||C.coral, borderRadius:8, padding:"2px 8px", fontSize:10, fontWeight:700 }}>
+                                  {new Date(d).toLocaleDateString("fr-FR",{day:"numeric",month:"short"})}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:6 }}>
+                          <div style={{ fontWeight:900, fontSize:16, color:item.color||C.coral }}>{item.prix} €</div>
+                          <button onClick={() => removeItem(item.id)} style={{ background:"#fff0f0", border:"none", color:"#e74c3c", borderRadius:8, padding:"4px 10px", cursor:"pointer", fontSize:12, fontWeight:800, fontFamily:"inherit" }}>✕ Retirer</button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              );
+            })()}
 
             {/* Total */}
             <div style={{ background:`linear-gradient(135deg,${C.ocean},${C.sea})`, borderRadius:18, padding:18, color:"#fff" }}>
@@ -7336,7 +7387,7 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
 }
 
 
-function BottomNav({ current, onNav, panierCount = 0 }) {
+function BottomNav({ current, onNav, panierCount = 0, hidepanier = false }) {
   const items = [
     { id:"home",             emoji:"🏠", label:"Accueil"    },
     { id:"formules",         emoji:"🎫", label:"Formules"   },
@@ -7354,7 +7405,7 @@ function BottomNav({ current, onNav, panierCount = 0 }) {
         </button>
       ))}
       {/* Bouton panier flottant */}
-      <button onClick={() => onNav("panier")} style={{
+      {!hidepanier && <button onClick={() => onNav("panier")} style={{
         position:"fixed", bottom:80, right:18, zIndex:200,
         background: panierCount > 0 ? `linear-gradient(135deg,${C.coral},${C.sun})` : "#fff",
         border: panierCount > 0 ? "none" : `2px solid #e0e0e0`,
@@ -7369,7 +7420,7 @@ function BottomNav({ current, onNav, panierCount = 0 }) {
             {panierCount}
           </div>
         )}
-      </button>
+      </button>}
     </div>
   );
 }
@@ -7591,7 +7642,7 @@ export default function App() {
             .then(({ data }) => {
               if (data) {
                 setUser({ ...data, prenom: data.prenom, nom: data.nom, email: data.email, tel: data.tel, supabaseId: data.id });
-                setScreen("profil");
+                setScreen("home"); // Toujours atterrir sur l'accueil
               } else {
                 setUser({ email: session.user.email, prenom: "", nom: "", supabaseId: session.user.id });
                 setScreen("inscription");
@@ -7679,8 +7730,8 @@ export default function App() {
         button { font-family: 'Nunito', sans-serif; }
       `}</style>
       <div style={{ flex:1, overflowY:"auto" }}>{renderScreen()}</div>
-      {screen !== "inscription" && <BottomNav current={screen} onNav={setScreen} panierCount={panier.length} />}
+      {screen !== "inscription" && <BottomNav current={screen} onNav={setScreen} panierCount={screen === "admin" ? 0 : panier.length} hidepanier={screen === "admin"} />}
     </div>
   );
 }
-// soir Thu Apr  2 20:14:49 CEST 2026
+// multi fixes 2 Thu Apr  2 20:22:25 CEST 2026
