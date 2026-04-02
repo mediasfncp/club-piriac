@@ -2295,9 +2295,16 @@ function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSession
     return `${day.date.getFullYear()}-${String(day.date.getMonth()+1).padStart(2,"0")}-${String(day.date.getDate()).padStart(2,"0")}`;
   };
 
-  // Prix unitaire × nb enfants sélectionnés
+  // Prix unitaire × nb enfants sélectionnés × forfait
+  const FORFAITS_RESA = [
+    { qty:1,  price:20,  label:"1 leçon",   badge:"Unité" },
+    { qty:5,  price:95,  label:"5 leçons",  badge:"Forfait" },
+    { qty:6,  price:113, label:"6 leçons",  badge:"Forfait" },
+    { qty:10, price:170, label:"10 leçons", badge:"⭐ Meilleur tarif" },
+  ];
+  const [selectedForfait, setSelectedForfait] = useState(FORFAITS_RESA[0]);
   const nbEnf = Math.max(1, selectedEnfants.length);
-  const prixSeance = 20 * nbEnf;
+  const prixSeance = selectedForfait.price * nbEnf;
 
   const handleConfirm = async () => {
     if (setAllSeasonSessions) setAllSeasonSessions(prev => prev.map(s => s.id === booking.id ? { ...s, spots: Math.max(0, s.spots-1) } : s));
@@ -2326,13 +2333,13 @@ function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSession
     setPanier(prev => [...prev, {
       id: `res-${Date.now()}`,
       type: "natation",
-      label: `Séance ${booking.time} · ${selectedDay?.label} ${selectedDay?.num} ${selectedDay?.month}`,
+      label: `${selectedForfait.label} · ${booking.time} · ${selectedDay?.label} ${selectedDay?.num} ${selectedDay?.month}`,
       emoji: "🏊",
       color: C.ocean,
       prix: prixSeance,
       enfants: selectedEnfants,
       creneaux: [{ key: `${resaDateISO}-${booking.time}`, dayISO: resaDateISO, time: booking.time, dayId: effectiveDayId }],
-      details: `${nbEnf} enfant${nbEnf>1?"s":""}`,
+      details: `${selectedForfait.label} · ${nbEnf} enfant${nbEnf>1?"s":""}`,
     }]);
     setBooking(null);
     setSelectedEnfants([]);
@@ -2436,6 +2443,37 @@ function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSession
             </div>
           </Card>
         )}
+
+        {/* Forfait */}
+        <Card>
+          <h3 style={{ color:C.dark, margin:"0 0 10px", fontSize:15 }}>🎟️ Forfait</h3>
+          <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+            {FORFAITS_RESA.map(f => {
+              const sel = selectedForfait.qty === f.qty;
+              return (
+                <div key={f.qty} onClick={() => setSelectedForfait(f)} style={{
+                  display:"flex", justifyContent:"space-between", alignItems:"center",
+                  background: sel ? `${C.ocean}15` : "#f8f8f8",
+                  border:`2px solid ${sel ? C.ocean : "#e0e0e0"}`,
+                  borderRadius:14, padding:"10px 14px", cursor:"pointer",
+                }}>
+                  <div>
+                    <span style={{ fontWeight:900, color:sel?C.ocean:C.dark, fontSize:14 }}>{f.label}</span>
+                    {f.badge && <span style={{ marginLeft:8, background:sel?C.ocean:"#e0e0e0", color:sel?"#fff":"#888", borderRadius:50, padding:"1px 8px", fontSize:10, fontWeight:800 }}>{f.badge}</span>}
+                  </div>
+                  <div style={{ fontWeight:900, fontSize:16, color:sel?C.ocean:"#888" }}>
+                    {f.price} €{nbEnf > 1 ? ` × ${nbEnf}` : ""}
+                    {nbEnf > 1 && <span style={{ fontSize:11, color:C.coral, marginLeft:4 }}>= {f.price * nbEnf} €</span>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ marginTop:10, display:"flex", justifyContent:"space-between", alignItems:"center", background:`${C.ocean}08`, borderRadius:10, padding:"8px 12px" }}>
+            <span style={{ fontSize:13, color:"#888", fontWeight:700 }}>Total · {nbEnf} enfant{nbEnf>1?"s":""}</span>
+            <span style={{ fontSize:18, fontWeight:900, color:C.coral }}>{prixSeance} €</span>
+          </div>
+        </Card>
 
         <div style={{ background:"#F8FBFF", borderRadius:14, padding:"12px 14px", textAlign:"left" }}>
           <div style={{ fontWeight:900, color:C.dark, fontSize:13, marginBottom:8 }}>💳 Modes de paiement acceptés</div>
@@ -3584,6 +3622,27 @@ function FicheEnfantModal({ enfant, onClose }) {
             </div>
           </div>
 
+          {/* Adresses */}
+          {(enfant.adresse || enfant.adresse_vac) && (
+            <div style={{ background:"#fff", borderRadius:16, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
+              <div style={{ fontWeight:800, color:"#2C3E50", fontSize:12, marginBottom:10, textTransform:"uppercase", letterSpacing:0.5 }}>📍 Adresses</div>
+              {enfant.adresse && (
+                <div style={{ marginBottom:8 }}>
+                  <div style={{ fontSize:10, fontWeight:900, color:C.ocean, textTransform:"uppercase", marginBottom:3 }}>🏠 Domicile</div>
+                  <div style={{ fontSize:13, color:"#555" }}>{enfant.adresse}</div>
+                  {(enfant.ville || enfant.cp) && <div style={{ fontSize:12, color:"#888" }}>{enfant.cp} {enfant.ville}</div>}
+                </div>
+              )}
+              {enfant.adresse_vac && (
+                <div style={{ borderTop: enfant.adresse ? "1px solid #f0f0f0" : "none", paddingTop: enfant.adresse ? 8 : 0 }}>
+                  <div style={{ fontSize:10, fontWeight:900, color:C.coral, textTransform:"uppercase", marginBottom:3 }}>🏖️ Vacances</div>
+                  <div style={{ fontSize:13, color:"#555" }}>{enfant.adresse_vac}</div>
+                  {(enfant.ville_vac || enfant.cp_vac) && <div style={{ fontSize:12, color:"#888" }}>{enfant.cp_vac} {enfant.ville_vac}</div>}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Allergies */}
           {enfant.allergies ? (
             <div style={{ background:"#FFF0F0", border:`1.5px solid ${C.sunset}30`, borderRadius:16, padding:"14px 16px" }}>
@@ -4126,7 +4185,8 @@ function RechercheTab({ allResas, sessions, dbMembres }) {
 
   // Tous les enfants avec leur parent
   const tousLesEnfants = tousLesMembres.flatMap(m =>
-    (m.enfants || []).map(e => ({ ...e, parent: m.name || `${m.prenom} ${m.nom}`, parentId: m.id, parentColor: m.color || C.ocean, parentPhone: m.phone || m.tel }))
+    (m.enfants || []).map(e => ({ ...e, parent: m.name || `${m.prenom} ${m.nom}`, parentId: m.id, parentColor: m.color || C.ocean, parentPhone: m.phone || m.tel,
+      adresse: m.adresse, ville: m.ville, cp: m.cp, adresse_vac: m.adresse_vac, ville_vac: m.ville_vac, cp_vac: m.cp_vac }))
   );
 
   // Résultats filtrés
@@ -4322,7 +4382,8 @@ const ALL_PAYMENTS = [
 function PaiementsTab({ onValidate }) {
   const [resas, setResas]     = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter]   = useState("tous");
+  const [filter, setFilter]     = useState("tous");
+  const [dateFilter, setDateFilter] = useState(""); // YYYY-WXX or YYYY-MM
 
   const loadAll = async () => {
     const [{ data: nat }, { data: club }] = await Promise.all([
@@ -4482,7 +4543,17 @@ function PaiementsTab({ onValidate }) {
     return getClubMontant(g);
   };
 
-  const filtered = filter === "tous" ? allGroups : allGroups.filter(g => g.statut === filter);
+  const filtered = (() => {
+    let g = filter === "tous" ? allGroups : allGroups.filter(g => g.statut === filter);
+    if (dateFilter) {
+      g = g.filter(gr => {
+        const d = gr.resas[0]?._date?.slice(0,10);
+        if (!d) return false;
+        return d.startsWith(dateFilter);
+      });
+    }
+    return g;
+  })();
 
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
@@ -4501,7 +4572,7 @@ function PaiementsTab({ onValidate }) {
         ))}
       </div>
 
-      {/* Filtres */}
+      {/* Filtres statut + date */}
       <div style={{ display:"flex", gap:6, background:"#fff", borderRadius:14, padding:5, boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
         {[["tous","Toutes"],["pending","⏳ En attente"],["confirmed","✓ Payées"]].map(([k,l]) => (
           <button key={k} onClick={() => setFilter(k)} style={{
@@ -4510,6 +4581,12 @@ function PaiementsTab({ onValidate }) {
             padding:"8px 4px", cursor:"pointer", fontWeight:900, fontSize:11, fontFamily:"inherit",
           }}>{l}</button>
         ))}
+      </div>
+      <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+        <div style={{ fontSize:11, fontWeight:900, color:"#888", whiteSpace:"nowrap" }}>📅 Filtrer par date :</div>
+        <input type="month" value={dateFilter} onChange={e => setDateFilter(e.target.value)}
+          style={{ flex:1, border:"2px solid #e0e8f0", borderRadius:10, padding:"7px 10px", fontSize:13, fontFamily:"inherit", outline:"none" }} />
+        {dateFilter && <button onClick={() => setDateFilter("")} style={{ background:"#f0f0f0", border:"none", borderRadius:8, padding:"7px 10px", cursor:"pointer", fontSize:12, fontWeight:800, fontFamily:"inherit", color:"#888" }}>✕</button>}
       </div>
 
       {/* Liste groupée */}
@@ -5053,8 +5130,12 @@ function PlanningTab({ allSeasonSessions, clubPlaces, reservations = [] }) {
         const slots = getNataSlots(selectedDayId);
         const morning   = slots.filter(s => parseInt(s.time) < 13);
         const afternoon = slots.filter(s => parseInt(s.time) >= 13);
-        const taken = slots.reduce((acc, s) => acc + (2 - s.spots), 0);
-        const avail = slots.reduce((acc, s) => acc + s.spots, 0);
+        const taken = (() => {
+          if (!dayObj?.date) return slots.reduce((acc, s) => acc + (2 - s.spots), 0);
+          const dateISO = `${dayObj.date.getFullYear()}-${String(dayObj.date.getMonth()+1).padStart(2,"0")}-${String(dayObj.date.getDate()).padStart(2,"0")}`;
+          return dbResasNat.filter(r => r.date_seance?.slice(0,10) === dateISO).reduce((s, r) => s + Math.max(1, (r.enfants||[]).length), 0);
+        })();
+        const avail = Math.max(0, slots.length * 2 - taken);
 
         const handlePrintJour = () => {
           const makeRows = (list) => list.map(s => {
@@ -6461,6 +6542,7 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
   const [weekIdx, setWeekIdx]           = useState(defaultWeekIdx);
   const [openMembreIds, setOpenMembreIds] = useState({});
   const [filterStatut, setFilterStatut]  = useState("tous");
+  const [showAll, setShowAll]            = useState(false);
 
   const currentWeek = allWeeks[Math.min(weekIdx, allWeeks.length-1)] || [];
   const weekStart   = currentWeek[0];
@@ -6471,8 +6553,8 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
     return `${d.date.getFullYear()}-${String(d.date.getMonth()+1).padStart(2,"0")}-${String(d.date.getDate()).padStart(2,"0")}`;
   }).filter(Boolean);
 
-  const resasSemNat  = dbResas.filter(r => weekISOs.includes(r.date_seance?.slice(0,10)));
-  const resasSemClub = dbResasClub.filter(r => weekISOs.includes(r.date_reservation?.slice(0,10)));
+  const resasSemNat  = showAll ? dbResas : dbResas.filter(r => weekISOs.includes(r.date_seance?.slice(0,10)));
+  const resasSemClub = showAll ? dbResasClub : dbResasClub.filter(r => weekISOs.includes(r.date_reservation?.slice(0,10)));
 
   const membresMap = {};
   [...resasSemNat.map(r => ({ ...r, _type:"nat" })),
@@ -6498,9 +6580,25 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
   const toggleMembre = (mid) => setOpenMembreIds(prev => ({ ...prev, [mid]: !prev[mid] }));
 
   if (membres.length === 0) return (
-    <div style={{ textAlign:"center", padding:"32px 0", color:"#bbb", fontSize:14 }}>
-      Aucune réservation cette semaine
-    </div>
+    <>
+      <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+        <div style={{ background:"#fff", borderRadius:14, padding:"9px 14px", display:"flex", alignItems:"center", justifyContent:"space-between", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
+          <button onClick={() => setWeekIdx(Math.max(0, weekIdx-1))} disabled={weekIdx===0||showAll}
+            style={{ background:weekIdx===0||showAll?"#f0f0f0":C.ocean, border:"none", color:weekIdx===0||showAll?"#bbb":"#fff", borderRadius:"50%", width:30, height:30, cursor:weekIdx===0||showAll?"not-allowed":"pointer", fontWeight:900, fontFamily:"inherit", fontSize:16 }}>‹</button>
+          <div style={{ textAlign:"center" }}>
+            {showAll ? <div style={{ fontWeight:900, color:C.dark, fontSize:13 }}>Toute la saison</div>
+              : <div style={{ fontWeight:900, color:C.dark, fontSize:13 }}>{weekStart?.num} {weekStart?.month} – {weekEnd?.num} {weekEnd?.month} 2026</div>}
+            <div style={{ fontSize:11, color:"#aaa" }}>{showAll ? "Toutes semaines" : `Semaine ${weekIdx+1}/${allWeeks.length}`} · 0 famille</div>
+          </div>
+          <button onClick={() => setWeekIdx(Math.min(allWeeks.length-1, weekIdx+1))} disabled={weekIdx>=allWeeks.length-1||showAll}
+            style={{ background:weekIdx>=allWeeks.length-1||showAll?"#f0f0f0":C.ocean, border:"none", color:weekIdx>=allWeeks.length-1||showAll?"#bbb":"#fff", borderRadius:"50%", width:30, height:30, cursor:weekIdx>=allWeeks.length-1||showAll?"not-allowed":"pointer", fontWeight:900, fontFamily:"inherit", fontSize:16 }}>›</button>
+        </div>
+        <button onClick={() => setShowAll(v => !v)} style={{ background:showAll?C.ocean:"#f0f0f0", color:showAll?"#fff":"#888", border:"none", borderRadius:10, padding:"7px", cursor:"pointer", fontWeight:800, fontSize:11, fontFamily:"inherit" }}>
+          {showAll ? "✓ Toute la saison" : "Voir toute la saison"}
+        </button>
+      </div>
+      <div style={{ textAlign:"center", padding:"32px 0", color:"#bbb", fontSize:14 }}>Aucune réservation {showAll ? "" : "cette semaine"}</div>
+    </>
   );
 
   return (
@@ -6508,19 +6606,22 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
       {/* Nav semaine + filtre */}
       <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
         <div style={{ background:"#fff", borderRadius:14, padding:"9px 14px", display:"flex", alignItems:"center", justifyContent:"space-between", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
-          <button onClick={() => setWeekIdx(Math.max(0, weekIdx-1))} disabled={weekIdx===0}
-            style={{ background:weekIdx===0?"#f0f0f0":C.ocean, border:"none", color:weekIdx===0?"#bbb":"#fff", borderRadius:"50%", width:30, height:30, cursor:weekIdx===0?"not-allowed":"pointer", fontWeight:900, fontFamily:"inherit", fontSize:16 }}>‹</button>
+          <button onClick={() => setWeekIdx(Math.max(0, weekIdx-1))} disabled={weekIdx===0||showAll}
+            style={{ background:weekIdx===0||showAll?"#f0f0f0":C.ocean, border:"none", color:weekIdx===0||showAll?"#bbb":"#fff", borderRadius:"50%", width:30, height:30, cursor:weekIdx===0||showAll?"not-allowed":"pointer", fontWeight:900, fontFamily:"inherit", fontSize:16 }}>‹</button>
           <div style={{ textAlign:"center" }}>
-            <div style={{ fontWeight:900, color:C.dark, fontSize:13 }}>
-              {weekStart?.num} {weekStart?.month} – {weekEnd?.num} {weekEnd?.month} 2026
-            </div>
-            <div style={{ fontSize:11, color:"#aaa" }}>Semaine {weekIdx+1}/{allWeeks.length} · {membres.length} famille{membres.length>1?"s":""}</div>
+            {showAll
+              ? <div style={{ fontWeight:900, color:C.dark, fontSize:13 }}>🗓️ Toute la saison</div>
+              : <div style={{ fontWeight:900, color:C.dark, fontSize:13 }}>{weekStart?.num} {weekStart?.month} – {weekEnd?.num} {weekEnd?.month} 2026</div>}
+            <div style={{ fontSize:11, color:"#aaa" }}>{showAll ? `${membres.length} famille${membres.length>1?"s":""}` : `Semaine ${weekIdx+1}/${allWeeks.length} · ${membres.length} famille${membres.length>1?"s":""}`}</div>
           </div>
-          <button onClick={() => setWeekIdx(Math.min(allWeeks.length-1, weekIdx+1))} disabled={weekIdx>=allWeeks.length-1}
-            style={{ background:weekIdx>=allWeeks.length-1?"#f0f0f0":C.ocean, border:"none", color:weekIdx>=allWeeks.length-1?"#bbb":"#fff", borderRadius:"50%", width:30, height:30, cursor:weekIdx>=allWeeks.length-1?"not-allowed":"pointer", fontWeight:900, fontFamily:"inherit", fontSize:16 }}>›</button>
+          <button onClick={() => setWeekIdx(Math.min(allWeeks.length-1, weekIdx+1))} disabled={weekIdx>=allWeeks.length-1||showAll}
+            style={{ background:weekIdx>=allWeeks.length-1||showAll?"#f0f0f0":C.ocean, border:"none", color:weekIdx>=allWeeks.length-1||showAll?"#bbb":"#fff", borderRadius:"50%", width:30, height:30, cursor:weekIdx>=allWeeks.length-1||showAll?"not-allowed":"pointer", fontWeight:900, fontFamily:"inherit", fontSize:16 }}>›</button>
         </div>
         <div style={{ display:"flex", gap:6 }}>
-          {[["tous","Tout"],["pending","⏳ En attente"],["confirmed","✅ Confirmés"]].map(([k,l]) => (
+          <button onClick={() => setShowAll(v => !v)} style={{ flex:1, background:showAll?C.ocean:"#f0f0f0", color:showAll?"#fff":"#888", border:"none", borderRadius:10, padding:"7px 4px", cursor:"pointer", fontWeight:800, fontSize:11, fontFamily:"inherit" }}>
+            {showAll ? "✓ Toute la saison" : "🗓️ Toute la saison"}
+          </button>
+          {[["tous","Tout"],["pending","⏳ Attente"],["confirmed","✅ Confirmés"]].map(([k,l]) => (
             <button key={k} onClick={() => setFilterStatut(k)} style={{ flex:1, background:filterStatut===k?C.ocean:"#f0f0f0", color:filterStatut===k?"#fff":"#888", border:"none", borderRadius:10, padding:"7px 4px", cursor:"pointer", fontWeight:800, fontSize:11, fontFamily:"inherit" }}>{l}</button>
           ))}
         </div>
@@ -6728,8 +6829,8 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
   const pendingCount = dbResas.filter(r => r.statut === "pending").length + dbResasClub.filter(r => r.statut === "pending").length;
 
   // Taux de remplissage natation — toute la saison
-  const totalSlotsNat  = ALL_SEASON_SLOTS_INIT.length * 2; // total places saison
-  const takenNat       = confirmedNat.length; // uniquement résas validées
+  const totalSlotsNat  = ALL_SEASON_SLOTS_INIT.length * 2; // 2 places par créneau
+  const takenNat       = confirmedNat.reduce((s, r) => s + Math.max(1, (r.enfants||[]).length), 0); // places réelles utilisées
   const fillRateNat    = totalSlotsNat > 0 ? Math.round((takenNat / totalSlotsNat) * 100) : 0;
   const freeNat        = Math.max(0, totalSlotsNat - takenNat);
 
@@ -6757,24 +6858,30 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
 
   return (
     <div style={{ background: "#F0F4F8", minHeight: "100%" }}>
-      <div style={{ background: "linear-gradient(135deg, #0F2027, #203A43, #2C5364)", padding: "24px 24px 0" }}>
+      <div style={{ background: `linear-gradient(135deg, ${C.ocean}, ${C.sea}, ${C.sky})`, padding: "24px 24px 0" }}>
         <div style={{ maxWidth: 1400, margin: "0 auto" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <BackBtn onNav={onNav} />
             <div>
-              <div style={{ color: "rgba(255,255,255,0.6)", fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>Espace</div>
-              <h2 style={{ color: "#fff", margin: 0, fontWeight: 900, fontSize: 20 }}>Administration</h2>
+              <div style={{ color: "rgba(255,255,255,0.75)", fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>🏖️ FNCP</div>
+              <h2 style={{ color: "#fff", margin: 0, fontWeight: 900, fontSize: 22 }}>Administration</h2>
             </div>
           </div>
-          <div style={{ background: "rgba(255,255,255,0.12)", borderRadius: 12, padding: "6px 12px", textAlign: "center" }}>
-            <div style={{ color: "rgba(255,255,255,0.7)", fontSize: 10 }}>Remplissage</div>
-            <div style={{ color: C.sun, fontWeight: 900, fontSize: 18 }}>{fillRateNat}%</div>
+          <div style={{ display:"flex", gap:8 }}>
+            <div style={{ background: "rgba(255,255,255,0.2)", borderRadius: 14, padding: "8px 14px", textAlign: "center", backdropFilter:"blur(10px)" }}>
+              <div style={{ color: "rgba(255,255,255,0.8)", fontSize: 10, fontWeight:700 }}>Natation</div>
+              <div style={{ color: "#fff", fontWeight: 900, fontSize: 20 }}>{fillRateNat}%</div>
+            </div>
+            <div style={{ background: "rgba(255,255,255,0.2)", borderRadius: 14, padding: "8px 14px", textAlign: "center", backdropFilter:"blur(10px)" }}>
+              <div style={{ color: "rgba(255,255,255,0.8)", fontSize: 10, fontWeight:700 }}>En attente</div>
+              <div style={{ color: C.sun, fontWeight: 900, fontSize: 20 }}>{pendingCount}</div>
+            </div>
           </div>
         </div>
         <div style={{ display: "flex", gap: 4 }}>
           {tabs.map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)} style={{ flex: 1, background: tab === t.id ? "#fff" : "rgba(255,255,255,0.1)", color: tab === t.id ? "#203A43" : "rgba(255,255,255,0.7)", border: "none", borderRadius: "12px 12px 0 0", padding: "10px 4px 8px", cursor: "pointer", fontWeight: 900, fontSize: 10, fontFamily: "inherit", transition: "all .15s" }}>
+            <button key={t.id} onClick={() => setTab(t.id)} style={{ flex: 1, background: tab === t.id ? "#fff" : "rgba(255,255,255,0.15)", color: tab === t.id ? C.ocean : "rgba(255,255,255,0.85)", border: "none", borderRadius: "14px 14px 0 0", padding: "10px 4px 8px", cursor: "pointer", fontWeight: 900, fontSize: 10, fontFamily: "inherit", transition: "all .15s", backdropFilter:"blur(10px)" }}>
               <div style={{ fontSize: 18, marginBottom: 2 }}>{t.emoji}</div>
               <div>{t.label}</div>
             </button>
@@ -6813,15 +6920,16 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
               {/* KPIs */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                 {[
-                  { label: "Membres",  value: dbMembres.length, emoji: "👤", bg: `linear-gradient(135deg, ${C.ocean}, #0052A3)`, sh: C.ocean },
-                  { label: "Résas nat.", value: dbResas.length, emoji: "🏊", bg: `linear-gradient(135deg, ${C.green}, #1E8449)`, sh: C.green },
-                  { label: "Résas club", value: dbResasClub.length, emoji: "🏖️", bg: `linear-gradient(135deg, ${C.coral}, #C0392B)`, sh: C.coral },
-                  { label: "Encaissé aujourd'hui", value: `${realTotal} €`, emoji: "💳", bg: `linear-gradient(135deg, #9B59B6, #6C3483)`, sh: "#9B59B6" },
+                  { label: "Familles",        value: dbMembres.length,      emoji: "👨‍👩‍👧", bg: `linear-gradient(135deg,${C.ocean},#0099FF)`,   sh: C.ocean },
+                  { label: "Séances nat.",    value: dbResas.length,        emoji: "🏊",  bg: `linear-gradient(135deg,${C.sea},#00C9FF)`,    sh: C.sea },
+                  { label: "Résas club",      value: dbResasClub.length,    emoji: "🏖️", bg: `linear-gradient(135deg,${C.coral},${C.sun})`,  sh: C.coral },
+                  { label: "Encaissé auj.",   value: `${realTotal} €`,      emoji: "💶",  bg: `linear-gradient(135deg,${C.green},#00B894)`,   sh: C.green },
                 ].map(s => (
-                  <div key={s.label} style={{ background: s.bg, borderRadius: 20, padding: "16px 14px", boxShadow: `0 6px 20px ${s.sh}44` }}>
-                    <div style={{ fontSize: 28, marginBottom: 8 }}>{s.emoji}</div>
-                    <div style={{ fontSize: 28, fontWeight: 900, color: "#fff", lineHeight: 1 }}>{s.value}</div>
-                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.75)", fontWeight: 700, marginTop: 4 }}>{s.label}</div>
+                  <div key={s.label} style={{ background: s.bg, borderRadius: 22, padding: "18px 16px", boxShadow: `0 8px 24px ${s.sh}55`, position:"relative", overflow:"hidden" }}>
+                    <div style={{ position:"absolute", top:-10, right:-10, fontSize:52, opacity:.15 }}>{s.emoji}</div>
+                    <div style={{ fontSize: 32, marginBottom: 6 }}>{s.emoji}</div>
+                    <div style={{ fontSize: 30, fontWeight: 900, color: "#fff", lineHeight: 1 }}>{s.value}</div>
+                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.85)", fontWeight: 700, marginTop: 6, textTransform:"uppercase", letterSpacing:0.5 }}>{s.label}</div>
                   </div>
                 ))}
               </div>
@@ -7734,4 +7842,4 @@ export default function App() {
     </div>
   );
 }
-// multi fixes 2 Thu Apr  2 20:22:25 CEST 2026
+// multi updates Thu Apr  2 21:50:58 CEST 2026
