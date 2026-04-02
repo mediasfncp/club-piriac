@@ -7920,4 +7920,4 @@ export default function App() {
     </div>
   );
 }
-// forfait panier + session Thu Apr  2 22:27:28 CEST 2026
+// email + forfait + session Thu Apr  2 22:27:55 CEST 2026
