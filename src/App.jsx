@@ -828,7 +828,7 @@ function FormulesEveilScreen({ onNav, user, panier, setPanier }) {
         <div style={{ fontSize: 72, marginBottom: 16 }}>🔒</div>
         <h2 style={{ color: C.dark, fontSize: 22, margin: "0 0 10px" }}>Inscription requise</h2>
         <p style={{ color: "#777", fontSize: 15, margin: "0 0 28px", lineHeight: 1.6 }}>
-          Pour réserver une séance d'éveil aquatique, tu dois d'abord t'inscrire au Club de Plage FNCP.
+          Pour réserver une séance d'éveil aquatique, tu dois d'abord t'inscrire au Eole Beach Club.
         </p>
         <SunBtn color={C.coral} onClick={() => onNav("inscription")} style={{ marginBottom: 14 }}>📋 S'inscrire maintenant</SunBtn>
         <button onClick={() => onNav("home")} style={{ background: "none", border: "none", color: "#aaa", fontSize: 14, cursor: "pointer", fontFamily: "inherit", fontWeight: 700 }}>← Retour à l'accueil</button>
@@ -868,7 +868,7 @@ function FormulesEveilScreen({ onNav, user, panier, setPanier }) {
       <div style={{ background:"#fff", borderRadius:20, padding:20, margin:"16px 0", boxShadow:"0 4px 16px rgba(0,0,0,0.06)" }}>
         <p style={{ color:"#666", fontSize:14, lineHeight:1.8 }}>
           🌊 Éveil Aquatique · <strong>{done.sunday}</strong> à {done.slot}{done.enfant ? ` · pour ${done.enfant}` : ""}<br/>
-          L'équipe FNCP vous contactera pour le paiement.<br/>
+          L'équipe Eole Beach Club vous contactera pour le paiement.<br/>
           🏦 Virement · ✉️ Chèque · 💶 Espèces · 🎫 Chèques vacances
         </p>
         <div style={{ background:"#F3E8FF", borderRadius:12, padding:"10px 14px", fontSize:13, color:"#9B59B6", fontWeight:700 }}>
@@ -1136,7 +1136,7 @@ function FormulesNatationScreen({ onNav, user, allSeasonSessions, panier, setPan
         <p style={{ color:"#666", fontSize:14, lineHeight:1.8 }}>
           Formule <strong>{selected?.label}</strong> ({prixTotal} €){selectedEnfants.length > 0 ? ` pour ${selectedEnfants.join(", ")}` : ""}.<br/>
           {selectedCreneaux.length > 0 && <>{selectedCreneaux.length} créneau{selectedCreneaux.length>1?"x":""} sélectionné{selectedCreneaux.length>1?"s":""}.<br/></>}
-          L'équipe FNCP vous contactera pour le paiement.<br/>
+          L'équipe Eole Beach Club vous contactera pour le paiement.<br/>
           🏦 Virement · ✉️ Chèque · 💶 Espèces · 🎫 Chèques vacances
         </p>
         <div style={{ background:`${C.ocean}10`, borderRadius:12, padding:"10px 14px", fontSize:13, color:C.ocean, fontWeight:700 }}>
@@ -1785,7 +1785,7 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser, pa
       <div style={{ background:"#fff", borderRadius:20, padding:20, margin:"16px 0", boxShadow:"0 4px 16px rgba(0,0,0,0.06)" }}>
         <div style={{ fontSize:14, color:"#555", lineHeight:1.8 }}>
           Votre demande de <strong>Carte Liberté · {selectedLiberte.label}</strong> est enregistrée.<br/>
-          <strong>L'équipe FNCP va vous contacter</strong> pour le paiement :<br/>
+          <strong>L'équipe Eole Beach Club va vous contacter</strong> pour le paiement :<br/>
           🏦 Virement · ✉️ Chèque · 💶 Espèces · 🎫 Chèques vacances
         </div>
         <div style={{ marginTop:12, background:`${C.coral}10`, borderRadius:12, padding:"10px 14px", fontSize:13, color:C.coral, fontWeight:700 }}>
@@ -1806,7 +1806,7 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser, pa
       <div style={{ background:"#fff", borderRadius:20, padding:20, margin:"16px 0", boxShadow:"0 4px 16px rgba(0,0,0,0.06)" }}>
         <div style={{ fontSize:14, color:"#555", lineHeight:1.8 }}>
           Votre demande de réservation a bien été enregistrée.<br/>
-          <strong>L'équipe FNCP va vous contacter</strong> pour finaliser le paiement par :<br/>
+          <strong>L'équipe Eole Beach Club va vous contacter</strong> pour finaliser le paiement par :<br/>
           🏦 Virement · ✉️ Chèque · 💶 Espèces · 🎫 Chèques vacances
         </div>
         <div style={{ marginTop:12, background:`${C.coral}10`, borderRadius:12, padding:"10px 14px", fontSize:13, color:C.coral, fontWeight:700 }}>
@@ -2107,7 +2107,7 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser, pa
                     </div>
                   ))}
                   <div style={{ fontSize:11, color:"#aaa", marginTop:8, fontStyle:"italic" }}>
-                    Votre réservation sera confirmée à réception du paiement par l'équipe FNCP.
+                    Votre réservation sera confirmée à réception du paiement par l'équipe Eole Beach Club.
                   </div>
                 </div>
 
@@ -2404,7 +2404,7 @@ function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSession
         </div>
         <div style={{ fontSize:14, color:"#555", lineHeight:1.8, marginBottom:12 }}>
           Votre demande est enregistrée.<br/>
-          <strong>L'équipe FNCP va vous contacter</strong> pour le paiement :<br/>
+          <strong>L'équipe Eole Beach Club va vous contacter</strong> pour le paiement :<br/>
           🏦 Virement · ✉️ Chèque · 💶 Espèces · 🎫 Chèques vacances
         </div>
         <div style={{ background:`${C.ocean}10`, borderRadius:12, padding:"10px 14px", fontSize:13, color:C.ocean, fontWeight:700 }}>
@@ -2526,7 +2526,7 @@ function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSession
         </div>
         <div style={{ fontSize:14, color:"#555", lineHeight:1.8, marginBottom:12 }}>
           Votre demande est enregistrée.<br/>
-          <strong>L'équipe FNCP va vous contacter</strong> pour le paiement :<br/>
+          <strong>L'équipe Eole Beach Club va vous contacter</strong> pour le paiement :<br/>
           🏦 Virement · ✉️ Chèque · 💶 Espèces · 🎫 Chèques vacances
         </div>
         <div style={{ background:`${C.ocean}10`, borderRadius:12, padding:"10px 14px", fontSize:13, color:C.ocean, fontWeight:700 }}>
@@ -2866,7 +2866,7 @@ function LoginScreen({ onNav, setUser }) {
       <div style={{ background: `linear-gradient(135deg, ${C.ocean}, ${C.sea})`, padding: "24px 20px 0" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
           <button onClick={() => onNav("home")} style={{ background: "rgba(255,255,255,0.2)", border: "none", color: "#fff", borderRadius: "50%", width: 36, height: 36, cursor: "pointer", fontSize: 18, fontFamily: "inherit" }}>←</button>
-          <h2 style={{ color: "#fff", margin: 0, fontWeight: 900, fontSize: 20 }}>Mon espace FNCP</h2>
+          <h2 style={{ color: "#fff", margin: 0, fontWeight: 900, fontSize: 20 }}>Mon espace Eole Beach Club</h2>
         </div>
         <Wave fill={C.shell} />
       </div>
@@ -2970,7 +2970,7 @@ function InscriptionScreen({ onNav, setUser }) {
           <span style={{ color: "#fff", fontSize: 12, fontWeight: 900, letterSpacing: 2, textTransform: "uppercase" }}>Inscription confirmée</span>
         </div>
         <h1 style={{ color: "#fff", fontSize: 32, fontWeight: 900, margin: "0 0 8px" }}>Bienvenue {form.prenom} !</h1>
-        <p style={{ color: "rgba(255,255,255,0.85)", fontSize: 16, margin: "0 0 32px", fontWeight: 600 }}>Tu fais maintenant partie de la famille FNCP 🌊</p>
+        <p style={{ color: "rgba(255,255,255,0.85)", fontSize: 16, margin: "0 0 32px", fontWeight: 600 }}>Tu fais maintenant partie de la famille Eole Beach Club 🌊</p>
         <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap", marginBottom: 32 }}>
           <div style={{ background: "rgba(255,255,255,0.22)", borderRadius: 50, padding: "8px 18px", color: "#fff", fontWeight: 800, fontSize: 13 }}>👧 {form.enfants.length} enfant{form.enfants.length > 1 ? "s" : ""}</div>
           {form.droitImage && <div style={{ background: "rgba(255,255,255,0.22)", borderRadius: 50, padding: "8px 18px", color: "#fff", fontWeight: 800, fontSize: 13 }}>📸 Droit image ✓</div>}
@@ -3130,10 +3130,10 @@ function InscriptionScreen({ onNav, setUser }) {
           <Card>
             <h3 style={{ color: C.dark, marginTop: 0 }}>📸 Droit à l'image</h3>
             <div style={{ background: `${C.sky}20`, border: `2px solid ${C.sky}`, borderRadius: 16, padding: 16, marginBottom: 20, fontSize: 14, color: "#555", lineHeight: 1.7 }}>
-              Dans le cadre des activités du Club de Plage FNCP, des photos et/ou vidéos pourront être réalisées lors des séances. Ces images peuvent être utilisées à des fins de communication non commerciale.
+              Dans le cadre des activités du Eole Beach Club, des photos et/ou vidéos pourront être réalisées lors des séances. Ces images peuvent être utilisées à des fins de communication non commerciale.
             </div>
             {[
-              { key: "droitImage",    label: "J'autorise le Club de Plage FNCP à photographier et/ou filmer mon/mes enfant(s) lors des activités.", icon: "📷" },
+              { key: "droitImage",    label: "J'autorise l'Eole Beach Club à photographier et/ou filmer mon/mes enfant(s) lors des activités.", icon: "📷" },
               { key: "droitDiffusion",label: "J'autorise la diffusion de ces images sur les supports de communication du club (site, réseaux sociaux, affiches).", icon: "📢" },
             ].map(({ key, label, icon }) => (
               <div key={key} onClick={() => setForm(p => ({ ...p, [key]: !p[key] }))} style={{ display: "flex", alignItems: "flex-start", gap: 14, padding: "14px 16px", marginBottom: 12, background: form[key] ? `${C.green}15` : "#f9f9f9", border: `2.5px solid ${form[key] ? C.green : "#e0e0e0"}`, borderRadius: 18, cursor: "pointer", transition: "all .18s" }}>
@@ -3187,7 +3187,7 @@ function InscriptionScreen({ onNav, setUser }) {
                   <div style={{ background:`linear-gradient(135deg,${C.ocean},${C.sea})`, margin:"0 16px", borderRadius:20, padding:"14px 18px", position:"relative" }}>
                     <button onClick={() => setShowCgvModal(false)} style={{ position:"absolute", top:10, right:12, background:"rgba(255,255,255,0.25)", border:"none", color:"#fff", borderRadius:"50%", width:30, height:30, cursor:"pointer", fontWeight:900, fontSize:16, fontFamily:"inherit" }}>✕</button>
                     <div style={{ color:"#fff", fontWeight:900, fontSize:17 }}>📄 Conditions Générales</div>
-                    <div style={{ color:"rgba(255,255,255,0.85)", fontSize:13 }}>Club de Plage FNCP · Saison 2026</div>
+                    <div style={{ color:"rgba(255,255,255,0.85)", fontSize:13 }}>EOLE BEACH CLUB · Saison 2026</div>
                   </div>
                   <div style={{ overflowY:"auto", padding:"16px 20px 32px", display:"flex", flexDirection:"column", gap:14, fontSize:14, color:"#555", lineHeight:1.7 }}>
                     <div><strong style={{ color:C.dark }}>💶 Remboursement</strong><br/>Aucune prestation ne pourra être remboursée, excepté sur présentation d'une attestation médicale justifiant l'impossibilité de participer aux activités.</div>
@@ -3211,7 +3211,7 @@ function InscriptionScreen({ onNav, setUser }) {
                   {form.cgvAccepted ? "✓" : ""}
                 </div>
                 <div style={{ fontSize: 12, color: "#555", lineHeight: 1.5 }}>
-                  J'ai lu et j'accepte les <span style={{ color: C.ocean, fontWeight: 700, cursor: "pointer" }} onClick={(e) => { e.stopPropagation(); setShowCgvModal(true); }}>Conditions Générales de Vente</span> ainsi que le règlement intérieur du Club de Plage FNCP, et j'autorise la prise en charge de mon/mes enfant(s) dans le cadre des activités.
+                  J'ai lu et j'accepte les <span style={{ color: C.ocean, fontWeight: 700, cursor: "pointer" }} onClick={(e) => { e.stopPropagation(); setShowCgvModal(true); }}>Conditions Générales de Vente</span> ainsi que le règlement intérieur de l'Eole Beach Club, et j'autorise la prise en charge de mon/mes enfant(s) dans le cadre des activités.
                 </div>
               </div>
             </div>
@@ -3353,7 +3353,7 @@ function InfosScreen({ onNav }) {
                 ))}
                 <div style={{ background:"#F0F4F8", borderRadius:12, padding:"10px 12px", fontSize:11, color:"#888", textAlign:"center" }}>
                   En effectuant une réservation, vous acceptez l'intégralité des présentes CGV.<br />
-                  <span style={{ color:C.ocean, fontWeight:700 }}>FNCP · Club de Plage · La Baule · Saison 2026</span>
+                  <span style={{ color:C.ocean, fontWeight:700 }}>EOLE BEACH CLUB · Club de Plage · Piriac-sur-Mer · Saison 2026</span>
                 </div>
               </div>
             </div>
@@ -4925,7 +4925,7 @@ function DayDetailModal({ day, activity, session, onClose, dbResasNat = [], dbRe
   </tr></thead>
   <tbody>${rows}</tbody>
 </table>
-<div class="footer">FNCP Club de Plage · Saison 2026 · Imprimé le ${new Date().toLocaleDateString('fr-FR')}</div>
+<div class="footer">Eole Beach Club · Saison 2026 · Imprimé le ${new Date().toLocaleDateString('fr-FR')}</div>
 </body></html>`;
 
     const win = window.open('', '_blank');
@@ -5287,7 +5287,7 @@ tr:nth-child(even){background:#f9fbff}
 <p class="sub">${dayObj?.label} ${dayObj?.num} ${dayObj?.month} 2026 · ${slots.length} créneaux · ${avail} places libres · ${taken} places prises</p>
 ${morning.length>0?`<h2>☀️ Matin</h2><table><thead><tr><th>Heure</th><th>Disponibilité</th><th>Enfants inscrits</th><th>Parent</th></tr></thead><tbody>${makeRows(morning)}</tbody></table>`:''}
 ${afternoon.length>0?`<h2>🌊 Après-midi</h2><table><thead><tr><th>Heure</th><th>Disponibilité</th><th>Enfants inscrits</th><th>Parent</th></tr></thead><tbody>${makeRows(afternoon)}</tbody></table>`:''}
-<div class="footer">FNCP Club de Plage · Saison 2026 · Imprimé le ${new Date().toLocaleDateString('fr-FR')}</div>
+<div class="footer">Eole Beach Club · Saison 2026 · Imprimé le ${new Date().toLocaleDateString('fr-FR')}</div>
 </body></html>`;
           const win = window.open('', '_blank');
           win.document.write(html); win.document.close(); win.focus();
@@ -5374,7 +5374,7 @@ th{background:#1A8FE3;color:#fff;padding:10px 12px;text-align:left}
 <p class="sub">${weekLabel} 2026 · Créneaux 30 min · 2 places max</p>
 <table><thead><tr><th>Jour</th><th>☀️ Matin</th><th>🌊 Après-midi</th><th>Libres</th><th>Prises</th><th>Rempli</th></tr></thead>
 <tbody>${rows}</tbody></table>
-<div class="footer">FNCP Club de Plage · Saison 2026 · Imprimé le ${new Date().toLocaleDateString('fr-FR')}</div>
+<div class="footer">Eole Beach Club · Saison 2026 · Imprimé le ${new Date().toLocaleDateString('fr-FR')}</div>
 </body></html>`;
             const win = window.open('', '_blank');
             win.document.write(html); win.document.close(); win.focus();
@@ -5738,7 +5738,7 @@ th{background:#1A8FE3;color:#fff;padding:9px 12px;text-align:left}
 <h2>Liste détaillée</h2>
 <table><thead><tr><th>#</th><th>Nom</th><th>Prénom</th><th>Âge</th><th>Groupe</th><th>Activité</th><th>Parent</th><th>Allergies</th></tr></thead>
 <tbody>${rows}</tbody></table>
-<div class="footer">FNCP Club de Plage · Saison 2026 · Imprimé le ${new Date().toLocaleDateString('fr-FR')}</div>
+<div class="footer">Eole Beach Club · Saison 2026 · Imprimé le ${new Date().toLocaleDateString('fr-FR')}</div>
 </body></html>`;
     const win = window.open('', '_blank');
     win.document.write(html); win.document.close(); win.focus();
@@ -7605,7 +7605,7 @@ tr:nth-child(even){background:#f8fbff}
 </style></head><body>
 <div class="card">
 <h1>🏖️ Confirmation de commande</h1>
-<p class="sub">Club de Plage FNCP · Saison 2026</p>
+<p class="sub">EOLE BEACH CLUB · Saison 2026</p>
 <p style="font-size:14px;margin-bottom:16px">Bonjour <strong>${nomMembre}</strong>,<br/>Votre demande de réservation a bien été enregistrée. Voici le récapitulatif :</p>
 <table>
 <thead><tr><th>Prestation</th><th>Enfant(s)</th><th>Détails</th><th style="text-align:right">Prix</th></tr></thead>
@@ -7618,7 +7618,7 @@ tr:nth-child(even){background:#f8fbff}
 <div class="footer">
   <strong>Modes de paiement acceptés :</strong><br/>
   🏦 Virement bancaire &nbsp;·&nbsp; ✉️ Chèque &nbsp;·&nbsp; 💶 Espèces &nbsp;·&nbsp; 🎫 Chèques vacances<br/><br/>
-  Club de Plage FNCP · La Baule · Saison 2026<br/>
+  Eole Beach Club · Club de Plage · Piriac-sur-Mer · Saison 2026<br/>
   <em>Cet email est généré automatiquement depuis l'application FNCP.</em>
 </div>
 </div></body></html>`;
@@ -7638,7 +7638,7 @@ tr:nth-child(even){background:#f8fbff}
       <h2 style={{ color:C.ocean, margin:"0 0 8px" }}>Demande envoyée !</h2>
       <p style={{ color:"#888", fontSize:14, lineHeight:1.8 }}>
         Toutes vos prestations ont été enregistrées.<br/>
-        L'équipe FNCP vous contactera pour le paiement.
+        L'équipe Eole Beach Club vous contactera pour le paiement.
       </p>
       <div style={{ background:`${C.green}10`, borderRadius:14, padding:"12px 20px", margin:"12px 0", fontSize:13, color:C.green, fontWeight:700 }}>
         📄 Un récapitulatif s'est ouvert dans un nouvel onglet
@@ -8133,4 +8133,4 @@ export default function App() {
     </div>
   );
 }
-// branding 2 Sat Apr  4 19:34:44 CEST 2026
+// branding eole Sat Apr  4 19:50:19 CEST 2026
