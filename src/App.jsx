@@ -8361,7 +8361,7 @@ const ADMIN_CODE = "club2026";
 // Liste blanche emails admin (Option 2 — double protection avec is_admin en base)
 const ADMIN_EMAILS = [
   "charlenesauzeau@mac.com",
-  // Ajoutez ici le deuxième email admin
+  "clubdeplage.piriacsurmer@hotmail.com",
 ];
 
 function ProfilConnecte({ user, setUser, setScreen, reservations }) {
@@ -8712,4 +8712,4 @@ export default function App() {
     </div>
   );
 }
-// admin security option 4 Sat Apr  4 23:24:07 CEST 2026
+// admin email 2 Sat Apr  4 23:29:51 CEST 2026
