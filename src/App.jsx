@@ -8674,8 +8674,10 @@ export default function App() {
               </div>
             </Card>
           )}
-          {/* Accès Admin protégé par code */}
-          <AdminCodeAccess onUnlock={() => setScreen("admin")} user={user} />
+          {/* Accès Admin — visible uniquement pour les admins */}
+          {user && ADMIN_EMAILS.includes(user.email?.toLowerCase()) && (
+            <AdminCodeAccess onUnlock={() => setScreen("admin")} user={user} />
+          )}
         </div>
       );
       default: return <HomeScreen {...props} />;
@@ -8705,4 +8707,4 @@ export default function App() {
     </div>
   );
 }
-// admin discret Sat Apr  4 23:31:55 CEST 2026
+// admin hidden Sat Apr  4 23:35:05 CEST 2026
