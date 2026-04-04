@@ -3055,81 +3055,77 @@ function InscriptionScreen({ onNav, setUser }) {
         {step === 2 && (
           <Card>
             <h3 style={{ color: C.dark, marginTop: 0 }}>🧒 Enfants inscrits</h3>
+
+            {/* Enfants déjà ajoutés */}
             {form.enfants.map(e => (
               <div key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: `${C.sea}18`, border: `2px solid ${C.sea}40`, borderRadius: 14, padding: "10px 14px", marginBottom: 10 }}>
                 <div>
-                  <div style={{ fontWeight: 800, color: C.dark }}>{e.prenom} {NOM(e.nom)}</div>
+                  <div style={{ fontWeight: 800, color: C.dark }}>{e.sexe === "M" ? "👦" : "👧"} {e.prenom} {NOM(e.nom)}</div>
                   <div style={{ fontSize: 12, color: "#888" }}>
                     {e.naissance ? e.naissance.split("-").reverse().join("/") : ""} · {e.activite === "club" ? "🏖️ Club" : e.activite === "natation" ? "🏊 Natation" : "🏖️🏊 Club & Natation"}
                     {e.activite !== "club" && ` · ${e.niveau}`}
                   </div>
                   {e.allergies && <div style={{ fontSize: 12, color: C.sunset }}>⚠️ {e.allergies}</div>}
                 </div>
-                <button onClick={() => setForm(p => ({ ...p, enfants: p.enfants.filter(x => x.id !== e.id) }))} style={{ background: `${C.sunset}20`, border: "none", color: C.sunset, borderRadius: "50%", width: 28, height: 28, cursor: "pointer", fontWeight: 900 }}>✕</button>
+                <button onClick={() => setForm(p => ({ ...p, enfants: p.enfants.filter(x => x.id !== e.id) }))}
+                  style={{ background: `${C.sunset}20`, border: "none", color: C.sunset, borderRadius: "50%", width: 28, height: 28, cursor: "pointer", fontWeight: 900 }}>✕</button>
               </div>
             ))}
-            {/* Formulaire ajout enfant */}
+
+            {/* Formulaire nouvel enfant */}
             {showEnfantForm && (
-            <div style={{ border: `2.5px dashed ${C.sea}`, borderRadius: 18, padding: 16, marginBottom: 14, background: `${C.sea}06` }}>
-              <h4 style={{ color: C.ocean, marginTop: 0 }}>{form.enfants.length === 0 ? "👧 Informations de l'enfant" : "➕ Ajouter un autre enfant"}</h4>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
-                <FInput label="Prénom" value={newEnfant.prenom} onChange={v => setNewEnfant(e => ({ ...e, prenom: v }))} required />
-                <FInput label="Nom" value={newEnfant.nom} onChange={v => setNewEnfant(e => ({ ...e, nom: v }))} required />
-              </div>
-              <FInput label="Date de naissance" type="date" value={newEnfant.naissance} onChange={v => setNewEnfant(e => ({ ...e, naissance: v }))} required />
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 900, color: C.deep, display: "block", marginBottom: 6, letterSpacing: 0.5, textTransform: "uppercase" }}>Sexe</label>
-                <div style={{ display: "flex", gap: 8 }}>
-                  {[["M","👦 Garçon"],["F","👧 Fille"]].map(([val, label]) => (
-                    <div key={val} onClick={() => setNewEnfant(e => ({ ...e, sexe: val }))} style={{ flex:1, textAlign:"center", padding:"10px 6px", borderRadius:14, cursor:"pointer", fontWeight:800, fontSize:13,
-                      background: newEnfant.sexe === val ? (val === "M" ? C.green : "#9B59B6") : "#f0f0f0",
-                      color: newEnfant.sexe === val ? "#fff" : "#888",
-                      border: `2px solid ${newEnfant.sexe === val ? (val === "M" ? C.green : "#9B59B6") : "transparent"}`,
-                      transition:"all .15s" }}>{label}</div>
-                  ))}
+              <div style={{ border: `2.5px dashed ${C.sea}`, borderRadius: 18, padding: 16, marginBottom: 14, background: `${C.sea}06` }}>
+                <h4 style={{ color: C.ocean, marginTop: 0 }}>
+                  {form.enfants.length === 0 ? "👧 Informations de l'enfant" : `➕ Enfant ${form.enfants.length + 1}`}
+                </h4>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
+                  <FInput label="Prénom" value={newEnfant.prenom} onChange={v => setNewEnfant(e => ({ ...e, prenom: v }))} required />
+                  <FInput label="Nom" value={newEnfant.nom} onChange={v => setNewEnfant(e => ({ ...e, nom: v }))} required />
                 </div>
-              </div>
-              <div style={{ marginBottom: 12 }}>
-                <label style={{ fontSize: 12, fontWeight: 900, color: C.deep, display: "block", marginBottom: 6, letterSpacing: 0.5, textTransform: "uppercase" }}>Activité</label>
-                <div style={{ display: "flex", gap: 8 }}>
-                  {[["club","🏖️ Club"],["natation","🏊 Natation"],["les deux","🏖️🏊 Les deux"]].map(([val, label]) => (
-                    <div key={val} onClick={() => setNewEnfant(e => ({ ...e, activite: val }))} style={{ flex: 1, textAlign: "center", padding: "9px 6px", borderRadius: 14, cursor: "pointer", fontWeight: 800, fontSize: 12, background: newEnfant.activite === val ? C.sea : "#f0f0f0", color: newEnfant.activite === val ? "#fff" : "#888", border: `2px solid ${newEnfant.activite === val ? C.sea : "transparent"}`, transition: "all .15s" }}>{label}</div>
-                  ))}
-                </div>
-              </div>
-              {(newEnfant.activite === "natation" || newEnfant.activite === "les deux") && (
+                <FInput label="Date de naissance" type="date" value={newEnfant.naissance} onChange={v => setNewEnfant(e => ({ ...e, naissance: v }))} required />
                 <div style={{ marginBottom: 12 }}>
-                  <label style={{ fontSize: 12, fontWeight: 900, color: C.deep, display: "block", marginBottom: 5, letterSpacing: 0.5, textTransform: "uppercase" }}>Niveau 🏊</label>
-                  <select value={newEnfant.niveau} onChange={e => setNewEnfant(n => ({ ...n, niveau: e.target.value }))} style={{ width: "100%", border: `2.5px solid ${C.sky}`, borderRadius: 12, padding: "10px 14px", fontSize: 15, fontFamily: "inherit", background: "#fafcff" }}>
-                    <option value="debutant">🌱 Débutant</option>
-                    <option value="intermediaire">🌊 Intermédiaire</option>
-                    <option value="avance">🏊 Avancé</option>
-                  </select>
+                  <label style={{ fontSize: 12, fontWeight: 900, color: C.deep, display: "block", marginBottom: 6, letterSpacing: 0.5, textTransform: "uppercase" }}>Sexe</label>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    {[["M","👦 Garçon"],["F","👧 Fille"]].map(([val, label]) => (
+                      <div key={val} onClick={() => setNewEnfant(e => ({ ...e, sexe: val }))} style={{ flex:1, textAlign:"center", padding:"10px 6px", borderRadius:14, cursor:"pointer", fontWeight:800, fontSize:13,
+                        background: newEnfant.sexe === val ? (val === "M" ? C.green : "#9B59B6") : "#f0f0f0",
+                        color: newEnfant.sexe === val ? "#fff" : "#888",
+                        border: `2px solid ${newEnfant.sexe === val ? (val === "M" ? C.green : "#9B59B6") : "transparent"}`,
+                        transition:"all .15s" }}>{label}</div>
+                    ))}
+                  </div>
                 </div>
-              )}
-              <FInput label="Allergies / informations médicales" value={newEnfant.allergies} onChange={v => setNewEnfant(e => ({ ...e, allergies: v }))} placeholder="Aucune si vide" />
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 900, color: C.ocean, display: "block", marginBottom: 4 }}>👤 Personnes autorisées à récupérer l'enfant</label>
-                <div style={{ fontSize: 11, color: "#aaa", marginBottom: 6 }}>Autres que le responsable légal (prénom + nom + lien de parenté)</div>
-                <FInput placeholder="Ex : Marie Dupont (grand-mère), Paul Martin (oncle)…" value={newEnfant.personnesAutorisees || ""} onChange={v => setNewEnfant(e => ({ ...e, personnesAutorisees: v }))} />
+                <div style={{ marginBottom: 12 }}>
+                  <label style={{ fontSize: 12, fontWeight: 900, color: C.deep, display: "block", marginBottom: 6, letterSpacing: 0.5, textTransform: "uppercase" }}>Activité</label>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    {[["club","🏖️ Club"],["natation","🏊 Natation"],["les deux","🏖️🏊 Les deux"]].map(([val, label]) => (
+                      <div key={val} onClick={() => setNewEnfant(e => ({ ...e, activite: val }))} style={{ flex: 1, textAlign: "center", padding: "9px 6px", borderRadius: 14, cursor: "pointer", fontWeight: 800, fontSize: 12, background: newEnfant.activite === val ? C.sea : "#f0f0f0", color: newEnfant.activite === val ? "#fff" : "#888", border: `2px solid ${newEnfant.activite === val ? C.sea : "transparent"}`, transition: "all .15s" }}>{label}</div>
+                    ))}
+                  </div>
+                </div>
+                {(newEnfant.activite === "natation" || newEnfant.activite === "les deux") && (
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={{ fontSize: 12, fontWeight: 900, color: C.deep, display: "block", marginBottom: 5, letterSpacing: 0.5, textTransform: "uppercase" }}>Niveau 🏊</label>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      {[["debutant","🌱 Débutant"],["intermediaire","🌊 Intermédiaire"],["avance","🏊 Avancé"]].map(([val, label]) => (
+                        <div key={val} onClick={() => setNewEnfant(e => ({ ...e, niveau: val }))} style={{ flex:1, textAlign:"center", padding:"8px 4px", borderRadius:12, cursor:"pointer", fontWeight:800, fontSize:11, background: newEnfant.niveau === val ? C.ocean : "#f0f0f0", color: newEnfant.niveau === val ? "#fff" : "#888" }}>{label}</div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <FInput label="Allergies / informations médicales" value={newEnfant.allergies} onChange={v => setNewEnfant(e => ({ ...e, allergies: v }))} placeholder="Aucune si vide" />
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 900, color: C.ocean, display: "block", marginBottom: 4 }}>👤 Personnes autorisées à récupérer l'enfant</label>
+                  <div style={{ fontSize: 11, color: "#aaa", marginBottom: 6 }}>Autres que le responsable légal (prénom + nom + lien de parenté)</div>
+                  <FInput placeholder="Ex : Marie Dupont (grand-mère), Paul Martin (oncle)…" value={newEnfant.personnesAutorisees || ""} onChange={v => setNewEnfant(e => ({ ...e, personnesAutorisees: v }))} />
+                </div>
               </div>
-              <SunBtn small color={C.sea} full onClick={() => {
-                if (newEnfant.prenom && newEnfant.nom && newEnfant.naissance) {
-                  const age = calcAge(newEnfant.naissance);
-                  if (age < 3) { alert("L'enfant doit avoir au moins 3 ans pour s'inscrire."); return; }
-                  setForm(p => ({ ...p, enfants: [...p.enfants, { ...newEnfant, id: Date.now() }] }));
-                  setNewEnfant({ prenom: "", nom: "", naissance: "", sexe: "", activite: "club", niveau: "debutant", allergies: "", personnesAutorisees: "" });
-                  setShowEnfantForm(false);
-                } else {
-                  alert("Merci de remplir le prénom, nom et date de naissance.");
-                }
-              }}>✅ Valider cet enfant</SunBtn>
-            </div>
             )}
 
-            {/* Bouton ajouter un autre enfant */}
-            {!showEnfantForm && (
-              <button onClick={() => setShowEnfantForm(true)} style={{ width:"100%", background:`${C.sea}15`, border:`2px dashed ${C.sea}`, color:C.sea, borderRadius:14, padding:"12px", cursor:"pointer", fontWeight:900, fontSize:14, fontFamily:"inherit", marginBottom:14 }}>
+            {/* Bouton + Ajouter un autre enfant */}
+            {form.enfants.length > 0 && !showEnfantForm && (
+              <button onClick={() => setShowEnfantForm(true)}
+                style={{ width:"100%", background:`${C.sea}15`, border:`2px dashed ${C.sea}`, color:C.sea, borderRadius:14, padding:"12px", cursor:"pointer", fontWeight:900, fontSize:14, fontFamily:"inherit", marginBottom:14 }}>
                 ➕ Ajouter un autre enfant
               </button>
             )}
@@ -3137,15 +3133,15 @@ function InscriptionScreen({ onNav, setUser }) {
             <div style={{ display: "flex", gap: 10 }}>
               <SunBtn color="#bbb" onClick={() => setStep(1)} style={{ flex: 1 }}>← Retour</SunBtn>
               <SunBtn color={C.coral} onClick={() => {
-                // Valider l'enfant en cours s'il est rempli
+                // Valider l'enfant en cours si le formulaire est rempli
                 if (showEnfantForm && newEnfant.prenom && newEnfant.nom && newEnfant.naissance) {
                   const age = calcAge(newEnfant.naissance);
                   if (age < 3) { alert("L'enfant doit avoir au moins 3 ans pour s'inscrire."); return; }
                   setForm(p => ({ ...p, enfants: [...p.enfants, { ...newEnfant, id: Date.now() }] }));
                   setNewEnfant({ prenom: "", nom: "", naissance: "", sexe: "", activite: "club", niveau: "debutant", allergies: "", personnesAutorisees: "" });
-                }
-                if (form.enfants.length === 0 && !(newEnfant.prenom && newEnfant.nom && newEnfant.naissance)) {
-                  alert("Veuillez ajouter au moins un enfant.");
+                  setShowEnfantForm(false);
+                } else if (form.enfants.length === 0) {
+                  alert("Veuillez remplir les informations de votre enfant avant de continuer.");
                   return;
                 }
                 setStep(3);
@@ -8161,4 +8157,4 @@ export default function App() {
     </div>
   );
 }
-// inscription enfant UX Sat Apr  4 20:06:18 CEST 2026
+// inscription enfant UX v2 Sat Apr  4 20:17:49 CEST 2026
