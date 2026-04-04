@@ -8358,6 +8358,12 @@ function BottomNav({ current, onNav, panierCount = 0, hidepanier = false }) {
 // ── ADMIN CODE ACCESS ─────────────────────────────────────
 const ADMIN_CODE = "club2026";
 
+// Liste blanche emails admin (Option 2 — double protection avec is_admin en base)
+const ADMIN_EMAILS = [
+  "charlenesauzeau@mac.com",
+  // Ajoutez ici le deuxième email admin
+];
+
 function ProfilConnecte({ user, setUser, setScreen, reservations }) {
   const [resasNat, setResasNat]       = useState([]);
   const [resasClub, setResasClub]     = useState([]);
@@ -8412,33 +8418,66 @@ function ProfilConnecte({ user, setUser, setScreen, reservations }) {
   );
 }
 
-function AdminCodeAccess({ onUnlock }) {
-  const [open, setOpen]   = useState(false);
-  const [code, setCode]   = useState("");
-  const [error, setError] = useState(false);
-  const [shake, setShake] = useState(false);
+function AdminCodeAccess({ onUnlock, user }) {
+  const [open, setOpen]     = useState(false);
+  const [code, setCode]     = useState("");
+  const [error, setError]   = useState("");
+  const [shake, setShake]   = useState(false);
+  const [checking, setChecking] = useState(false);
 
-  const handleChange = (val) => {
+  // Vérifier si l'utilisateur connecté est admin
+  const userEmail = user?.email || "";
+  const isWhitelisted = ADMIN_EMAILS.includes(userEmail.toLowerCase());
+
+  const handleChange = async (val) => {
     const clean = val.slice(0, 8);
     setCode(clean);
-    setError(false);
+    setError("");
     if (clean.length === 8) {
-      if (clean.toLowerCase() === ADMIN_CODE.toLowerCase()) {
-        setOpen(false);
-        setCode("");
-        onUnlock();
-      } else {
-        setError(true);
+      if (clean.toLowerCase() !== ADMIN_CODE.toLowerCase()) {
+        setError("Code incorrect");
         setShake(true);
-        setTimeout(() => { setShake(false); setCode(""); setError(false); }, 800);
+        setTimeout(() => { setShake(false); setCode(""); setError(""); }, 800);
+        return;
       }
+      // Code correct — vérifier is_admin en base si connecté
+      if (!user?.supabaseId) {
+        setError("Vous devez être connecté pour accéder à l'admin.");
+        setShake(true);
+        setTimeout(() => { setShake(false); setCode(""); setError(""); }, 1200);
+        return;
+      }
+      setChecking(true);
+      try {
+        const { data } = await sb.from("membres").select("is_admin, email").eq("id", user.supabaseId).single();
+        const emailOk = ADMIN_EMAILS.includes((data?.email || "").toLowerCase());
+        const dbOk    = data?.is_admin === true;
+        if (emailOk || dbOk) {
+          setOpen(false);
+          setCode("");
+          onUnlock();
+        } else {
+          setError("Accès non autorisé pour ce compte.");
+          setShake(true);
+          setTimeout(() => { setShake(false); setCode(""); setError(""); }, 1200);
+        }
+      } catch {
+        setError("Erreur de vérification.");
+        setShake(true);
+        setTimeout(() => { setShake(false); setCode(""); setError(""); }, 1000);
+      }
+      setChecking(false);
     }
   };
 
   const handleOpen = () => {
+    if (!user?.supabaseId) {
+      alert("Vous devez être connecté pour accéder à l'espace administrateur.");
+      return;
+    }
     setOpen(true);
     setCode("");
-    setError(false);
+    setError("");
     setTimeout(() => document.getElementById("admin-hidden-input")?.focus(), 100);
   };
 
@@ -8449,7 +8488,7 @@ function AdminCodeAccess({ onUnlock }) {
           <div style={{ width: 40, height: 40, borderRadius: 14, background: "rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>⚙️</div>
           <div>
             <div style={{ color: "#fff", fontWeight: 900, fontSize: 14 }}>Espace Administrateur</div>
-            <div style={{ color: "rgba(255,255,255,0.6)", fontSize: 11 }}>🔒 Accès protégé par code</div>
+            <div style={{ color: "rgba(255,255,255,0.6)", fontSize: 11 }}>🔒 Accès réservé aux administrateurs</div>
           </div>
         </div>
         <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 20 }}>›</div>
@@ -8501,7 +8540,13 @@ function AdminCodeAccess({ onUnlock }) {
 
             {error && (
               <div style={{ background: "#fff0f0", border: "1.5px solid #fca5a5", borderRadius: 12, padding: "8px 14px", marginBottom: 16, fontSize: 13, color: "#e74c3c", fontWeight: 700 }}>
-                ❌ Code incorrect. Réessayez.
+                ❌ {error}
+              </div>
+            )}
+
+            {checking && (
+              <div style={{ background: "#EEF8FF", border: "1.5px solid #1A8FE3", borderRadius: 12, padding: "8px 14px", marginBottom: 16, fontSize: 13, color: C.ocean, fontWeight: 700 }}>
+                ⏳ Vérification en cours…
               </div>
             )}
 
@@ -8637,7 +8682,7 @@ export default function App() {
             </Card>
           )}
           {/* Accès Admin protégé par code */}
-          <AdminCodeAccess onUnlock={() => setScreen("admin")} />
+          <AdminCodeAccess onUnlock={() => setScreen("admin")} user={user} />
         </div>
       );
       default: return <HomeScreen {...props} />;
@@ -8667,4 +8712,4 @@ export default function App() {
     </div>
   );
 }
-// onglet comptes Sat Apr  4 23:05:27 CEST 2026
+// admin security option 4 Sat Apr  4 23:24:07 CEST 2026
