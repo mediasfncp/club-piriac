@@ -6977,6 +6977,343 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
   );
 }
 
+// ── ONGLET COMPTES FIN DE SAISON ─────────────────────────
+function ComptesTab({ dbMembres, dbResas, dbResasClub, onRefresh }) {
+  const [acomptes, setAcomptes]       = useState({});   // { membreId: [{id, montant, date_paiement, label}] }
+  const [exclusions, setExclusions]   = useState({});   // { resaId: true }
+  const [showAcompte, setShowAcompte] = useState(null); // membreId en cours
+  const [acompteForm, setAcompteForm] = useState({ montant:"", date_paiement:"", label:"" });
+  const [loading, setLoading]         = useState(true);
+  const [selectedMembre, setSelectedMembre] = useState(null);
+
+  // Charger acomptes + exclusions
+  useEffect(() => {
+    const load = async () => {
+      const [{ data: ac }, { data: ex }] = await Promise.all([
+        sb.from("comptes_acomptes").select("*").order("date_paiement"),
+        sb.from("comptes_exclusions").select("*"),
+      ]);
+      // Grouper acomptes par membre
+      const acMap = {};
+      (ac || []).forEach(a => { if (!acMap[a.membre_id]) acMap[a.membre_id] = []; acMap[a.membre_id].push(a); });
+      setAcomptes(acMap);
+      // Exclusions par resaId
+      const exMap = {};
+      (ex || []).forEach(e => { exMap[e.resa_id] = e.resa_type; });
+      setExclusions(exMap);
+      setLoading(false);
+    };
+    load().catch(() => setLoading(false));
+  }, []);
+
+  const PRIX_NAT = { 1:20,2:40,3:60,4:80,5:95,6:113,7:131,8:147,9:162,10:170 };
+  const getPrixNat = n => n <= 10 ? (PRIX_NAT[n] || n*20) : 170+(n-10)*17;
+
+  // Membres avec compte fin de saison
+  const membresCompte = (dbMembres || []).filter(m => m.compte_fin_saison);
+
+  const getMontantResa = (r, type) => {
+    if (type === "natation") return Number(r.montant || 20);
+    const nb = Number(r.enfants?.[0]);
+    const LP = {6:96,12:180,18:252,24:288,30:330};
+    if (nb >= 6 && LP[nb]) return LP[nb];
+    const match = (r.label_jour||"").match(/\[MONTANT:(\d+)\]/);
+    return match ? Number(match[1]) : 0;
+  };
+
+  const getCompte = (membre) => {
+    const resasNat  = dbResas.filter(r => r.membre_id === membre.id && r.statut === "confirmed" && !exclusions[r.id]);
+    const resasClub = dbResasClub.filter(r => r.membre_id === membre.id && r.statut === "confirmed" && !exclusions[r.id]);
+    const totalPrestations = [
+      ...resasNat.map(r => getMontantResa(r, "natation")),
+      ...resasClub.map(r => getMontantResa(r, "club")),
+    ].reduce((s, v) => s + v, 0);
+    const totalAcomptes = (acomptes[membre.id] || []).reduce((s, a) => s + a.montant, 0);
+    return { resasNat, resasClub, totalPrestations, totalAcomptes, solde: totalPrestations - totalAcomptes };
+  };
+
+  const toggleExclusion = async (resaId, resaType) => {
+    if (exclusions[resaId]) {
+      await sb.from("comptes_exclusions").delete().eq("resa_id", resaId);
+      setExclusions(prev => { const n = {...prev}; delete n[resaId]; return n; });
+    } else {
+      await sb.from("comptes_exclusions").insert([{ resa_id: resaId, resa_type: resaType }]);
+      setExclusions(prev => ({ ...prev, [resaId]: resaType }));
+    }
+  };
+
+  const addAcompte = async (membreId) => {
+    if (!acompteForm.montant || !acompteForm.date_paiement) { alert("Montant et date requis."); return; }
+    const { data } = await sb.from("comptes_acomptes").insert([{
+      membre_id: membreId, montant: Number(acompteForm.montant),
+      date_paiement: acompteForm.date_paiement, label: acompteForm.label || "Acompte",
+    }]).select().single();
+    if (data) {
+      setAcomptes(prev => ({ ...prev, [membreId]: [...(prev[membreId]||[]), data] }));
+      setAcompteForm({ montant:"", date_paiement:"", label:"" });
+      setShowAcompte(null);
+    }
+  };
+
+  const deleteAcompte = async (membreId, acompteId) => {
+    if (!window.confirm("Supprimer cet acompte ?")) return;
+    await sb.from("comptes_acomptes").delete().eq("id", acompteId);
+    setAcomptes(prev => ({ ...prev, [membreId]: (prev[membreId]||[]).filter(a => a.id !== acompteId) }));
+  };
+
+  const toggleCompte = async (membre) => {
+    await sb.from("membres").update({ compte_fin_saison: !membre.compte_fin_saison }).eq("id", membre.id);
+    onRefresh();
+  };
+
+  const genererFacture = (membre, compte) => {
+    const nomMembre = `${membre.prenom} ${(membre.nom||"").toUpperCase()}`;
+    const lignesNat = compte.resasNat.map(r => `<tr><td>🏊 Natation · ${r.heure}</td><td>${r.date_seance ? new Date(r.date_seance).toLocaleDateString("fr-FR",{day:"numeric",month:"short"}) : "—"}</td><td style="text-align:right;font-weight:700">${getMontantResa(r,"natation")} €</td></tr>`).join("");
+    const lignesClub = compte.resasClub.map(r => {
+      const isLib = (r.label_jour||"").startsWith("[LIBERTE]");
+      const label = isLib ? "🎟️ Liberté" : r.session==="matin" ? "🏖️ Club Matin" : "🏖️ Club Après-midi";
+      return `<tr><td>${label}</td><td>${r.date_reservation ? new Date(r.date_reservation).toLocaleDateString("fr-FR",{day:"numeric",month:"short"}) : "—"}</td><td style="text-align:right;font-weight:700">${getMontantResa(r,"club")} €</td></tr>`;
+    }).join("");
+    const lignesAcomptes = (acomptes[membre.id]||[]).map(a => `<tr style="background:#E8F5E9"><td colspan="2">✅ ${a.label} — ${new Date(a.date_paiement).toLocaleDateString("fr-FR")}</td><td style="text-align:right;font-weight:700;color:#2e7d32">- ${a.montant} €</td></tr>`).join("");
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Facture ${nomMembre}</title>
+<style>body{font-family:Arial,sans-serif;color:#2C3E50;padding:30px;max-width:680px;margin:0 auto}
+.header{background:linear-gradient(135deg,#1A8FE3,#4ECDC4);color:#fff;padding:20px 24px;border-radius:12px;margin-bottom:24px}
+h1{margin:0 0 4px;font-size:20px}
+.sub{font-size:12px;opacity:.85;margin:0}
+table{width:100%;border-collapse:collapse;margin-bottom:8px}
+th{background:#1A8FE3;color:#fff;padding:9px 12px;text-align:left;font-size:11px;text-transform:uppercase}
+td{padding:8px 12px;border-bottom:1px solid #f0f0f0;font-size:13px}
+.total-row td{font-weight:900;font-size:15px;background:#f0f4f8;border-top:2px solid #1A8FE3}
+.solde{background:linear-gradient(135deg,#1A8FE3,#4ECDC4);color:#fff;padding:16px 20px;border-radius:12px;display:flex;justify-content:space-between;align-items:center;margin-top:16px}
+.footer{margin-top:24px;text-align:center;font-size:11px;color:#888;line-height:1.8}
+@media print{button{display:none}}</style></head><body>
+<div class="header"><h1>🏖️ Eole Beach Club</h1><p class="sub">Club de Plage · École de Natation · Piriac-sur-Mer · Saison 2026</p></div>
+<h2 style="margin:0 0 4px">Récapitulatif de compte</h2>
+<p style="color:#888;font-size:13px;margin:0 0 20px">Client : <strong>${nomMembre}</strong> · Saison 2026</p>
+<table>
+<thead><tr><th>Prestation</th><th>Date</th><th style="text-align:right">Montant</th></tr></thead>
+<tbody>${lignesNat}${lignesClub}
+<tr class="total-row"><td colspan="2">Sous-total prestations</td><td style="text-align:right">${compte.totalPrestations} €</td></tr>
+${lignesAcomptes}
+</tbody></table>
+<div class="solde"><span style="font-size:15px;font-weight:700">SOLDE DÛ</span><span style="font-size:26px;font-weight:900">${compte.solde} €</span></div>
+<div class="footer">
+Eole Beach Club · Plage Saint-Michel · 44420 Piriac-sur-Mer<br/>
+📞 07 67 78 69 22 · clubdeplage.piriacsurmer@hotmail.com<br/>
+Document généré le ${new Date().toLocaleDateString("fr-FR")}
+</div>
+<div style="text-align:center;margin-top:20px"><button onclick="window.print()" style="background:#1A8FE3;color:#fff;border:none;padding:10px 24px;border-radius:8px;font-size:14px;cursor:pointer;font-weight:700">🖨️ Imprimer</button></div>
+</body></html>`;
+    const win = window.open("","_blank");
+    if (win) { win.document.write(html); win.document.close(); }
+  };
+
+  if (loading) return <div style={{ textAlign:"center", padding:40, color:"#bbb" }}>Chargement…</div>;
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+      {/* En-tête */}
+      <div style={{ background:"#fff", borderRadius:16, padding:"14px 18px", boxShadow:"0 2px 10px rgba(0,0,0,0.05)" }}>
+        <div style={{ fontWeight:900, color:C.dark, fontSize:15, marginBottom:4 }}>📒 Comptes fin de saison</div>
+        <div style={{ fontSize:12, color:"#aaa" }}>Membres réglant en fin de saison — suivi des prestations et acomptes</div>
+      </div>
+
+      {/* Toggle membres non-compte pour les activer */}
+      <div style={{ background:"#fff", borderRadius:16, padding:"14px 18px", boxShadow:"0 2px 10px rgba(0,0,0,0.05)" }}>
+        <div style={{ fontWeight:800, color:C.dark, fontSize:13, marginBottom:10 }}>👥 Activer le compte fin de saison</div>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(200px, 1fr))", gap:8 }}>
+          {(dbMembres||[]).map(m => (
+            <div key={m.id} onClick={() => toggleCompte(m)} style={{ display:"flex", alignItems:"center", gap:8, background: m.compte_fin_saison ? `${C.ocean}15` : "#f8f8f8", border:`2px solid ${m.compte_fin_saison ? C.ocean : "#e0e0e0"}`, borderRadius:12, padding:"8px 12px", cursor:"pointer" }}>
+              <div style={{ width:18, height:18, borderRadius:4, background: m.compte_fin_saison ? C.ocean : "#ddd", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                {m.compte_fin_saison && <span style={{ color:"#fff", fontSize:12, fontWeight:900 }}>✓</span>}
+              </div>
+              <span style={{ fontSize:12, fontWeight:700, color: m.compte_fin_saison ? C.ocean : "#555" }}>{m.prenom} {NOM(m.nom)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Comptes actifs */}
+      {membresCompte.length === 0 ? (
+        <div style={{ textAlign:"center", padding:"32px 0", color:"#bbb", fontSize:14 }}>
+          Aucun membre en compte fin de saison — activez-en ci-dessus
+        </div>
+      ) : membresCompte.map(m => {
+        const compte = getCompte(m);
+        const isOpen = selectedMembre === m.id;
+        return (
+          <div key={m.id} style={{ background:"#fff", borderRadius:20, boxShadow:"0 4px 16px rgba(0,0,0,0.07)", overflow:"hidden", border: compte.solde > 0 ? `2px solid ${C.ocean}30` : `2px solid ${C.green}30` }}>
+            {/* Header carte */}
+            <div onClick={() => setSelectedMembre(isOpen ? null : m.id)} style={{ padding:"16px 18px", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+              <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                <div style={{ width:46, height:46, borderRadius:14, background:`linear-gradient(135deg,${C.ocean},${C.sea})`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22 }}>👤</div>
+                <div>
+                  <div style={{ fontWeight:900, color:C.dark, fontSize:15 }}>{m.prenom} {NOM(m.nom)}</div>
+                  <div style={{ fontSize:11, color:"#aaa" }}>{m.email}</div>
+                  <div style={{ display:"flex", gap:8, marginTop:4 }}>
+                    <span style={{ background:`${C.ocean}15`, color:C.ocean, borderRadius:50, padding:"2px 10px", fontSize:11, fontWeight:800 }}>{compte.resasNat.length + compte.resasClub.length} préstation{compte.resasNat.length+compte.resasClub.length>1?"s":""}</span>
+                    {compte.totalAcomptes > 0 && <span style={{ background:`${C.green}15`, color:C.green, borderRadius:50, padding:"2px 10px", fontSize:11, fontWeight:800 }}>✅ {compte.totalAcomptes} € versés</span>}
+                  </div>
+                </div>
+              </div>
+              <div style={{ textAlign:"right" }}>
+                <div style={{ fontWeight:900, fontSize:22, color: compte.solde === 0 ? C.green : C.coral }}>{compte.solde} €</div>
+                <div style={{ fontSize:10, color:"#aaa" }}>solde dû</div>
+                <div style={{ fontSize:16, color:"#ccc", marginTop:4 }}>{isOpen ? "▲" : "▼"}</div>
+              </div>
+            </div>
+
+            {/* Détail dépliable */}
+            {isOpen && (
+              <div style={{ borderTop:"1px solid #f0f0f0", padding:"16px 18px" }}>
+
+                {/* Résas natation */}
+                {compte.resasNat.length > 0 && (
+                  <div style={{ marginBottom:16 }}>
+                    <div style={{ fontWeight:800, color:C.ocean, fontSize:12, textTransform:"uppercase", marginBottom:8 }}>🏊 Natation</div>
+                    {compte.resasNat.map(r => (
+                      <div key={r.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"7px 10px", background: exclusions[r.id] ? "#f8f8f8" : `${C.ocean}06`, borderRadius:10, marginBottom:4, opacity: exclusions[r.id] ? 0.5 : 1 }}>
+                        <div>
+                          <span style={{ fontWeight:700, fontSize:13, color: exclusions[r.id] ? "#aaa" : C.dark }}>{r.heure}</span>
+                          <span style={{ fontSize:11, color:"#aaa", marginLeft:8 }}>{r.date_seance ? new Date(r.date_seance).toLocaleDateString("fr-FR",{day:"numeric",month:"short"}) : "—"}</span>
+                          {r.enfants?.length > 0 && <span style={{ fontSize:10, color:C.ocean, marginLeft:6 }}>{r.enfants.join(", ")}</span>}
+                        </div>
+                        <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                          <span style={{ fontWeight:700, color: exclusions[r.id] ? "#aaa" : C.ocean, fontSize:13, textDecoration: exclusions[r.id] ? "line-through" : "none" }}>{getMontantResa(r,"natation")} €</span>
+                          <button onClick={() => toggleExclusion(r.id, "natation")} title={exclusions[r.id] ? "Inclure" : "Exclure"}
+                            style={{ background: exclusions[r.id] ? `${C.green}20` : "#fff0f0", border:"none", borderRadius:6, padding:"3px 8px", cursor:"pointer", fontSize:11, fontWeight:700, color: exclusions[r.id] ? C.green : C.sunset, fontFamily:"inherit" }}>
+                            {exclusions[r.id] ? "↩ Inclure" : "✕ Exclure"}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Résas club */}
+                {compte.resasClub.length > 0 && (
+                  <div style={{ marginBottom:16 }}>
+                    <div style={{ fontWeight:800, color:C.coral, fontSize:12, textTransform:"uppercase", marginBottom:8 }}>🏖️ Club de Plage</div>
+                    {compte.resasClub.map(r => {
+                      const isLib = (r.label_jour||"").startsWith("[LIBERTE]");
+                      const label = isLib ? "🎟️ Liberté" : r.session==="matin" ? "☀️ Matin" : "🌊 Après-midi";
+                      return (
+                        <div key={r.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"7px 10px", background: exclusions[r.id] ? "#f8f8f8" : `${C.coral}06`, borderRadius:10, marginBottom:4, opacity: exclusions[r.id] ? 0.5 : 1 }}>
+                          <div>
+                            <span style={{ fontWeight:700, fontSize:13, color: exclusions[r.id] ? "#aaa" : C.dark }}>{label}</span>
+                            <span style={{ fontSize:11, color:"#aaa", marginLeft:8 }}>{r.date_reservation ? new Date(r.date_reservation).toLocaleDateString("fr-FR",{day:"numeric",month:"short"}) : "—"}</span>
+                          </div>
+                          <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                            <span style={{ fontWeight:700, color: exclusions[r.id] ? "#aaa" : C.coral, fontSize:13, textDecoration: exclusions[r.id] ? "line-through" : "none" }}>{getMontantResa(r,"club")} €</span>
+                            <button onClick={() => toggleExclusion(r.id, "club")} title={exclusions[r.id] ? "Inclure" : "Exclure"}
+                              style={{ background: exclusions[r.id] ? `${C.green}20` : "#fff0f0", border:"none", borderRadius:6, padding:"3px 8px", cursor:"pointer", fontSize:11, fontWeight:700, color: exclusions[r.id] ? C.green : C.sunset, fontFamily:"inherit" }}>
+                              {exclusions[r.id] ? "↩ Inclure" : "✕ Exclure"}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Acomptes */}
+                <div style={{ marginBottom:16 }}>
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+                    <div style={{ fontWeight:800, color:C.green, fontSize:12, textTransform:"uppercase" }}>💳 Acomptes versés</div>
+                    <button onClick={() => setShowAcompte(showAcompte === m.id ? null : m.id)}
+                      style={{ background:`${C.green}15`, border:"none", color:C.green, borderRadius:8, padding:"4px 10px", cursor:"pointer", fontWeight:800, fontSize:11, fontFamily:"inherit" }}>
+                      ➕ Ajouter
+                    </button>
+                  </div>
+                  {(acomptes[m.id]||[]).map(a => (
+                    <div key={a.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"7px 10px", background:`${C.green}08`, borderRadius:10, marginBottom:4 }}>
+                      <div>
+                        <span style={{ fontWeight:700, fontSize:13, color:C.dark }}>{a.label}</span>
+                        <span style={{ fontSize:11, color:"#aaa", marginLeft:8 }}>{new Date(a.date_paiement).toLocaleDateString("fr-FR",{day:"numeric",month:"short",year:"numeric"})}</span>
+                      </div>
+                      <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                        <span style={{ fontWeight:700, color:C.green, fontSize:13 }}>- {a.montant} €</span>
+                        <button onClick={() => deleteAcompte(m.id, a.id)}
+                          style={{ background:"#fff0f0", border:"none", color:C.sunset, borderRadius:6, width:24, height:24, cursor:"pointer", fontSize:13, fontFamily:"inherit" }}>🗑</button>
+                      </div>
+                    </div>
+                  ))}
+                  {(acomptes[m.id]||[]).length === 0 && <div style={{ fontSize:12, color:"#bbb", fontStyle:"italic" }}>Aucun acompte enregistré</div>}
+
+                  {/* Formulaire acompte */}
+                  {showAcompte === m.id && (
+                    <div style={{ background:`${C.green}08`, border:`2px solid ${C.green}30`, borderRadius:12, padding:"12px 14px", marginTop:10 }}>
+                      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:8 }}>
+                        <div>
+                          <label style={{ fontSize:11, fontWeight:800, color:C.green, display:"block", marginBottom:4 }}>Montant (€) *</label>
+                          <input type="number" value={acompteForm.montant} onChange={e => setAcompteForm(p => ({...p, montant:e.target.value}))}
+                            style={{ width:"100%", border:`2px solid ${C.green}40`, borderRadius:8, padding:"8px 10px", fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} placeholder="Ex: 100" />
+                        </div>
+                        <div>
+                          <label style={{ fontSize:11, fontWeight:800, color:C.green, display:"block", marginBottom:4 }}>Date *</label>
+                          <input type="date" value={acompteForm.date_paiement} onChange={e => setAcompteForm(p => ({...p, date_paiement:e.target.value}))}
+                            style={{ width:"100%", border:`2px solid ${C.green}40`, borderRadius:8, padding:"8px 10px", fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+                        </div>
+                      </div>
+                      <div style={{ marginBottom:8 }}>
+                        <label style={{ fontSize:11, fontWeight:800, color:C.green, display:"block", marginBottom:4 }}>Libellé</label>
+                        <input value={acompteForm.label} onChange={e => setAcompteForm(p => ({...p, label:e.target.value}))}
+                          style={{ width:"100%", border:`2px solid ${C.green}40`, borderRadius:8, padding:"8px 10px", fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} placeholder="Ex: Acompte chèque" />
+                      </div>
+                      <div style={{ display:"flex", gap:8 }}>
+                        <button onClick={() => setShowAcompte(null)} style={{ flex:1, background:"#f0f0f0", border:"none", color:"#888", borderRadius:8, padding:"8px", cursor:"pointer", fontWeight:700, fontFamily:"inherit" }}>Annuler</button>
+                        <button onClick={() => addAcompte(m.id)} style={{ flex:2, background:`linear-gradient(135deg,${C.green},#27AE60)`, border:"none", color:"#fff", borderRadius:8, padding:"8px", cursor:"pointer", fontWeight:900, fontFamily:"inherit" }}>✅ Enregistrer</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Récap total */}
+                <div style={{ background:`${C.ocean}08`, borderRadius:14, padding:"14px 16px", display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginBottom:14 }}>
+                  <div style={{ textAlign:"center" }}>
+                    <div style={{ fontWeight:900, fontSize:18, color:C.ocean }}>{compte.totalPrestations} €</div>
+                    <div style={{ fontSize:10, color:"#aaa", textTransform:"uppercase" }}>Prestations</div>
+                  </div>
+                  <div style={{ textAlign:"center" }}>
+                    <div style={{ fontWeight:900, fontSize:18, color:C.green }}>- {compte.totalAcomptes} €</div>
+                    <div style={{ fontSize:10, color:"#aaa", textTransform:"uppercase" }}>Acomptes</div>
+                  </div>
+                  <div style={{ textAlign:"center" }}>
+                    <div style={{ fontWeight:900, fontSize:22, color: compte.solde === 0 ? C.green : C.coral }}>{compte.solde} €</div>
+                    <div style={{ fontSize:10, color:"#aaa", textTransform:"uppercase" }}>Solde dû</div>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div style={{ display:"flex", gap:8 }}>
+                  <button onClick={() => genererFacture(m, compte)} style={{ flex:1, background:`linear-gradient(135deg,${C.ocean},${C.sea})`, border:"none", color:"#fff", borderRadius:12, padding:"11px", cursor:"pointer", fontWeight:900, fontSize:13, fontFamily:"inherit" }}>
+                    🖨️ Générer la facture
+                  </button>
+                  {compte.solde === 0 ? (
+                    <div style={{ flex:1, background:`${C.green}15`, borderRadius:12, padding:"11px", textAlign:"center", fontWeight:900, fontSize:13, color:C.green }}>✅ Soldé</div>
+                  ) : (
+                    <button onClick={async () => {
+                      const montant = prompt(`Solder le compte de ${m.prenom} ${m.nom} ?\nSolde dû : ${compte.solde} €\n\nMontant soldé :`);
+                      if (!montant) return;
+                      const { data } = await sb.from("comptes_acomptes").insert([{
+                        membre_id: m.id, montant: Number(montant),
+                        date_paiement: new Date().toISOString().slice(0,10), label: "Solde final",
+                      }]).select().single();
+                      if (data) setAcomptes(prev => ({ ...prev, [m.id]: [...(prev[m.id]||[]), data] }));
+                    }} style={{ flex:1, background:`linear-gradient(135deg,${C.green},#27AE60)`, border:"none", color:"#fff", borderRadius:12, padding:"11px", cursor:"pointer", fontWeight:900, fontSize:13, fontFamily:"inherit" }}>
+                      💶 Solder le compte
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSessions, setAllSeasonSessions, clubPlaces, setClubPlaces }) {
   const [tab, setTab] = useState("dashboard");
   const [dbResas, setDbResas]         = useState([]);
@@ -7118,6 +7455,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
     { id: "planning",     emoji: "🗓️", label: "Planning"   },
     { id: "paiements",    emoji: "💳", label: "Paiements"  },
     { id: "libertes",     emoji: "🎟️", label: "Liberté"   },
+    { id: "comptes",      emoji: "📒", label: "Comptes"    },
     { id: "recherche",    emoji: "🔍", label: "Recherche"  },
   ];
 
@@ -7567,6 +7905,10 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
           <CartesLiberteTab dbMembres={dbMembres} />
         )}
 
+        {tab === "comptes" && (
+          <ComptesTab dbMembres={dbMembres} dbResas={dbResas} dbResasClub={dbResasClub} onRefresh={() => getAllMembres().then(d => setDbMembres(d)).catch(() => {})} />
+        )}
+
         {tab === "recherche" && (
           <RechercheTab allResas={allResas} sessions={sessions} dbMembres={dbMembres} />
         )}
@@ -7704,36 +8046,115 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
       }).join("");
 
       const nomMembre = `${user.prenom || ""} ${(user.nom || "").toUpperCase()}`.trim();
-      const emailHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Confirmation FNCP</title>
-<style>body{font-family:Arial,sans-serif;color:#2C3E50;margin:0;padding:20px;background:#f0f4f8}
-.card{background:#fff;border-radius:16px;padding:28px;max-width:600px;margin:0 auto;box-shadow:0 4px 20px rgba(0,0,0,0.1)}
-h1{color:#1A8FE3;margin:0 0 4px;font-size:22px}
-.sub{color:#888;font-size:13px;margin:0 0 20px}
-table{width:100%;border-collapse:collapse;font-size:13px}
-th{background:linear-gradient(135deg,#1A8FE3,#4ECDC4);color:#fff;padding:10px 12px;text-align:left;font-size:11px;text-transform:uppercase}
-tr:nth-child(even){background:#f8fbff}
-.total{background:linear-gradient(135deg,#1A8FE3,#4ECDC4);color:#fff;padding:12px 16px;border-radius:12px;display:flex;justify-content:space-between;align-items:center;margin-top:16px;font-weight:900;font-size:16px}
-.footer{margin-top:20px;padding:16px;background:#FFF9F0;border-radius:12px;font-size:12px;color:#888;text-align:center}
-.badge{display:inline-block;background:#FF8E5320;color:#FF8E53;border-radius:50px;padding:2px 10px;font-size:11px;font-weight:700;margin-left:6px}
+      // Détecter les types de prestations pour adapter le règlement
+      const hasNat = Object.keys(natGroupes).length > 0;
+      const hasClub = panier.filter(i => i.type === "club").length > 0;
+      const hasLiberte = panier.filter(i => i.type === "liberte").length > 0;
+
+      const reglementSections = [];
+      if (hasNat) reglementSections.push(`
+        <div style="margin-bottom:14px;padding:14px 16px;background:#EEF8FF;border-left:4px solid #1A8FE3;border-radius:8px">
+          <div style="font-weight:700;color:#1A8FE3;font-size:13px;margin-bottom:6px">🏊 École de Natation</div>
+          <div style="font-size:13px;color:#555;line-height:1.7">
+            Le règlement s'effectue avant la première séance, directement au club ou par virement.<br/>
+            Vos séances seront confirmées dès réception du paiement.<br/>
+            <strong>Rappel :</strong> Arriver 5 minutes avant le créneau. Prévoir maillot de bain, serviette et bonnet.
+          </div>
+        </div>`);
+      if (hasClub) reglementSections.push(`
+        <div style="margin-bottom:14px;padding:14px 16px;background:#FFF0EC;border-left:4px solid #FF8E53;border-radius:8px">
+          <div style="font-weight:700;color:#FF8E53;font-size:13px;margin-bottom:6px">🏖️ Club de Plage</div>
+          <div style="font-size:13px;color:#555;line-height:1.7">
+            Le règlement peut s'effectuer en une fois ou en plusieurs fois selon votre convenance.<br/>
+            L'accès au club sera activé dès réception du paiement.<br/>
+            <strong>Rappel :</strong> Prévoir casquette, gourde, serviette de bain et crème solaire.
+          </div>
+        </div>`);
+      if (hasLiberte) reglementSections.push(`
+        <div style="margin-bottom:14px;padding:14px 16px;background:#FFF9E6;border-left:4px solid #FFD93D;border-radius:8px">
+          <div style="font-weight:700;color:#b45309;font-size:13px;margin-bottom:6px">🎟️ Carte Liberté</div>
+          <div style="font-size:13px;color:#555;line-height:1.7">
+            La carte Liberté est valable toute la saison 2026.<br/>
+            Elle sera créditée sur votre compte dès réception du paiement.<br/>
+            Vous pourrez ensuite réserver vos demi-journées librement depuis l'application.
+          </div>
+        </div>`);
+
+      const emailHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Confirmation Eole Beach Club</title>
+<style>
+body{font-family:Arial,sans-serif;color:#2C3E50;margin:0;padding:20px;background:#f0f4f8}
+.card{background:#fff;border-radius:16px;padding:28px;max-width:620px;margin:0 auto;box-shadow:0 4px 20px rgba(0,0,0,0.1)}
+.header{background:linear-gradient(135deg,#1A8FE3,#4ECDC4);border-radius:12px;padding:20px 24px;margin-bottom:20px;color:#fff}
+.header h1{margin:0 0 4px;font-size:22px}
+.header p{margin:0;font-size:13px;opacity:.85}
+table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:16px}
+th{background:#1A8FE3;color:#fff;padding:10px 12px;text-align:left;font-size:11px;text-transform:uppercase}
+td{padding:9px 12px;border-bottom:1px solid #f0f0f0}
+tr:nth-child(even) td{background:#f8fbff}
+.total-box{background:linear-gradient(135deg,#1A8FE3,#4ECDC4);color:#fff;padding:14px 18px;border-radius:12px;display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+.total-box .label{font-size:14px;font-weight:700}
+.total-box .amount{font-size:22px;font-weight:900}
+.payment-box{background:#FFF9F0;border:2px solid #FFD93D;border-radius:12px;padding:16px 18px;margin-bottom:20px}
+.payment-box h3{margin:0 0 10px;color:#b45309;font-size:14px}
+.payment-methods{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.payment-method{background:#fff;border:1.5px solid #e0e0e0;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;color:#555}
+.footer{margin-top:20px;padding:14px;background:#F0F4F8;border-radius:10px;font-size:11px;color:#888;text-align:center;line-height:1.8}
 </style></head><body>
 <div class="card">
-<h1>🏖️ Confirmation de commande</h1>
-<p class="sub">EOLE BEACH CLUB · Saison 2026</p>
-<p style="font-size:14px;margin-bottom:16px">Bonjour <strong>${nomMembre}</strong>,<br/>Votre demande de réservation a bien été enregistrée. Voici le récapitulatif :</p>
-<table>
-<thead><tr><th>Prestation</th><th>Enfant(s)</th><th>Détails</th><th style="text-align:right">Prix</th></tr></thead>
-<tbody>${lignesNat}${lignesAutres}</tbody>
-</table>
-<div class="total"><span>Total</span><span>${total} €</span></div>
-<div style="margin-top:16px;padding:12px 16px;background:#FFF3CD;border-radius:12px;font-size:13px;color:#856404;font-weight:700">
-⏳ Votre accès sera activé à réception du paiement
-</div>
-<div class="footer">
-  <strong>Modes de paiement acceptés :</strong><br/>
-  🏦 Virement bancaire &nbsp;·&nbsp; ✉️ Chèque &nbsp;·&nbsp; 💶 Espèces &nbsp;·&nbsp; 🎫 Chèques vacances<br/><br/>
-  Eole Beach Club · Club de Plage · Piriac-sur-Mer · Saison 2026<br/>
-  <em>Cet email est généré automatiquement depuis l'application FNCP.</em>
-</div>
+  <div class="header">
+    <h1>🏖️ Eole Beach Club</h1>
+    <p>Club de Plage · École de Natation · Piriac-sur-Mer · Saison 2026</p>
+  </div>
+
+  <p style="font-size:14px;margin:0 0 16px;line-height:1.7">Bonjour <strong>${nomMembre}</strong>,<br/>
+  Merci pour votre inscription ! Votre demande a bien été enregistrée. Voici le récapitulatif de votre commande ainsi que les informations de règlement.</p>
+
+  <table>
+    <thead><tr><th>Prestation</th><th>Enfant(s)</th><th>Détails</th><th style="text-align:right">Prix</th></tr></thead>
+    <tbody>${lignesNat}${lignesAutres}</tbody>
+  </table>
+
+  <div class="total-box">
+    <span class="label">Total à régler</span>
+    <span class="amount">${total} €</span>
+  </div>
+
+  <div class="payment-box">
+    <h3>💳 Comment régler votre inscription ?</h3>
+    <div style="font-size:13px;color:#555;line-height:1.7">
+      Vous pouvez régler votre inscription directement au club ou à distance selon les modes de paiement suivants :
+    </div>
+    <div class="payment-methods">
+      <span class="payment-method">🏦 Virement bancaire</span>
+      <span class="payment-method">✉️ Chèque</span>
+      <span class="payment-method">💶 Espèces</span>
+      <span class="payment-method">🎫 Chèques vacances</span>
+    </div>
+    <div style="margin-top:12px;font-size:12px;color:#888;font-style:italic">
+      Pour le virement ou chèque, merci de préciser le nom de votre enfant et la prestation en référence.<br/>
+      Le chèque est à libeller à l'ordre de : <strong>Eole Beach Club</strong>
+    </div>
+  </div>
+
+  ${reglementSections.join("")}
+
+  <div style="padding:14px 16px;background:#E8F5E9;border-left:4px solid #6BCB77;border-radius:8px;margin-bottom:20px">
+    <div style="font-size:13px;color:#2e7d32;font-weight:700">✅ Prochaines étapes</div>
+    <ol style="font-size:13px;color:#555;line-height:1.9;margin:8px 0 0;padding-left:18px">
+      <li>Effectuez le règlement selon l'un des modes ci-dessus</li>
+      <li>L'équipe Eole Beach Club valide votre réservation</li>
+      <li>Votre accès est activé dans l'application</li>
+      <li>À vous la plage ! 🏖️</li>
+    </ol>
+  </div>
+
+  <div class="footer">
+    <strong>Eole Beach Club · Club de Plage / École de Natation</strong><br/>
+    Plage Saint-Michel · Rue des Caps Horniers · 44420 Piriac-sur-Mer<br/>
+    📞 07 67 78 69 22 &nbsp;·&nbsp; ✉️ clubdeplage.piriacsurmer@hotmail.com<br/>
+    🌐 www.clubdeplage-piriacsurmer.fr<br/><br/>
+    <em>Cet email est généré automatiquement depuis l'application Eole Beach Club.</em>
+  </div>
 </div></body></html>`;
 
       // Ouvrir l'email dans une nouvelle fenêtre pour impression/copie
@@ -8246,4 +8667,4 @@ export default function App() {
     </div>
   );
 }
-// date envoi resa Sat Apr  4 21:32:22 CEST 2026
+// onglet comptes Sat Apr  4 23:05:27 CEST 2026
