@@ -3012,14 +3012,14 @@ function InscriptionScreen({ onNav, setUser }) {
             <div style={{ fontSize:12, fontWeight:900, color:C.ocean, textTransform:"uppercase", letterSpacing:0.5, marginBottom:-4 }}>🏠 Adresse principale</div>
             <FInput label="Adresse *" value={form.adresse} onChange={f("adresse")} required />
             {step1Error && !form.adresse && <div style={{ fontSize: 12, color: C.sunset, fontWeight: 700, marginTop: -10, marginBottom: 12 }}>⚠️ L'adresse est obligatoire</div>}
-            <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "0 12px" }}>
-              <div>
-                <FInput label="Ville *" value={form.ville} onChange={f("ville")} required />
-                {step1Error && !form.ville && <div style={{ fontSize: 12, color: C.sunset, fontWeight: 700, marginTop: -10, marginBottom: 12 }}>⚠️ Obligatoire</div>}
-              </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "0 12px" }}>
               <div>
                 <FInput label="Code postal *" value={form.cp} onChange={f("cp")} required />
                 {form.cp && !cpValid && <div style={{ fontSize: 12, color: C.sunset, fontWeight: 700, marginTop: -10, marginBottom: 12 }}>⚠️ 5 chiffres</div>}
+              </div>
+              <div>
+                <FInput label="Ville *" value={form.ville} onChange={f("ville")} required />
+                {step1Error && !form.ville && <div style={{ fontSize: 12, color: C.sunset, fontWeight: 700, marginTop: -10, marginBottom: 12 }}>⚠️ Obligatoire</div>}
               </div>
             </div>
 
@@ -3027,14 +3027,14 @@ function InscriptionScreen({ onNav, setUser }) {
             <div style={{ fontSize:12, fontWeight:900, color:C.coral, textTransform:"uppercase", letterSpacing:0.5, marginBottom:-4 }}>🏖️ Adresse de vacances</div>
             <FInput label="Adresse *" value={form.adresse_vac} onChange={f("adresse_vac")} required />
             {step1Error && !form.adresse_vac && <div style={{ fontSize: 12, color: C.sunset, fontWeight: 700, marginTop: -10, marginBottom: 12 }}>⚠️ L'adresse de vacances est obligatoire</div>}
-            <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "0 12px" }}>
-              <div>
-                <FInput label="Ville *" value={form.ville_vac} onChange={f("ville_vac")} required />
-                {step1Error && !form.ville_vac && <div style={{ fontSize: 12, color: C.sunset, fontWeight: 700, marginTop: -10, marginBottom: 12 }}>⚠️ Obligatoire</div>}
-              </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "0 12px" }}>
               <div>
                 <FInput label="Code postal *" value={form.cp_vac} onChange={f("cp_vac")} required />
                 {form.cp_vac && !cpVacValid && <div style={{ fontSize: 12, color: C.sunset, fontWeight: 700, marginTop: -10, marginBottom: 12 }}>⚠️ 5 chiffres</div>}
+              </div>
+              <div>
+                <FInput label="Ville *" value={form.ville_vac} onChange={f("ville_vac")} required />
+                {step1Error && !form.ville_vac && <div style={{ fontSize: 12, color: C.sunset, fontWeight: 700, marginTop: -10, marginBottom: 12 }}>⚠️ Obligatoire</div>}
               </div>
             </div>
 
@@ -8243,4 +8243,4 @@ export default function App() {
     </div>
   );
 }
-// branding admin + adresse Sat Apr  4 21:01:28 CEST 2026
+// cp ville order Sat Apr  4 21:26:09 CEST 2026
