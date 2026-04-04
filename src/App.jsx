@@ -2906,6 +2906,7 @@ function InscriptionScreen({ onNav, setUser }) {
   const [newEnfant, setNewEnfant] = useState({ prenom: "", nom: "", naissance: "", activite: "club", niveau: "debutant", allergies: "" });
   const [done, setDone] = useState(false);
   const [step1Error, setStep1Error] = useState(false);
+  const [showCgvModal, setShowCgvModal] = useState(false);
   const f = k => v => setForm(p => ({ ...p, [k]: v }));
 
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email);
@@ -3051,12 +3052,17 @@ function InscriptionScreen({ onNav, setUser }) {
                 </div>
               )}
               <FInput label="Allergies / informations médicales" value={newEnfant.allergies} onChange={v => setNewEnfant(e => ({ ...e, allergies: v }))} placeholder="Aucune si vide" />
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 900, color: C.ocean, display: "block", marginBottom: 4 }}>👤 Personnes autorisées à récupérer l'enfant</label>
+                <div style={{ fontSize: 11, color: "#aaa", marginBottom: 6 }}>Autres que le responsable légal (prénom + nom + lien de parenté)</div>
+                <FInput placeholder="Ex : Marie Dupont (grand-mère), Paul Martin (oncle)…" value={newEnfant.personnesAutorisees || ""} onChange={v => setNewEnfant(e => ({ ...e, personnesAutorisees: v }))} />
+              </div>
               <SunBtn small color={C.sea} full onClick={() => {
                 if (newEnfant.prenom && newEnfant.nom && newEnfant.naissance) {
                   const age = calcAge(newEnfant.naissance);
                   if (age < 3) { alert("L'enfant doit avoir au moins 3 ans pour s'inscrire."); return; }
                   setForm(p => ({ ...p, enfants: [...p.enfants, { ...newEnfant, id: Date.now() }] }));
-                  setNewEnfant({ prenom: "", nom: "", naissance: "", activite: "club", niveau: "debutant", allergies: "" });
+                  setNewEnfant({ prenom: "", nom: "", naissance: "", activite: "club", niveau: "debutant", allergies: "", personnesAutorisees: "" });
                 }
               }}>+ Ajouter cet enfant</SunBtn>
             </div>
@@ -3117,6 +3123,30 @@ function InscriptionScreen({ onNav, setUser }) {
               <div style={{ color: "#666" }}>Diffusion : {form.droitDiffusion ? "✅ Autorisée" : "❌ Refusée"}</div>
             </div>
 
+            {/* Modale CGV inline */}
+            {showCgvModal && (
+              <div style={{ position:"fixed", inset:0, zIndex:1200, display:"flex", flexDirection:"column" }}>
+                <div onClick={() => setShowCgvModal(false)} style={{ position:"absolute", inset:0, background:"rgba(0,20,50,0.65)", backdropFilter:"blur(5px)" }} />
+                <div style={{ position:"relative", marginTop:"auto", background:"#fff", borderRadius:"28px 28px 0 0", maxHeight:"85vh", display:"flex", flexDirection:"column", boxShadow:"0 -12px 48px rgba(0,0,0,0.3)" }}>
+                  <div style={{ display:"flex", justifyContent:"center", padding:"12px 0 4px" }}>
+                    <div style={{ width:40, height:5, borderRadius:10, background:"#ddd" }} />
+                  </div>
+                  <div style={{ background:`linear-gradient(135deg,${C.ocean},${C.sea})`, margin:"0 16px", borderRadius:20, padding:"14px 18px", position:"relative" }}>
+                    <button onClick={() => setShowCgvModal(false)} style={{ position:"absolute", top:10, right:12, background:"rgba(255,255,255,0.25)", border:"none", color:"#fff", borderRadius:"50%", width:30, height:30, cursor:"pointer", fontWeight:900, fontSize:16, fontFamily:"inherit" }}>✕</button>
+                    <div style={{ color:"#fff", fontWeight:900, fontSize:17 }}>📄 Conditions Générales</div>
+                    <div style={{ color:"rgba(255,255,255,0.85)", fontSize:13 }}>Club de Plage FNCP · Saison 2026</div>
+                  </div>
+                  <div style={{ overflowY:"auto", padding:"16px 20px 32px", display:"flex", flexDirection:"column", gap:14, fontSize:14, color:"#555", lineHeight:1.7 }}>
+                    <div><strong style={{ color:C.dark }}>💶 Remboursement</strong><br/>Aucune prestation ne pourra être remboursée, excepté sur présentation d'une attestation médicale justifiant l'impossibilité de participer aux activités.</div>
+                    <div><strong style={{ color:C.dark }}>📋 Règlement Club de Plage</strong><br/>Respecter les consignes des animateurs · Prévoir un équipement adapté (casquette, gourde, serviette, maillot) · Pas de nourriture dans l'espace de jeux.</div>
+                    <div><strong style={{ color:C.dark }}>🏊 Règlement Natation</strong><br/>Arriver 5 min avant la séance · Enfants accompagnés jusqu'au bassin · Inscription préalable obligatoire.</div>
+                    <div><strong style={{ color:C.dark }}>📸 Droit à l'image</strong><br/>Des photos et/ou vidéos pourront être réalisées lors des séances à des fins de communication non commerciale, sous réserve de votre autorisation.</div>
+                    <SunBtn color={C.green} full onClick={() => { setForm(p => ({ ...p, cgvAccepted: true })); setShowCgvModal(false); }}>✅ J'accepte les conditions</SunBtn>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* CGV acceptance */}
             <div style={{ background: `${C.deep}08`, border: `1.5px solid ${C.deep}25`, borderRadius: 14, padding: 14, marginBottom: 14 }}>
               <div style={{ fontWeight: 800, color: C.deep, fontSize: 13, marginBottom: 8 }}>📄 Conditions Générales de Vente</div>
@@ -3128,7 +3158,7 @@ function InscriptionScreen({ onNav, setUser }) {
                   {form.cgvAccepted ? "✓" : ""}
                 </div>
                 <div style={{ fontSize: 12, color: "#555", lineHeight: 1.5 }}>
-                  J'ai lu et j'accepte les <span style={{ color: C.ocean, fontWeight: 700, cursor: "pointer" }} onClick={(e) => { e.stopPropagation(); onNav("infos"); }}>Conditions Générales de Vente</span> ainsi que le règlement intérieur du Club de Plage FNCP, et j'autorise la prise en charge de mon/mes enfant(s) dans le cadre des activités.
+                  J'ai lu et j'accepte les <span style={{ color: C.ocean, fontWeight: 700, cursor: "pointer" }} onClick={(e) => { e.stopPropagation(); setShowCgvModal(true); }}>Conditions Générales de Vente</span> ainsi que le règlement intérieur du Club de Plage FNCP, et j'autorise la prise en charge de mon/mes enfant(s) dans le cadre des activités.
                 </div>
               </div>
             </div>
@@ -3608,6 +3638,14 @@ function FicheEnfantModal({ enfant, onClose }) {
                   {(enfant.ville_vac || enfant.cp_vac) && <div style={{ fontSize:12, color:"#888" }}>{enfant.cp_vac} {enfant.ville_vac}</div>}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Personnes autorisées à récupérer */}
+          {enfant.personnes_autorisees && (
+            <div style={{ background:"#fff", borderRadius:16, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
+              <div style={{ fontWeight:800, color:"#2C3E50", fontSize:12, marginBottom:8, textTransform:"uppercase", letterSpacing:0.5 }}>👤 Personnes autorisées à récupérer l'enfant</div>
+              <div style={{ fontSize:14, color:"#555", lineHeight:1.6 }}>{enfant.personnes_autorisees}</div>
             </div>
           )}
 
@@ -6831,8 +6869,12 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
   // Montant club — Carte Liberté selon nb demi-j, sinon 0 (formule semaine payée globalement)
   const LIBERTE_PRIX = { 6:96, 12:180, 18:252, 24:288, 30:330 };
   const montantClub = (resas) => resas.reduce((s, r) => {
+    // Carte liberté
     const nb = Number(Array.isArray(r.enfants) ? r.enfants[0] : 0);
-    if (nb >= 6 && LIBERTE_PRIX[nb]) return s + LIBERTE_PRIX[nb]; // carte liberté
+    if (nb >= 6 && LIBERTE_PRIX[nb]) return s + LIBERTE_PRIX[nb];
+    // Montant encodé dans label_jour : [MONTANT:XX]
+    const match = (r.label_jour || "").match(/\[MONTANT:(\d+)\]/);
+    if (match) return s + Number(match[1]);
     return s + Number(r.montant || 0);
   }, 0);
 
@@ -7963,4 +8005,4 @@ export default function App() {
     </div>
   );
 }
-// adresses + prix nat + filtre photo Thu Apr  2 22:56:54 CEST 2026
+// 3 fixes Sat Apr  4 14:10:45 CEST 2026
