@@ -6742,16 +6742,14 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
                           <div style={{ display:"flex", gap:4, alignItems:"center" }}>
                             {r.statut === "pending" ? (
                               <button onClick={async () => {
-                                // Calculer le montant depuis label_jour ou enfants
                                 let montant = 0;
                                 const isLiberte = !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6;
                                 if (isLiberte) {
-                                  const LIBERTE_PRIX = { 6:96, 12:180, 18:252, 24:288, 30:330 };
-                                  montant = LIBERTE_PRIX[Number(r.enfants[0])] || 0;
+                                  const LP = { 6:96, 12:180, 18:252, 24:288, 30:330 };
+                                  montant = LP[Number(r.enfants[0])] || 0;
                                 } else {
                                   const match = (r.label_jour || "").match(/\[MONTANT:(\d+)\]/);
-                                  if (match) montant = Number(match[1]);
-                                  else montant = (r.enfants?.length || 1) * (r.session === "matin" || r.session === "apmidi" ? 20 : 40);
+                                  montant = match ? Number(match[1]) : 0;
                                 }
                                 await sb.from("reservations_club").update({ statut:"confirmed", validated_at:new Date().toISOString(), montant }).eq("id",r.id);
                                 refreshResas();
@@ -8018,4 +8016,4 @@ export default function App() {
     </div>
   );
 }
-// fix timezone Sat Apr  4 15:04:29 CEST 2026
+// fix montant club Sat Apr  4 15:11:59 CEST 2026
