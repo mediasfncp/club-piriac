@@ -8483,8 +8483,10 @@ function AdminCodeAccess({ onUnlock, user }) {
 
   return (
     <div style={{ marginTop: 24 }}>
-      <div onClick={handleOpen} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: 0.4, cursor: "pointer", padding: "8px" }}>
-        <span style={{ fontSize: 11, color: "#888", fontWeight: 700 }}>⚙️ Espace administrateur</span>
+      <div onClick={handleOpen} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "#f0f0f0", borderRadius: 12, padding: "10px 16px", cursor: "pointer", border: "1.5px solid #e0e0e0" }}>
+        <span style={{ fontSize: 14 }}>⚙️</span>
+        <span style={{ fontSize: 12, color: "#888", fontWeight: 800 }}>Espace administrateur</span>
+        <span style={{ fontSize: 12, color: "#ccc" }}>›</span>
       </div>
 
       {open && (
@@ -8707,4 +8709,4 @@ export default function App() {
     </div>
   );
 }
-// admin hidden Sat Apr  4 23:35:05 CEST 2026
+// admin btn visible Sat Apr  4 23:35:54 CEST 2026
