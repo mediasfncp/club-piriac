@@ -634,9 +634,9 @@ function HomeScreen({ onNav, user }) {
       <div style={{ background: "linear-gradient(160deg, #0099FF 0%, #00C9FF 55%, #4ECDC4 100%)", padding: "36px 22px 0", textAlign: "center", position: "relative", overflow: "hidden" }}>
         <div style={{ position: "relative", zIndex: 2 }}>
           <div style={{ display: "inline-block", background: "rgba(255,255,255,0.22)", backdropFilter: "blur(8px)", borderRadius: 50, padding: "4px 20px", marginBottom: 10, border: "2px solid rgba(255,255,255,0.4)" }}>
-            <span style={{ color: "#fff", fontSize: 18, fontWeight: 900, letterSpacing: 4, textTransform: "uppercase" }}>FNCP</span>
+            <span style={{ color: "#fff", fontSize: 14, fontWeight: 900, letterSpacing: 2, textTransform: "uppercase" }}>PIRIAC SUR MER</span>
           </div>
-          <h1 style={{ color: "#fff", fontSize: 29, margin: "6px 0 2px", fontWeight: 900, textShadow: "0 3px 14px rgba(0,0,0,0.22)", letterSpacing: -0.5 }}>Clubs de Plage</h1>
+          <h1 style={{ color: "#fff", fontSize: 29, margin: "6px 0 2px", fontWeight: 900, textShadow: "0 3px 14px rgba(0,0,0,0.22)", letterSpacing: -0.5 }}>Eole Beach Club</h1>
           <p style={{ color: "rgba(255,255,255,0.9)", fontSize: 14, margin: "0 0 2px", fontWeight: 700 }}>
             {user ? `Bonjour ${user.prenom} 👋` : "Club de plage · Natation · Soleil pour tous !"}
           </p>
@@ -655,7 +655,7 @@ function HomeScreen({ onNav, user }) {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 13, marginBottom: 13 }}>
           {[
             { screen: "formules",         emoji: "🎫", label: "Formules",              sub: "Club · Natation",           bg: `linear-gradient(135deg, #00C9FF, ${C.ocean})`,    sh: C.ocean },
-            { screen: "reservation",      emoji: "🏊", label: "Natation",              sub: "Dès 4 ans · Créneaux 30 min", bg: `linear-gradient(135deg, ${C.sea}, #00B09B)`,     sh: C.sea   },
+            { screen: "reservation",      emoji: "🏊", label: "École Natation",         sub: "Dès 4 ans · Créneaux 30 min", bg: `linear-gradient(135deg, ${C.sea}, #00B09B)`,     sh: C.sea   },
             { screen: "prestations",      emoji: "🏖️", label: "Club de Plage",        sub: "3 à 12 ans · Matin / AM", bg: `linear-gradient(135deg, ${C.coral}, ${C.sunset})`, sh: C.coral },
             { screen: "mes-reservations", emoji: "🎫", label: "Mes accès",             sub: "Saison 2026",                 bg: `linear-gradient(135deg, ${C.green}, #27AE60)`,    sh: C.green },
           ].map(item => (
@@ -8133,4 +8133,4 @@ export default function App() {
     </div>
   );
 }
-// responsive full + planning 2col Sat Apr  4 19:09:32 CEST 2026
+// branding Sat Apr  4 19:25:19 CEST 2026
