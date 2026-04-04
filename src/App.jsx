@@ -8676,8 +8676,8 @@ export default function App() {
               </div>
             </Card>
           )}
-          {/* Accès Admin — visible uniquement pour les admins */}
-          {user && ADMIN_EMAILS.includes(user.email?.toLowerCase()) && (
+          {/* Accès Admin — visible uniquement si connecté */}
+          {user?.supabaseId && (
             <AdminCodeAccess onUnlock={() => setScreen("admin")} user={user} />
           )}
         </div>
@@ -8709,4 +8709,4 @@ export default function App() {
     </div>
   );
 }
-// admin btn visible Sat Apr  4 23:35:54 CEST 2026
+// admin btn fix Sat Apr  4 23:38:20 CEST 2026
