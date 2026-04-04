@@ -3780,14 +3780,14 @@ function FicheEnfantModal({ enfant, onClose }) {
                 <div style={{ marginBottom:8 }}>
                   <div style={{ fontSize:10, fontWeight:900, color:C.ocean, textTransform:"uppercase", marginBottom:3 }}>🏠 Domicile</div>
                   <div style={{ fontSize:13, color:"#555" }}>{enfant.adresse}</div>
-                  {(enfant.ville || enfant.cp) && <div style={{ fontSize:12, color:"#888" }}>{enfant.cp} {enfant.ville}</div>}
+                  {(enfant.ville || enfant.cp) && <div style={{ fontSize:12, color:"#888" }}>{enfant.ville} {enfant.cp}</div>}
                 </div>
               )}
               {enfant.adresse_vac && (
                 <div style={{ borderTop: enfant.adresse ? "1px solid #f0f0f0" : "none", paddingTop: enfant.adresse ? 8 : 0 }}>
                   <div style={{ fontSize:10, fontWeight:900, color:C.coral, textTransform:"uppercase", marginBottom:3 }}>🏖️ Vacances</div>
                   <div style={{ fontSize:13, color:"#555" }}>{enfant.adresse_vac}</div>
-                  {(enfant.ville_vac || enfant.cp_vac) && <div style={{ fontSize:12, color:"#888" }}>{enfant.cp_vac} {enfant.ville_vac}</div>}
+                  {(enfant.ville_vac || enfant.cp_vac) && <div style={{ fontSize:12, color:"#888" }}>{enfant.ville_vac} {enfant.cp_vac}</div>}
                 </div>
               )}
             </div>
@@ -3885,13 +3885,13 @@ function FicheModal({ membre, onClose }) {
             <div style={{ marginBottom: 8 }}>
               <div style={{ fontSize:10, fontWeight:900, color:C.ocean, textTransform:"uppercase", marginBottom:3 }}>🏠 Domicile</div>
               <div style={{ fontSize: 13, color: "#555" }}>{membre.adresse || "—"}</div>
-              {(membre.ville || membre.cp) && <div style={{ fontSize: 12, color: "#888" }}>{membre.cp} {membre.ville}</div>}
+              {(membre.ville || membre.cp) && <div style={{ fontSize: 12, color: "#888" }}>{membre.ville} {membre.cp}</div>}
             </div>
             {(membre.adresse_vac || membre.ville_vac) && (
               <div style={{ borderTop:"1px solid #f0f0f0", paddingTop:8 }}>
                 <div style={{ fontSize:10, fontWeight:900, color:C.coral, textTransform:"uppercase", marginBottom:3 }}>🏖️ Vacances</div>
                 <div style={{ fontSize: 13, color: "#555" }}>{membre.adresse_vac || "—"}</div>
-                {(membre.ville_vac || membre.cp_vac) && <div style={{ fontSize: 12, color: "#888" }}>{membre.cp_vac} {membre.ville_vac}</div>}
+                {(membre.ville_vac || membre.cp_vac) && <div style={{ fontSize: 12, color: "#888" }}>{membre.ville_vac} {membre.cp_vac}</div>}
               </div>
             )}
           </div>
@@ -7127,7 +7127,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <BackBtn onNav={onNav} />
             <div>
-              <div style={{ color: "rgba(255,255,255,0.75)", fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>🏖️ FNCP</div>
+              <div style={{ color: "rgba(255,255,255,0.75)", fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase" }}>🏖️ EOLE BEACH CLUB · Piriac-sur-Mer</div>
               <h2 style={{ color: "#fff", margin: 0, fontWeight: 900, fontSize: 22 }}>Administration</h2>
             </div>
           </div>
@@ -8243,4 +8243,4 @@ export default function App() {
     </div>
   );
 }
-// fix club grouping v2 Sat Apr  4 20:57:37 CEST 2026
+// branding admin + adresse Sat Apr  4 21:01:28 CEST 2026
