@@ -8483,15 +8483,8 @@ function AdminCodeAccess({ onUnlock, user }) {
 
   return (
     <div style={{ marginTop: 24 }}>
-      <div onClick={handleOpen} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "linear-gradient(135deg, #0F2027, #203A43)", borderRadius: 20, padding: "14px 18px", cursor: "pointer", boxShadow: "0 4px 16px rgba(0,0,0,0.15)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 14, background: "rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>⚙️</div>
-          <div>
-            <div style={{ color: "#fff", fontWeight: 900, fontSize: 14 }}>Espace Administrateur</div>
-            <div style={{ color: "rgba(255,255,255,0.6)", fontSize: 11 }}>🔒 Accès réservé aux administrateurs</div>
-          </div>
-        </div>
-        <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 20 }}>›</div>
+      <div onClick={handleOpen} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: 0.4, cursor: "pointer", padding: "8px" }}>
+        <span style={{ fontSize: 11, color: "#888", fontWeight: 700 }}>⚙️ Espace administrateur</span>
       </div>
 
       {open && (
@@ -8712,4 +8705,4 @@ export default function App() {
     </div>
   );
 }
-// admin email 2 Sat Apr  4 23:29:51 CEST 2026
+// admin discret Sat Apr  4 23:31:55 CEST 2026
