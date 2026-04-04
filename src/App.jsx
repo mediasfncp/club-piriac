@@ -6908,6 +6908,7 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
                           <span style={{ fontWeight:800, color:C.dark, fontSize:12 }}>{r.heure}</span>
                           <span style={{ color:"#aaa", fontSize:11, marginLeft:6 }}>{r.date_seance ? new Date(r.date_seance).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}) : "—"}</span>
                           {r.enfants?.length > 0 && <span style={{ color:C.ocean, fontSize:10, marginLeft:6, fontWeight:700 }}>{enrichEnfants(r.enfants, r.membres).join(", ")}</span>}
+                          {r.created_at && <div style={{ fontSize:9, color:"#bbb", marginTop:2 }}>Envoyé le {new Date(r.created_at).toLocaleDateString("fr-FR",{day:"numeric",month:"short",year:"numeric"})}</div>}
                         </div>
                         <div style={{ display:"flex", gap:4, alignItems:"center" }}>
                           {r.statut === "pending" ? (
@@ -6937,6 +6938,7 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
                             </span>
                             <span style={{ color:"#aaa", fontSize:11, marginLeft:6 }}>{r.date_reservation ? new Date(r.date_reservation).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}) : "—"}</span>
                             {r.enfants?.length > 0 && !isLiberte && <span style={{ color:C.coral, fontSize:10, marginLeft:6, fontWeight:700 }}>{enrichEnfants(r.enfants, r.membres).join(", ")}</span>}
+                            {r.created_at && <div style={{ fontSize:9, color:"#bbb", marginTop:2 }}>Envoyé le {new Date(r.created_at).toLocaleDateString("fr-FR",{day:"numeric",month:"short",year:"numeric"})}</div>}
                           </div>
                           <div style={{ display:"flex", gap:4, alignItems:"center" }}>
                             {r.statut === "pending" ? (
@@ -7461,6 +7463,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                                 {g.type === "natation" ? `🏊 Natation · ${g.resas.length} séance${g.resas.length>1?"s":""}` : g.resas.some(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6) ? `🎟️ Carte Liberté · ${Number(g.resas[0]?.enfants?.[0])} demi-journées` : `🏖️ Club · ${g.resas.length} séance${g.resas.length>1?"s":""}`}
                               </div>
                               {g.membre?.email && <div style={{ fontSize:10, color:"#bbb", marginTop:2 }}>{g.membre.email}</div>}
+                              {g.resas[0]?.created_at && <div style={{ fontSize:10, color:"#bbb", marginTop:1 }}>📅 Envoyé le {new Date(g.resas[0].created_at).toLocaleDateString("fr-FR",{day:"numeric",month:"short",year:"numeric"})}</div>}
                             </div>
                             <button onClick={async () => {
                               const table = g.type === "natation" ? "reservations_natation" : "reservations_club";
@@ -8243,4 +8246,4 @@ export default function App() {
     </div>
   );
 }
-// cp ville order Sat Apr  4 21:26:09 CEST 2026
+// date envoi resa Sat Apr  4 21:32:22 CEST 2026
