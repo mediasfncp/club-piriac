@@ -6741,7 +6741,21 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
                           </div>
                           <div style={{ display:"flex", gap:4, alignItems:"center" }}>
                             {r.statut === "pending" ? (
-                              <button onClick={async () => { await sb.from("reservations_club").update({statut:"confirmed", validated_at:new Date().toISOString()}).eq("id",r.id); refreshResas(); }}
+                              <button onClick={async () => {
+                                // Calculer le montant depuis label_jour ou enfants
+                                let montant = 0;
+                                const isLiberte = !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6;
+                                if (isLiberte) {
+                                  const LIBERTE_PRIX = { 6:96, 12:180, 18:252, 24:288, 30:330 };
+                                  montant = LIBERTE_PRIX[Number(r.enfants[0])] || 0;
+                                } else {
+                                  const match = (r.label_jour || "").match(/\[MONTANT:(\d+)\]/);
+                                  if (match) montant = Number(match[1]);
+                                  else montant = (r.enfants?.length || 1) * (r.session === "matin" || r.session === "apmidi" ? 20 : 40);
+                                }
+                                await sb.from("reservations_club").update({ statut:"confirmed", validated_at:new Date().toISOString(), montant }).eq("id",r.id);
+                                refreshResas();
+                              }}
                                 style={{ background:C.green, border:"none", color:"#fff", borderRadius:8, padding:"3px 8px", cursor:"pointer", fontWeight:900, fontSize:10, fontFamily:"inherit" }}>✅</button>
                             ) : <span style={{ fontSize:10, color:C.green, fontWeight:800 }}>✓</span>}
                             <button onClick={() => setModifierResa({ resa: r, type:"club" })}
@@ -6866,16 +6880,14 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
     }, 0);
   };
 
-  // Montant club — Carte Liberté selon nb demi-j, sinon 0 (formule semaine payée globalement)
   const LIBERTE_PRIX = { 6:96, 12:180, 18:252, 24:288, 30:330 };
   const montantClub = (resas) => resas.reduce((s, r) => {
-    // Carte liberté
+    if (r.montant) return s + Number(r.montant); // montant stocké à la validation
     const nb = Number(Array.isArray(r.enfants) ? r.enfants[0] : 0);
     if (nb >= 6 && LIBERTE_PRIX[nb]) return s + LIBERTE_PRIX[nb];
-    // Montant encodé dans label_jour : [MONTANT:XX]
     const match = (r.label_jour || "").match(/\[MONTANT:(\d+)\]/);
     if (match) return s + Number(match[1]);
-    return s + Number(r.montant || 0);
+    return s;
   }, 0);
 
   const realTotal = montantNat(confirmedNatToday) + montantClub(confirmedClubToday);
@@ -8005,4 +8017,4 @@ export default function App() {
     </div>
   );
 }
-// fix encaissement Sat Apr  4 14:48:57 CEST 2026
+// montant club Sat Apr  4 14:55:07 CEST 2026
