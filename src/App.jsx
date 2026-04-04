@@ -6712,7 +6712,7 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
                         </div>
                         <div style={{ display:"flex", gap:4, alignItems:"center" }}>
                           {r.statut === "pending" ? (
-                            <button onClick={async () => { await sb.from("reservations_natation").update({statut:"confirmed"}).eq("id",r.id); refreshResas(); }}
+                            <button onClick={async () => { await sb.from("reservations_natation").update({statut:"confirmed", validated_at:new Date().toISOString()}).eq("id",r.id); refreshResas(); }}
                               style={{ background:C.green, border:"none", color:"#fff", borderRadius:8, padding:"3px 8px", cursor:"pointer", fontWeight:900, fontSize:10, fontFamily:"inherit" }}>✅</button>
                           ) : <span style={{ fontSize:10, color:C.green, fontWeight:800 }}>✓</span>}
                           <button onClick={() => setModifierResa({ resa: r, type:"natation" })}
@@ -6741,7 +6741,7 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
                           </div>
                           <div style={{ display:"flex", gap:4, alignItems:"center" }}>
                             {r.statut === "pending" ? (
-                              <button onClick={async () => { await sb.from("reservations_club").update({statut:"confirmed"}).eq("id",r.id); refreshResas(); }}
+                              <button onClick={async () => { await sb.from("reservations_club").update({statut:"confirmed", validated_at:new Date().toISOString()}).eq("id",r.id); refreshResas(); }}
                                 style={{ background:C.green, border:"none", color:"#fff", borderRadius:8, padding:"3px 8px", cursor:"pointer", fontWeight:900, fontSize:10, fontFamily:"inherit" }}>✅</button>
                             ) : <span style={{ fontSize:10, color:C.green, fontWeight:800 }}>✓</span>}
                             <button onClick={() => setModifierResa({ resa: r, type:"club" })}
@@ -6847,8 +6847,8 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
   const todayISO = new Date().toISOString().slice(0,10);
   const confirmedNat  = dbResas.filter(r => r.statut === "confirmed");
   const confirmedClub = dbResasClub.filter(r => r.statut === "confirmed");
-  const confirmedNatToday  = dbResas.filter(r => r.statut === "confirmed" && r.date_seance?.slice(0,10) === todayISO);
-  const confirmedClubToday = dbResasClub.filter(r => r.statut === "confirmed" && r.date_reservation?.slice(0,10) === todayISO);
+  const confirmedNatToday  = dbResas.filter(r => r.statut === "confirmed" && r.validated_at?.slice(0,10) === todayISO);
+  const confirmedClubToday = dbResasClub.filter(r => r.statut === "confirmed" && r.validated_at?.slice(0,10) === todayISO);
 
   // Montant natation selon forfait (groupé par membre+date_creation)
   const montantNat = (resas) => {
@@ -7095,7 +7095,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                             </div>
                             <button onClick={async () => {
                               const table = g.type === "natation" ? "reservations_natation" : "reservations_club";
-                              await Promise.all(g.resas.map(r => sb.from(table).update({ statut:"confirmed" }).eq("id", r.id)));
+                              await Promise.all(g.resas.map(r => sb.from(table).update({ statut:"confirmed", validated_at:new Date().toISOString() }).eq("id", r.id)));
                               // Achat carte liberté → créditer solde
                               if (g.type === "club" && g.resas.some(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6)) {
                                 const r0 = g.resas[0];
@@ -7237,7 +7237,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                             </div>
                             <button onClick={async () => {
                               const table = g.type === "natation" ? "reservations_natation" : "reservations_club";
-                              await Promise.all(g.resas.map(r => sb.from(table).update({ statut:"confirmed" }).eq("id", r.id)));
+                              await Promise.all(g.resas.map(r => sb.from(table).update({ statut:"confirmed", validated_at:new Date().toISOString() }).eq("id", r.id)));
                               // Achat carte liberté → créditer
                               if (g.type === "club" && g.resas.some(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6)) {
                                 const r0 = g.resas[0];
@@ -8005,4 +8005,4 @@ export default function App() {
     </div>
   );
 }
-// fix encaissement club Sat Apr  4 14:28:44 CEST 2026
+// validated_at Sat Apr  4 14:38:29 CEST 2026
