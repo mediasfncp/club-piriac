@@ -655,8 +655,8 @@ function HomeScreen({ onNav, user }) {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 13, marginBottom: 13 }}>
           {[
             { screen: "formules",         emoji: "🎫", label: "Formules",              sub: "Club · Natation",           bg: `linear-gradient(135deg, #00C9FF, ${C.ocean})`,    sh: C.ocean },
-            { screen: "reservation",      emoji: "🏊", label: "Réserver",              sub: "Créneaux 30 min",            bg: `linear-gradient(135deg, ${C.sea}, #00B09B)`,      sh: C.sea   },
-            { screen: "prestations",      emoji: "🏖️", label: "Club de Plage",        sub: "Demi-journée matin / après-midi", bg: `linear-gradient(135deg, ${C.coral}, ${C.sunset})`, sh: C.coral },
+            { screen: "reservation",      emoji: "🏊", label: "Natation",              sub: "Dès 4 ans · Créneaux 30 min", bg: `linear-gradient(135deg, ${C.sea}, #00B09B)`,     sh: C.sea   },
+            { screen: "prestations",      emoji: "🏖️", label: "Club de Plage",        sub: "3 à 12 ans · Matin / AM", bg: `linear-gradient(135deg, ${C.coral}, ${C.sunset})`, sh: C.coral },
             { screen: "mes-reservations", emoji: "🎫", label: "Mes accès",             sub: "Saison 2026",                 bg: `linear-gradient(135deg, ${C.green}, #27AE60)`,    sh: C.green },
           ].map(item => (
             <div key={item.screen} onClick={() => onNav(item.screen)}
@@ -754,7 +754,7 @@ function FormulesChoixScreen({ onNav }) {
           <div style={{ fontSize: 36, flexShrink: 0 }}>🌊</div>
           <div style={{ flex: 1 }}>
             <div style={{ color: "#fff", fontWeight: 900, fontSize: 16, marginBottom: 2 }}>Éveil Aquatique</div>
-            <div style={{ color: "rgba(255,255,255,0.8)", fontSize: 12 }}>Séances de 30 min · Chaque dimanche</div>
+            <div style={{ color: "rgba(255,255,255,0.8)", fontSize: 12 }}>2 à 5 ans · Séances 30 min · Chaque dimanche</div>
             <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
               <div style={{ background: "rgba(255,255,255,0.2)", borderRadius: 50, padding: "3px 12px", color: "#fff", fontSize: 11, fontWeight: 900 }}>20 € / séance</div>
             </div>
@@ -1092,7 +1092,7 @@ function FormulesNatationScreen({ onNav, user, allSeasonSessions, panier, setPan
 
   const toggleEnfant = (prenom) => {
     setSelectedEnfants(prev => prev.includes(prenom) ? prev.filter(e => e !== prenom) : [...prev, prenom]);
-    setSelectedCreneaux([]); // reset créneaux si changement d'enfants
+    // Ne pas reset les créneaux quand on change la sélection d'enfants
   };
 
   const toggleCreneau = (dayISO, time, dayId) => {
@@ -2104,44 +2104,67 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser, pa
                   </div>
                 </div>
 
-                <div style={{ display:"flex", gap:8 }}>
-                  <button onClick={() => setStep("dates")} style={{ flex:1, background:"#f0f0f0", border:"none", color:"#888", borderRadius:14, padding:"11px", cursor:"pointer", fontWeight:800, fontFamily:"inherit" }}>← Dates</button>
-                  <SunBtn color={tarifData.color} onClick={async () => {
-                    // Créer résas en statut "pending"
-                    try {
-                      for (const iso of selectedDates) {
-                        await creerReservationClub({
-                          membreId: user?.supabaseId || null,
-                          dateReservation: iso,
-                          session: formulType === "journee" ? "matin" : formulType,
-                          labelJour: `[MONTANT:${Math.round(selectedRow.price / selectedDates.length)}] ${new Date(iso).toLocaleDateString("fr-FR", {weekday:"long",day:"numeric",month:"long"})}`,
-                          rappelDate: null,
-                          enfants: selectedEnfantsClub.length > 0 ? selectedEnfantsClub : (user?.enfants||[]).filter(e => e.activite==="club"||e.activite==="les deux").map(e=>e.prenom),
-                          statut: "pending",
-                        });
-                      }
-                    } catch(e) { console.warn(e); }
-                    if (setClubPlaces) setClubPlaces(prev => ({ ...prev, [formulType]: Math.max(0, (prev[formulType]||45) - nbEnfants) }));
-                    setDone("club");
-                  }}>📨 Envoyer la demande · {selectedRow.price} €</SunBtn>
-                  {setPanier && selectedDates.length > 0 && (
-                    <button onClick={() => {
-                      setPanier(prev => [...prev, {
-                        id: `club-${Date.now()}`,
-                        type: "club",
-                        label: `Club · ${formulType==="journee"?"Journée":formulType==="matin"?"☀️ Matin":"🌊 Après-midi"} · ${selectedRow?.label||""}`,
-                        emoji: "🏖️",
-                        color: C.coral,
-                        prix: selectedRow?.price || 0,
-                        enfants: selectedEnfantsClub,
-                        session: formulType, // journee | matin | apmidi
-                        dates: selectedDates,
-                        details: `${selectedDates.length} jour${selectedDates.length>1?"s":""}`,
-                      }]);
+                <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                  <button onClick={() => setStep("dates")} style={{ background:"#f0f0f0", border:"none", color:"#888", borderRadius:14, padding:"11px", cursor:"pointer", fontWeight:800, fontFamily:"inherit" }}>← Dates</button>
+                  {setPanier && selectedDates.length > 0 ? (
+                    <>
+                      <button onClick={() => {
+                        if (!selectedEnfantsClub.length) { alert("Veuillez sélectionner au moins un enfant."); return; }
+                        setPanier(prev => [...prev, {
+                          id: `club-${Date.now()}`,
+                          type: "club",
+                          label: `Club · ${formulType==="journee"?"Journée":formulType==="matin"?"☀️ Matin":"🌊 Après-midi"} · ${selectedRow?.label||""}`,
+                          emoji: "🏖️",
+                          color: C.coral,
+                          prix: selectedRow?.price || 0,
+                          enfants: selectedEnfantsClub,
+                          session: formulType,
+                          dates: selectedDates,
+                          details: `${selectedDates.length} jour${selectedDates.length>1?"s":""}`,
+                        }]);
+                        setDone("club");
+                      }} style={{ background:`linear-gradient(135deg,${C.coral},${C.sun})`, border:"none", color:"#fff", borderRadius:14, padding:"14px", cursor:"pointer", fontWeight:900, fontSize:14, fontFamily:"inherit", boxShadow:`0 4px 14px ${C.coral}44` }}>
+                        🛒 Ajouter au panier · {selectedRow?.price} €
+                      </button>
+                      <button onClick={async () => {
+                        if (!selectedEnfantsClub.length) { alert("Veuillez sélectionner au moins un enfant."); return; }
+                        try {
+                          for (const iso of selectedDates) {
+                            await creerReservationClub({
+                              membreId: user?.supabaseId || null,
+                              dateReservation: iso,
+                              session: formulType === "journee" ? "matin" : formulType,
+                              labelJour: `[MONTANT:${Math.round(selectedRow.price / selectedDates.length)}] ${new Date(iso).toLocaleDateString("fr-FR", {weekday:"long",day:"numeric",month:"long"})}`,
+                              rappelDate: null,
+                              enfants: selectedEnfantsClub,
+                              statut: "pending",
+                            });
+                          }
+                        } catch(e) { console.warn(e); }
+                        if (setClubPlaces) setClubPlaces(prev => ({ ...prev, [formulType]: Math.max(0, (prev[formulType]||45) - nbEnfants) }));
+                        setDone("club");
+                      }} style={{ background:"transparent", border:`2px solid ${tarifData.color}`, color:tarifData.color, borderRadius:14, padding:"10px", cursor:"pointer", fontWeight:800, fontSize:12, fontFamily:"inherit" }}>
+                        📨 Envoyer directement
+                      </button>
+                    </>
+                  ) : (
+                    <SunBtn color={tarifData.color} onClick={async () => {
+                      try {
+                        for (const iso of selectedDates) {
+                          await creerReservationClub({
+                            membreId: user?.supabaseId || null,
+                            dateReservation: iso,
+                            session: formulType === "journee" ? "matin" : formulType,
+                            labelJour: `[MONTANT:${Math.round(selectedRow.price / selectedDates.length)}] ${new Date(iso).toLocaleDateString("fr-FR", {weekday:"long",day:"numeric",month:"long"})}`,
+                            rappelDate: null,
+                            enfants: selectedEnfantsClub.length > 0 ? selectedEnfantsClub : (user?.enfants||[]).filter(e => e.activite==="club"||e.activite==="les deux").map(e=>e.prenom),
+                            statut: "pending",
+                          });
+                        }
+                      } catch(e) { console.warn(e); }
+                      if (setClubPlaces) setClubPlaces(prev => ({ ...prev, [formulType]: Math.max(0, (prev[formulType]||45) - nbEnfants) }));
                       setDone("club");
-                    }} style={{ width:"100%", marginTop:8, background:`linear-gradient(135deg,${C.sun},${C.coral})`, border:"none", color:"#fff", borderRadius:14, padding:"11px", cursor:"pointer", fontWeight:900, fontSize:13, fontFamily:"inherit" }}>
-                      🛒 Ajouter au panier
-                    </button>
+                    }}>📨 Envoyer la demande · {selectedRow.price} €</SunBtn>
                   )}
                 </div>
               </Card>
@@ -2399,7 +2422,7 @@ function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSession
           <div style={{ display:"grid", gridTemplateColumns:"auto 1fr", gap:"6px 12px", fontSize:14 }}>
             <span style={{ color:"#aaa" }}>Nom</span><strong>{user?.prenom} {NOM(user?.nom)}</strong>
             <span style={{ color:"#aaa" }}>Email</span><span>{user?.email||"—"}</span>
-            <span style={{ color:"#aaa" }}>Tél.</span><span>{user?.tel||"—"}</span>
+            <span style={{ color:"#aaa" }}>Tél.</span><span><a href={`tel:${user?.tel}`} style={{ color:"inherit", textDecoration:"none" }}>{user?.tel||"—"}</a></span>
           </div>
         </Card>
 
@@ -2457,17 +2480,24 @@ function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSession
           <div style={{ fontSize:11, color:"#aaa", marginTop:8, fontStyle:"italic" }}>Votre accès sera activé à réception du paiement.</div>
         </div>
 
-        <div style={{ display:"flex", gap:8 }}>
-          {setPanier && (
-            <button onClick={handlePanier} style={{
-              flex:1, background:`linear-gradient(135deg,${C.sun},${C.coral})`,
-              border:"none", color:"#fff", borderRadius:14, padding:"12px",
-              cursor:"pointer", fontWeight:900, fontSize:13, fontFamily:"inherit",
-            }}>
-              🛒 Panier · {prixSeance} €
-            </button>
+        <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+          {setPanier ? (
+            <>
+              <button onClick={handlePanier} style={{
+                background:`linear-gradient(135deg,${C.ocean},${C.sea})`,
+                border:"none", color:"#fff", borderRadius:14, padding:"14px",
+                cursor:"pointer", fontWeight:900, fontSize:14, fontFamily:"inherit",
+                boxShadow:`0 4px 14px ${C.ocean}44`,
+              }}>
+                🛒 Ajouter au panier · {prixSeance} €
+              </button>
+              <button onClick={handleConfirm} style={{ background:"transparent", border:`2px solid ${C.green}`, color:C.green, borderRadius:14, padding:"10px", cursor:"pointer", fontWeight:800, fontSize:12, fontFamily:"inherit" }}>
+                📨 Envoyer directement
+              </button>
+            </>
+          ) : (
+            <SunBtn color={C.green} full onClick={handleConfirm}>📨 Envoyer · {prixSeance} €</SunBtn>
           )}
-          <SunBtn color={C.green} full onClick={handleConfirm}>📨 Envoyer · {prixSeance} €</SunBtn>
         </div>
       </div>
     </div>
@@ -2514,7 +2544,7 @@ function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSession
           <div style={{ display:"grid", gridTemplateColumns:"auto 1fr", gap:"6px 12px", fontSize:14 }}>
             <span style={{ color:"#aaa" }}>Nom</span><strong>{user?.prenom} {NOM(user?.nom)}</strong>
             <span style={{ color:"#aaa" }}>Email</span><span>{user?.email||"—"}</span>
-            <span style={{ color:"#aaa" }}>Tél.</span><span>{user?.tel||"—"}</span>
+            <span style={{ color:"#aaa" }}>Tél.</span><span><a href={`tel:${user?.tel}`} style={{ color:"inherit", textDecoration:"none" }}>{user?.tel||"—"}</a></span>
           </div>
         </Card>
         {user?.enfants?.length > 0 && (
@@ -2907,7 +2937,7 @@ function LoginScreen({ onNav, setUser }) {
 function InscriptionScreen({ onNav, setUser }) {
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({ prenom: "", nom: "", email: "", tel: "", tel2: "", adresse: "", ville: "", cp: "", adresse_vac: "", ville_vac: "", cp_vac: "", enfants: [], droitImage: false, droitDiffusion: false });
-  const [newEnfant, setNewEnfant] = useState({ prenom: "", nom: "", naissance: "", activite: "club", niveau: "debutant", allergies: "" });
+  const [newEnfant, setNewEnfant] = useState({ prenom: "", nom: "", naissance: "", sexe: "", activite: "club", niveau: "debutant", allergies: "" });
   const [done, setDone] = useState(false);
   const [step1Error, setStep1Error] = useState(false);
   const [showCgvModal, setShowCgvModal] = useState(false);
@@ -3037,6 +3067,18 @@ function InscriptionScreen({ onNav, setUser }) {
                 <FInput label="Nom" value={newEnfant.nom} onChange={v => setNewEnfant(e => ({ ...e, nom: v }))} required />
               </div>
               <FInput label="Date de naissance" type="date" value={newEnfant.naissance} onChange={v => setNewEnfant(e => ({ ...e, naissance: v }))} required />
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 900, color: C.deep, display: "block", marginBottom: 6, letterSpacing: 0.5, textTransform: "uppercase" }}>Sexe</label>
+                <div style={{ display: "flex", gap: 8 }}>
+                  {[["M","👦 Garçon"],["F","👧 Fille"]].map(([val, label]) => (
+                    <div key={val} onClick={() => setNewEnfant(e => ({ ...e, sexe: val }))} style={{ flex:1, textAlign:"center", padding:"10px 6px", borderRadius:14, cursor:"pointer", fontWeight:800, fontSize:13,
+                      background: newEnfant.sexe === val ? (val === "M" ? C.green : "#9B59B6") : "#f0f0f0",
+                      color: newEnfant.sexe === val ? "#fff" : "#888",
+                      border: `2px solid ${newEnfant.sexe === val ? (val === "M" ? C.green : "#9B59B6") : "transparent"}`,
+                      transition:"all .15s" }}>{label}</div>
+                  ))}
+                </div>
+              </div>
               <div style={{ marginBottom: 12 }}>
                 <label style={{ fontSize: 12, fontWeight: 900, color: C.deep, display: "block", marginBottom: 6, letterSpacing: 0.5, textTransform: "uppercase" }}>Activité</label>
                 <div style={{ display: "flex", gap: 8 }}>
@@ -3066,7 +3108,7 @@ function InscriptionScreen({ onNav, setUser }) {
                   const age = calcAge(newEnfant.naissance);
                   if (age < 3) { alert("L'enfant doit avoir au moins 3 ans pour s'inscrire."); return; }
                   setForm(p => ({ ...p, enfants: [...p.enfants, { ...newEnfant, id: Date.now() }] }));
-                  setNewEnfant({ prenom: "", nom: "", naissance: "", activite: "club", niveau: "debutant", allergies: "", personnesAutorisees: "" });
+                  setNewEnfant({ prenom: "", nom: "", naissance: "", sexe: "", activite: "club", niveau: "debutant", allergies: "", personnesAutorisees: "" });
                 }
               }}>+ Ajouter cet enfant</SunBtn>
             </div>
@@ -3586,7 +3628,7 @@ const MEMBRES = [
 // ── FICHE ENFANT ──────────────────────────────────────────
 function FicheEnfantModal({ enfant, onClose }) {
   const age = calcAge(enfant.naissance);
-  const actColor = enfant.activite === "natation" ? C.ocean : enfant.activite === "club" ? C.coral : "#9B59B6";
+  const actColor = enfant.sexe === "F" ? "#9B59B6" : enfant.sexe === "M" ? C.green : enfant.activite === "natation" ? C.ocean : enfant.activite === "club" ? C.coral : "#9B59B6";
   const actLabel = enfant.activite === "natation" ? "🏊 Natation" : enfant.activite === "club" ? "🏖️ Club de Plage" : "🏊🏖️ Natation & Club";
   return (
     <div style={{ position:"fixed", inset:0, zIndex:1100, display:"flex", flexDirection:"column" }}>
@@ -3615,12 +3657,13 @@ function FicheEnfantModal({ enfant, onClose }) {
             <div style={{ display:"grid", gridTemplateColumns:"auto 1fr", gap:"8px 16px", fontSize:14 }}>
               <span style={{ color:"#aaa" }}>Naissance</span>
               <span style={{ fontWeight:700, color:"#2C3E50" }}>{enfant.naissance ? new Date(enfant.naissance).toLocaleDateString("fr-FR") : "—"} ({age} ans)</span>
+              {enfant.sexe && <><span style={{ color:"#aaa" }}>Sexe</span><span style={{ fontWeight:700, color: enfant.sexe==="F"?"#9B59B6":C.green }}>{enfant.sexe==="F"?"👧 Fille":"👦 Garçon"}</span></>}
               <span style={{ color:"#aaa" }}>Activité</span>
               <span style={{ fontWeight:700, color:actColor }}>{actLabel}</span>
               {enfant.activite !== "club" && <><span style={{ color:"#aaa" }}>Niveau</span><span style={{ fontWeight:700, color:C.sea }}>{enfant.niveau || "—"}</span></>}
               <span style={{ color:"#aaa" }}>Parent</span>
               <span style={{ fontWeight:700, color:"#2C3E50" }}>{enfant.parent || "—"}</span>
-              {enfant.parentPhone && <><span style={{ color:"#aaa" }}>Téléphone</span><span style={{ fontWeight:700, color:"#2C3E50" }}>{enfant.parentPhone}</span></>}
+              {enfant.parentPhone && <><span style={{ color:"#aaa" }}>Téléphone</span><span style={{ fontWeight:700, color:"#2C3E50" }}><a href={`tel:${enfant.parentPhone}`} style={{ color:"inherit", textDecoration:"none" }}>📞 {enfant.parentPhone}</a></span></>}
             </div>
           </div>
 
@@ -3726,7 +3769,7 @@ function FicheModal({ membre, onClose }) {
             <div>
               <div style={{ color: "#fff", fontWeight: 900, fontSize: 18 }}>{membre.name}</div>
               <div style={{ color: "rgba(255,255,255,0.8)", fontSize: 13 }}>{membre.email}</div>
-              <div style={{ color: "rgba(255,255,255,0.8)", fontSize: 13 }}>📞 {membre.phone}</div>
+              <div style={{ color: "rgba(255,255,255,0.8)", fontSize: 13 }}>📞 <a href={`tel:${membre.phone}`} style={{ color:"inherit", textDecoration:"none" }}>{membre.phone}</a></div>
             </div>
           </div>
         </div>
@@ -4018,6 +4061,7 @@ function AjouterEnfantModal({ membre, onClose, onSaved }) {
   const [prenom, setPrenom]     = useState("");
   const [nom, setNom]           = useState("");
   const [naissance, setNaissance] = useState("");
+  const [sexe, setSexe]         = useState("");
   const [activite, setActivite] = useState("club");
   const [niveau, setNiveau]     = useState("debutant");
   const [allergies, setAllergies] = useState("");
@@ -4028,7 +4072,7 @@ function AjouterEnfantModal({ membre, onClose, onSaved }) {
     if (!prenom || !nom || !naissance) { setError("Prénom, nom et date de naissance sont requis."); return; }
     setSaving(true);
     try {
-      await creerEnfants(membre.id, [{ prenom, nom, naissance, activite, niveau, allergies }]);
+      await creerEnfants(membre.id, [{ prenom, nom, naissance, sexe, activite, niveau, allergies }]);
       onSaved();
       onClose();
     } catch(e) {
@@ -4066,6 +4110,14 @@ function AjouterEnfantModal({ membre, onClose, onSaved }) {
             <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:4, textTransform:"uppercase" }}>Date de naissance *</label>
             <input type="date" value={naissance} onChange={e => setNaissance(e.target.value)}
               style={{ width:"100%", border:`2px solid #e0e8f0`, borderRadius:12, padding:"10px 12px", fontSize:14, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+          </div>
+          <div>
+            <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, textTransform:"uppercase" }}>Sexe</label>
+            <div style={{ display:"flex", gap:8 }}>
+              {[["M","👦 Garçon"],["F","👧 Fille"]].map(([val, label]) => (
+                <button key={val} onClick={() => setSexe(val)} style={{ flex:1, background: sexe===val?(val==="M"?C.green:"#9B59B6"):"#f0f0f0", color: sexe===val?"#fff":"#888", border:"none", borderRadius:12, padding:"9px", cursor:"pointer", fontWeight:800, fontSize:12, fontFamily:"inherit" }}>{label}</button>
+              ))}
+            </div>
           </div>
           <div>
             <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, textTransform:"uppercase" }}>Activité</label>
@@ -5313,7 +5365,7 @@ th{background:#1A8FE3;color:#fff;padding:10px 12px;text-align:left}
             boxShadow: `0 4px 14px ${C.ocean}44`,
           }}>🖨️ Imprimer la semaine</button>
 
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:10 }}>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(140px, 1fr))", gap:10 }}>
           {currentWeek.map(d => {
             const slots = getNataSlots(d.id);
             const dateISO = d.date ? `${d.date.getFullYear()}-${String(d.date.getMonth()+1).padStart(2,"0")}-${String(d.date.getDate()).padStart(2,"0")}` : "";
@@ -5428,7 +5480,7 @@ th{background:#1A8FE3;color:#fff;padding:10px 12px;text-align:left}
           {/* En-tête semaine avec totaux */}
           <div style={{ background: "#fff", borderRadius: 20, overflow: "hidden", boxShadow: "0 4px 16px rgba(0,0,0,0.06)" }}>
             {/* Header */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", background: "#F0F4F8", padding: "10px 16px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", background: "#F0F4F8", padding: "10px 16px" }}>
               <div style={{ fontSize: 11, fontWeight: 900, color: "#aaa" }}>JOUR</div>
               <div style={{ fontSize: 11, fontWeight: 900, color: C.coral, textAlign: "center" }}>☀️ MATIN</div>
               <div style={{ fontSize: 11, fontWeight: 900, color: C.ocean, textAlign: "center" }}>🌊 APRÈS-MIDI</div>
@@ -5437,7 +5489,7 @@ th{background:#1A8FE3;color:#fff;padding:10px 12px;text-align:left}
               const placesM = getPlacesClub(d.id, "matin");
               const placesA = getPlacesClub(d.id, "apmidi");
               return (
-              <div key={d.id} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", padding: "12px 16px", borderTop: i > 0 ? "1px solid #F0F4F8" : "none", alignItems: "center" }}>
+              <div key={d.id} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", padding: "12px 16px", borderTop: i > 0 ? "1px solid #F0F4F8" : "none", alignItems: "center" }}>
                 <div style={{ cursor: "pointer" }} onClick={() => { setModalDay(d); setModalSession(null); }}>
                   <div style={{ fontWeight: 900, color: C.dark, fontSize: 13 }}>{d.label} {d.num}</div>
                   <div style={{ fontSize: 10, color: "#bbb" }}>{d.month}</div>
@@ -5456,7 +5508,7 @@ th{background:#1A8FE3;color:#fff;padding:10px 12px;text-align:left}
               </div>
             );})}
             {/* Totaux semaine */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", padding: "12px 16px", background: "#F8FBFF", borderTop: "2px solid #EEF5FF" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", padding: "12px 16px", background: "#F8FBFF", borderTop: "2px solid #EEF5FF" }}>
               <div style={{ fontSize: 12, fontWeight: 900, color: "#2C3E50" }}>SEMAINE</div>
               {["matin","apmidi"].map((sess, si) => {
                 const totalInscrits = currentWeek.reduce((acc, d) => acc + (45 - getPlacesClub(d.id, sess)), 0);
@@ -7128,7 +7180,18 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                             </div>
                             <button onClick={async () => {
                               const table = g.type === "natation" ? "reservations_natation" : "reservations_club";
-                              await Promise.all(g.resas.map(r => sb.from(table).update({ statut:"confirmed", validated_at:new Date().toISOString() }).eq("id", r.id)));
+                              if (g.type === "club") {
+                                const LIBERTE_PRIX_V = { 6:96, 12:180, 18:252, 24:288, 30:330 };
+                                for (const r of g.resas) {
+                                  let montant = 0;
+                                  const isLib = !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6;
+                                  if (isLib) { montant = LIBERTE_PRIX_V[Number(r.enfants[0])] || 0; }
+                                  else { const m2 = (r.label_jour||"").match(/\[MONTANT:(\d+)\]/); montant = m2 ? Number(m2[1]) : 0; }
+                                  await sb.from(table).update({ statut:"confirmed", validated_at:new Date().toISOString(), montant }).eq("id", r.id);
+                                }
+                              } else {
+                                await Promise.all(g.resas.map(r => sb.from(table).update({ statut:"confirmed", validated_at:new Date().toISOString() }).eq("id", r.id)));
+                              }
                               // Achat carte liberté → créditer solde
                               if (g.type === "club" && g.resas.some(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6)) {
                                 const r0 = g.resas[0];
@@ -7270,7 +7333,18 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                             </div>
                             <button onClick={async () => {
                               const table = g.type === "natation" ? "reservations_natation" : "reservations_club";
-                              await Promise.all(g.resas.map(r => sb.from(table).update({ statut:"confirmed", validated_at:new Date().toISOString() }).eq("id", r.id)));
+                              if (g.type === "club") {
+                                const LIBERTE_PRIX_V = { 6:96, 12:180, 18:252, 24:288, 30:330 };
+                                for (const r of g.resas) {
+                                  let montant = 0;
+                                  const isLib = !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6;
+                                  if (isLib) { montant = LIBERTE_PRIX_V[Number(r.enfants[0])] || 0; }
+                                  else { const m2 = (r.label_jour||"").match(/\[MONTANT:(\d+)\]/); montant = m2 ? Number(m2[1]) : 0; }
+                                  await sb.from(table).update({ statut:"confirmed", validated_at:new Date().toISOString(), montant }).eq("id", r.id);
+                                }
+                              } else {
+                                await Promise.all(g.resas.map(r => sb.from(table).update({ statut:"confirmed", validated_at:new Date().toISOString() }).eq("id", r.id)));
+                              }
                               // Achat carte liberté → créditer
                               if (g.type === "club" && g.resas.some(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6)) {
                                 const r0 = g.resas[0];
@@ -7624,7 +7698,7 @@ tr:nth-child(even){background:#f8fbff}
                           <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:6 }}>
                             <div style={{ fontWeight:900, fontSize:16, color:C.ocean }}>{prixForfait} €</div>
                             {economie > 0 && <div style={{ fontSize:11, color:"#aaa", textDecoration:"line-through" }}>{prixBase} €</div>}
-                            <button onClick={() => groupe.items.forEach(i => removeItem(i.id))} style={{ background:"#fff0f0", border:"none", color:"#e74c3c", borderRadius:8, padding:"4px 10px", cursor:"pointer", fontSize:12, fontWeight:800, fontFamily:"inherit" }}>✕ Retirer</button>
+                            <button onClick={() => groupe.items.forEach(i => removeItem(i.id))} style={{ background:"#fff0f0", border:"none", color:"#e74c3c", borderRadius:8, width:32, height:32, cursor:"pointer", fontSize:16, fontFamily:"inherit", display:"flex", alignItems:"center", justifyContent:"center" }}>🗑</button>
                           </div>
                         </div>
                       </div>
@@ -7651,7 +7725,7 @@ tr:nth-child(even){background:#f8fbff}
                         </div>
                         <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:6 }}>
                           <div style={{ fontWeight:900, fontSize:16, color:item.color||C.coral }}>{item.prix} €</div>
-                          <button onClick={() => removeItem(item.id)} style={{ background:"#fff0f0", border:"none", color:"#e74c3c", borderRadius:8, padding:"4px 10px", cursor:"pointer", fontSize:12, fontWeight:800, fontFamily:"inherit" }}>✕ Retirer</button>
+                          <button onClick={() => removeItem(item.id)} style={{ background:"#fff0f0", border:"none", color:"#e74c3c", borderRadius:8, width:32, height:32, cursor:"pointer", fontSize:16, fontFamily:"inherit", display:"flex", alignItems:"center", justifyContent:"center" }}>🗑</button>
                         </div>
                       </div>
                     </div>
@@ -7771,7 +7845,7 @@ function ProfilConnecte({ user, setUser, setScreen, reservations }) {
         <div style={{ width:80, height:80, borderRadius:26, background:`linear-gradient(135deg,${C.ocean},${C.sea})`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:40, margin:"0 auto 14px" }}>👤</div>
         <h2 style={{ color:C.dark, margin:"0 0 4px" }}>{user.prenom} {NOM(user.nom)}</h2>
         <p style={{ color:"#888", fontSize:14, margin:"0 0 2px" }}>{user.email}</p>
-        <p style={{ color:"#888", fontSize:14, margin:"0 0 16px" }}>{user.tel}</p>
+        <p style={{ color:"#888", fontSize:14, margin:"0 0 16px" }}><a href={`tel:${user.tel}`} style={{ color:C.ocean, fontWeight:700, textDecoration:"none" }}>📞 {user.tel}</a></p>
         {user.enfants?.length > 0 && <div style={{ marginBottom:16, display:"flex", gap:6, flexWrap:"wrap", justifyContent:"center" }}>{user.enfants.map(e => <Pill key={e.id} color={C.sea}>{e.prenom}</Pill>)}</div>}
         <SunBtn color={C.sunset} onClick={async () => {
           try { await sb.auth.signOut(); } catch(e) {}
@@ -8022,7 +8096,7 @@ export default function App() {
   }, [isAdmin]);
 
   return (
-    <div style={{ ...(isAdmin ? {} : { maxWidth: 430 }), margin:"0 auto", minHeight:"100vh", display:"flex", flexDirection:"column", fontFamily:"'Nunito','Segoe UI',sans-serif", background: isAdmin ? "#F0F4F8" : C.shell }}>
+    <div style={{ ...(isAdmin ? {} : { maxWidth: 480 }), margin:"0 auto", minHeight:"100vh", display:"flex", flexDirection:"column", fontFamily:"'Nunito','Segoe UI',sans-serif", background: isAdmin ? "#F0F4F8" : C.shell, boxShadow: isAdmin ? "none" : "0 0 40px rgba(0,0,0,0.08)" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
         * { box-sizing: border-box; }
@@ -8038,4 +8112,4 @@ export default function App() {
     </div>
   );
 }
-// enfant obligatoire + nom famille Sat Apr  4 15:35:27 CEST 2026
+// multi fixes Sat Apr  4 18:31:05 CEST 2026

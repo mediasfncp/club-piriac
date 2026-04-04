@@ -51,6 +51,7 @@ export async function creerEnfants(membreId, enfants) {
     activite:   e.activite,
     niveau:     e.niveau,
     allergies:  e.allergies || '',
+    sexe:       e.sexe || null,
     personnes_autorisees: e.personnesAutorisees || null,
   }))
   const { data, error } = await supabase.from('enfants').insert(rows).select()
