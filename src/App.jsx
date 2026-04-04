@@ -6847,8 +6847,8 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
   const todayISO = new Date().toISOString().slice(0,10);
   const confirmedNat  = dbResas.filter(r => r.statut === "confirmed");
   const confirmedClub = dbResasClub.filter(r => r.statut === "confirmed");
-  const confirmedNatToday  = dbResas.filter(r => r.statut === "confirmed" && r.validated_at?.slice(0,10) === todayISO);
-  const confirmedClubToday = dbResasClub.filter(r => r.statut === "confirmed" && r.validated_at?.slice(0,10) === todayISO);
+  const confirmedNatToday  = dbResas.filter(r => r.statut === "confirmed" && (r.validated_at || r.created_at)?.slice(0,10) === todayISO);
+  const confirmedClubToday = dbResasClub.filter(r => r.statut === "confirmed" && (r.validated_at || r.created_at)?.slice(0,10) === todayISO);
 
   // Montant natation selon forfait (groupé par membre+date_creation)
   const montantNat = (resas) => {
@@ -8005,4 +8005,4 @@ export default function App() {
     </div>
   );
 }
-// validated_at Sat Apr  4 14:38:29 CEST 2026
+// fix encaissement Sat Apr  4 14:48:57 CEST 2026
