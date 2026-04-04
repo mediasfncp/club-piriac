@@ -4654,7 +4654,7 @@ function PaiementsTab({ onValidate }) {
       // Club: grouper toutes les résas ensemble par membre (pas par minute)
       // Natation: grouper par minute (forfaits distincts)
       const minuteCreation = (r.created_at||"").slice(0,16);
-      const key = r._type === "club" ? `${r.membre_id}-club` : `${r.membre_id}-${r._type}-${minuteCreation}`;
+      const key = `${r.membre_id}-${r._type}-${minuteCreation}`;
       if (!groups[key]) groups[key] = {
         key, membre: r.membres, type: r._type, statut: r.statut,
         created_at: r.created_at, resas: [],
@@ -7163,7 +7163,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
             const groups = {};
             allPending.forEach(r => {
               const minuteCreation = (r.created_at||"").slice(0,16);
-              const key = r._type === "club" ? `${r.membre_id}-club` : `${r.membre_id}-${r._type}-${minuteCreation}`;
+              const key = `${r.membre_id}-${r._type}-${minuteCreation}`;
               if (!groups[key]) groups[key] = { membre: r.membres, type: r._type, resas: [] };
               groups[key].resas.push(r);
             });
@@ -7296,20 +7296,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                                 {g.membre ? `${g.membre.prenom} ${NOM(g.membre.nom)}` : "—"}
                               </div>
                               <div style={{ fontSize:11, color, fontWeight:700 }}>
-                                {g.type==="natation"
-                                  ? `🏊 Natation · ${g.resas.length} séance${g.resas.length>1?"s":""}`
-                                  : g.resas.some(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6)
-                                    ? `🎟️ Carte Liberté · ${Number(g.resas[0]?.enfants?.[0])} demi-journées`
-                                    : (() => {
-                                        const totalMontant = g.resas.reduce((s, r) => {
-                                          const m = (r.label_jour||"").match(/\[MONTANT:(\d+)\]/);
-                                          return s + (m ? Number(m[1]) : 0);
-                                        }, 0);
-                                        const sessions = [...new Set(g.resas.map(r => r.session))];
-                                        const sessLabel = sessions.map(s => s==="matin"?"☀️ Matin":"🌊 AM").join(" + ");
-                                        return `🏖️ Club · ${g.resas.length} jour${g.resas.length>1?"s":""} · ${sessLabel}${totalMontant>0?` · ${totalMontant} €`:""}`;
-                                      })()
-                                }
+                                {g.type==="natation" ? `🏊 Natation · ${g.resas.length} séance${g.resas.length>1?"s":""}` : g.resas.some(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6) ? `🎟️ Carte Liberté · ${Number(g.resas[0]?.enfants?.[0])} demi-journées` : `🏖️ Club · ${g.resas.length} séance${g.resas.length>1?"s":""}`}
                               </div>
                             </div>
                             <button onClick={async () => {
@@ -7447,7 +7434,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                     const groups = {};
                     allPending.forEach(r => {
                       const minuteCreation = (r.created_at||"").slice(0,16);
-                      const key = r._type === "club" ? `${r.membre_id}-club` : `${r.membre_id}-${r._type}-${minuteCreation}`;
+                      const key = `${r.membre_id}-${r._type}-${minuteCreation}`;
                       if (!groups[key]) groups[key] = { membre: r.membres, type: r._type, resas: [] };
                       groups[key].resas.push(r);
                     });
@@ -8246,4 +8233,4 @@ export default function App() {
     </div>
   );
 }
-// fix club grouping Sat Apr  4 20:45:04 CEST 2026
+// revert grouping Sat Apr  4 20:50:44 CEST 2026
