@@ -5386,7 +5386,7 @@ th{background:#1A8FE3;color:#fff;padding:10px 12px;text-align:left}
             boxShadow: `0 4px 14px ${C.ocean}44`,
           }}>🖨️ Imprimer la semaine</button>
 
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(140px, 1fr))", gap:10 }}>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
           {currentWeek.map(d => {
             const slots = getNataSlots(d.id);
             const dateISO = d.date ? `${d.date.getFullYear()}-${String(d.date.getMonth()+1).padStart(2,"0")}-${String(d.date.getDate()).padStart(2,"0")}` : "";
@@ -8117,7 +8117,7 @@ export default function App() {
   }, [isAdmin]);
 
   return (
-    <div style={{ ...(isAdmin ? {} : { maxWidth: 480 }), margin:"0 auto", minHeight:"100vh", display:"flex", flexDirection:"column", fontFamily:"'Nunito','Segoe UI',sans-serif", background: isAdmin ? "#F0F4F8" : C.shell, boxShadow: isAdmin ? "none" : "0 0 40px rgba(0,0,0,0.08)" }}>
+    <div style={{ margin:"0 auto", minHeight:"100vh", display:"flex", flexDirection:"column", fontFamily:"'Nunito','Segoe UI',sans-serif", background: isAdmin ? "#F0F4F8" : C.shell }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
         * { box-sizing: border-box; }
@@ -8133,4 +8133,4 @@ export default function App() {
     </div>
   );
 }
-// multi fixes Sat Apr  4 18:59:27 CEST 2026
+// responsive full + planning 2col Sat Apr  4 19:09:32 CEST 2026
