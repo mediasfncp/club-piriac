@@ -808,9 +808,11 @@ function FormulesEveilScreen({ onNav, user, panier, setPanier }) {
     }
   }, [user?.supabaseId]);
 
-  const enfantsEveil = enfantsDB.length > 0
-    ? enfantsDB.filter(e => e.activite === "natation" || e.activite === "les deux")
-    : (user?.enfants || []).filter(e => e.activite === "natation" || e.activite === "les deux");
+  const enfantsEveil = (enfantsDB.length > 0 ? enfantsDB : (user?.enfants || []))
+    .filter(e => {
+      const age = calcAge(e.naissance);
+      return age >= 2 && age <= 5;
+    });
 
   // 🔒 Gate inscription
   if (!user) return (
@@ -902,7 +904,7 @@ function FormulesEveilScreen({ onNav, user, panier, setPanier }) {
           </div>
 
           {/* Sélection enfant nominatif */}
-          {enfantsEveil.length > 0 && (
+          {enfantsEveil.length > 0 ? (
             <div style={{ background:"#fff", borderRadius:18, padding:16, boxShadow:"0 2px 10px rgba(0,0,0,0.05)" }}>
               <div style={{ fontWeight:800, color:C.dark, fontSize:14, marginBottom:10 }}>🌊 Pour quel enfant ?</div>
               <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
@@ -924,6 +926,11 @@ function FormulesEveilScreen({ onNav, user, panier, setPanier }) {
               {selectedEnfant && (
                 <div style={{ fontSize:12, color:"#9B59B6", marginTop:8, fontWeight:700 }}>✓ Séance nominative pour {selectedEnfant}</div>
               )}
+            </div>
+          ) : (
+            <div style={{ background:`${C.sunset}10`, border:`2px solid ${C.sunset}30`, borderRadius:16, padding:"14px 18px" }}>
+              <div style={{ fontWeight:900, color:C.sunset, fontSize:13, marginBottom:4 }}>⚠️ Aucun enfant éligible</div>
+              <div style={{ fontSize:12, color:"#777" }}>L'éveil aquatique est réservé aux enfants de 2 à 5 ans. Vérifiez les dates de naissance dans votre profil.</div>
             </div>
           )}
           <div style={{ background: "#F3E8FF", border: "2px solid #9B59B640", borderRadius: 16, padding: "14px 18px" }}>
@@ -963,9 +970,9 @@ function FormulesEveilScreen({ onNav, user, panier, setPanier }) {
               🛒 Ajouter au panier
             </button>
           ) : null}
-          <SunBtn color={enfantsEveil.length > 0 && !selectedEnfant ? "#bbb" : "#9B59B6"} full
-            onClick={() => { if (enfantsEveil.length > 0 && !selectedEnfant) return; confirmBook(); }}>
-            {enfantsEveil.length > 0 && !selectedEnfant ? "👆 Sélectionnez un enfant" : "📨 Envoyer la demande · 20 €"}
+          <SunBtn color={!selectedEnfant ? "#bbb" : "#9B59B6"} full
+            onClick={() => { if (!selectedEnfant) return; confirmBook(); }}>
+            {!selectedEnfant ? (enfantsEveil.length === 0 ? "⚠️ Aucun enfant 2-5 ans" : "👆 Sélectionnez un enfant") : "📨 Envoyer la demande · 20 €"}
           </SunBtn>
         </div>
       </div>
@@ -3641,7 +3648,7 @@ function FicheEnfantModal({ enfant, onClose }) {
         <div style={{ background:`linear-gradient(135deg,${actColor},${actColor}cc)`, margin:"0 16px", borderRadius:20, padding:"20px 18px", position:"relative", marginBottom:12 }}>
           <button onClick={onClose} style={{ position:"absolute", top:12, right:12, background:"rgba(255,255,255,0.25)", border:"none", color:"#fff", borderRadius:"50%", width:30, height:30, cursor:"pointer", fontWeight:900, fontSize:16, fontFamily:"inherit" }}>✕</button>
           <div style={{ display:"flex", alignItems:"center", gap:14 }}>
-            <div style={{ width:60, height:60, borderRadius:20, background:"rgba(255,255,255,0.25)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:32 }}>👧</div>
+            <div style={{ width:60, height:60, borderRadius:20, background:"rgba(255,255,255,0.25)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:32 }}>{enfant.sexe === "M" ? "👦" : "👧"}</div>
             <div>
               <div style={{ color:"#fff", fontWeight:900, fontSize:20 }}>{enfant.prenom} {NOM(enfant.nom)}</div>
               <div style={{ color:"rgba(255,255,255,0.85)", fontSize:13 }}>{age} ans · {actLabel}</div>
@@ -4210,6 +4217,20 @@ function MembresTab({ allResas, dbMembres, onRefresh }) {
             </div>
             <div style={{ fontSize:20, color:"#ddd" }}>›</div>
           </div>
+          {u.supabase && u.enfants?.length > 0 && (
+            <div style={{ marginTop:8, borderTop:"1px solid #f0f0f0", paddingTop:8, display:"flex", flexDirection:"column", gap:4 }}>
+              {u.enfants.map((e, ei) => (
+                <div key={ei} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", background:"#f8fbff", borderRadius:10, padding:"6px 10px" }}>
+                  <span style={{ fontSize:12, fontWeight:700, color:"#2C3E50" }}>{e.sexe==="M"?"👦":"👧"} {e.prenom} {NOM(e.nom)}</span>
+                  <button onClick={async () => {
+                    if (!window.confirm(`Supprimer ${e.prenom} ?`)) return;
+                    await sb.from("enfants").delete().eq("id", e.id);
+                    onRefresh?.();
+                  }} style={{ background:"#fff0f0", border:"none", color:"#e74c3c", borderRadius:8, width:26, height:26, cursor:"pointer", fontSize:13, fontFamily:"inherit", flexShrink:0 }}>🗑</button>
+                </div>
+              ))}
+            </div>
+          )}
           {u.supabase && (
             <div style={{ display:"flex", gap:8, marginTop:10 }}>
               <button onClick={() => setModifierMembre(u)} style={{ flex:1, background:`${C.coral}12`, border:`1.5px solid ${C.coral}30`, color:C.coral, borderRadius:12, padding:"7px", cursor:"pointer", fontWeight:800, fontSize:12, fontFamily:"inherit" }}>
@@ -8112,4 +8133,4 @@ export default function App() {
     </div>
   );
 }
-// multi fixes Sat Apr  4 18:31:05 CEST 2026
+// multi fixes Sat Apr  4 18:59:27 CEST 2026
