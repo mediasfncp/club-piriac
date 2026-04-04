@@ -6858,11 +6858,12 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
     session: `${r.time} - ${DAYS.find(d=>d.id===r.day)?.label} ${DAYS.find(d=>d.id===r.day)?.num}`, status: "confirmed"
   }))];
 
-  const todayISO = new Date().toISOString().slice(0,10);
+  const todayISO = (() => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}-${String(t.getDate()).padStart(2,"0")}`; })();
+  const toLocalDate = (iso) => { if (!iso) return null; const d = new Date(iso); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
   const confirmedNat  = dbResas.filter(r => r.statut === "confirmed");
   const confirmedClub = dbResasClub.filter(r => r.statut === "confirmed");
-  const confirmedNatToday  = dbResas.filter(r => r.statut === "confirmed" && (r.validated_at || r.created_at)?.slice(0,10) === todayISO);
-  const confirmedClubToday = dbResasClub.filter(r => r.statut === "confirmed" && (r.validated_at || r.created_at)?.slice(0,10) === todayISO);
+  const confirmedNatToday  = dbResas.filter(r => r.statut === "confirmed" && toLocalDate(r.validated_at || r.created_at) === todayISO);
+  const confirmedClubToday = dbResasClub.filter(r => r.statut === "confirmed" && toLocalDate(r.validated_at || r.created_at) === todayISO);
 
   // Montant natation selon forfait (groupé par membre+date_creation)
   const montantNat = (resas) => {
@@ -8017,4 +8018,4 @@ export default function App() {
     </div>
   );
 }
-// montant club Sat Apr  4 14:55:07 CEST 2026
+// fix timezone Sat Apr  4 15:04:29 CEST 2026
