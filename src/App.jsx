@@ -638,7 +638,7 @@ function HomeScreen({ onNav, user }) {
           </div>
           <h1 style={{ color: "#fff", fontSize: 29, margin: "6px 0 2px", fontWeight: 900, textShadow: "0 3px 14px rgba(0,0,0,0.22)", letterSpacing: -0.5 }}>Eole Beach Club</h1>
           <p style={{ color: "rgba(255,255,255,0.9)", fontSize: 14, margin: "0 0 2px", fontWeight: 700 }}>
-            {user ? `Bonjour ${user.prenom} 👋` : "Club de plage · Natation · Soleil pour tous !"}
+            {user ? `Bonjour ${user.prenom} 👋` : "Club de plage · Ecole de natation · Soleil pour tous !"}
           </p>
           {user && <p style={{ color: "rgba(255,255,255,0.85)", fontSize: 13, margin: "0 0 6px", fontWeight: 600 }}>Prêt pour passer un été incroyable ? ☀️</p>}
         </div>
@@ -3304,11 +3304,11 @@ function InfosScreen({ onNav }) {
         <Card style={{ background: `linear-gradient(135deg, ${C.sky}18, ${C.sea}10)` }}>
           <h3 style={{ color: C.dark, marginTop: 0 }}>📍 Nous trouver</h3>
           <div style={{ fontSize: 14, color: "#555", lineHeight: 2.4 }}>
-            <div>🏖️ <strong>Club de Plage FNCP</strong></div>
-            <div>📍 Promenade des Sables, 44500 La Baule</div>
-            <div>📞 <a href="tel:0240000000" style={{ color: C.ocean, fontWeight: 700 }}>02 40 00 00 00</a></div>
-            <div>✉️ <a href="mailto:contact@fncp-plage.fr" style={{ color: C.ocean, fontWeight: 700 }}>contact@fncp-plage.fr</a></div>
-            <div>🌐 <a href="https://www.fncp.fr" target="_blank" rel="noreferrer" style={{ color: C.ocean, fontWeight: 700 }}>www.fncp.fr</a></div>
+            <div>🏖️ <strong>Eole Beach Club</strong></div>
+            <div>📍 Plage Saint-Michel - Rue des Caps Horniers, 44420 Piriac-sur-Mer</div>
+            <div>📞 <a href="tel:0767786922" style={{ color: C.ocean, fontWeight: 700 }}>07 67 78 69 22</a></div>
+            <div>✉️ <a href="mailto:clubdeplage.piriacsurmer@hotmail.com" style={{ color: C.ocean, fontWeight: 700 }}>clubdeplage.piriacsurmer@hotmail.com</a></div>
+            <div>🌐 <a href="https://www.clubdeplage-piriacsurmer.fr" target="_blank" rel="noreferrer" style={{ color: C.ocean, fontWeight: 700 }}>www.clubdeplage-piriacsurmer.fr</a></div>
           </div>
         </Card>
 
@@ -8133,4 +8133,4 @@ export default function App() {
     </div>
   );
 }
-// branding Sat Apr  4 19:25:19 CEST 2026
+// branding 2 Sat Apr  4 19:34:44 CEST 2026
