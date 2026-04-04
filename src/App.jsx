@@ -2948,6 +2948,7 @@ function InscriptionScreen({ onNav, setUser }) {
   const [done, setDone] = useState(false);
   const [step1Error, setStep1Error] = useState(false);
   const [showCgvModal, setShowCgvModal] = useState(false);
+  const [showEnfantForm, setShowEnfantForm] = useState(true); // formulaire ajout enfant visible
   const f = k => v => setForm(p => ({ ...p, [k]: v }));
 
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email);
@@ -3067,8 +3068,10 @@ function InscriptionScreen({ onNav, setUser }) {
                 <button onClick={() => setForm(p => ({ ...p, enfants: p.enfants.filter(x => x.id !== e.id) }))} style={{ background: `${C.sunset}20`, border: "none", color: C.sunset, borderRadius: "50%", width: 28, height: 28, cursor: "pointer", fontWeight: 900 }}>✕</button>
               </div>
             ))}
+            {/* Formulaire ajout enfant */}
+            {showEnfantForm && (
             <div style={{ border: `2.5px dashed ${C.sea}`, borderRadius: 18, padding: 16, marginBottom: 14, background: `${C.sea}06` }}>
-              <h4 style={{ color: C.ocean, marginTop: 0 }}>+ Ajouter un enfant</h4>
+              <h4 style={{ color: C.ocean, marginTop: 0 }}>{form.enfants.length === 0 ? "👧 Informations de l'enfant" : "➕ Ajouter un autre enfant"}</h4>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
                 <FInput label="Prénom" value={newEnfant.prenom} onChange={v => setNewEnfant(e => ({ ...e, prenom: v }))} required />
                 <FInput label="Nom" value={newEnfant.nom} onChange={v => setNewEnfant(e => ({ ...e, nom: v }))} required />
@@ -3116,12 +3119,37 @@ function InscriptionScreen({ onNav, setUser }) {
                   if (age < 3) { alert("L'enfant doit avoir au moins 3 ans pour s'inscrire."); return; }
                   setForm(p => ({ ...p, enfants: [...p.enfants, { ...newEnfant, id: Date.now() }] }));
                   setNewEnfant({ prenom: "", nom: "", naissance: "", sexe: "", activite: "club", niveau: "debutant", allergies: "", personnesAutorisees: "" });
+                  setShowEnfantForm(false);
+                } else {
+                  alert("Merci de remplir le prénom, nom et date de naissance.");
                 }
-              }}>+ Ajouter cet enfant</SunBtn>
+              }}>✅ Valider cet enfant</SunBtn>
             </div>
+            )}
+
+            {/* Bouton ajouter un autre enfant */}
+            {!showEnfantForm && (
+              <button onClick={() => setShowEnfantForm(true)} style={{ width:"100%", background:`${C.sea}15`, border:`2px dashed ${C.sea}`, color:C.sea, borderRadius:14, padding:"12px", cursor:"pointer", fontWeight:900, fontSize:14, fontFamily:"inherit", marginBottom:14 }}>
+                ➕ Ajouter un autre enfant
+              </button>
+            )}
+
             <div style={{ display: "flex", gap: 10 }}>
               <SunBtn color="#bbb" onClick={() => setStep(1)} style={{ flex: 1 }}>← Retour</SunBtn>
-              <SunBtn color={C.coral} onClick={() => setStep(3)} style={{ flex: 2 }}>Suivant → Droits 📸</SunBtn>
+              <SunBtn color={C.coral} onClick={() => {
+                // Valider l'enfant en cours s'il est rempli
+                if (showEnfantForm && newEnfant.prenom && newEnfant.nom && newEnfant.naissance) {
+                  const age = calcAge(newEnfant.naissance);
+                  if (age < 3) { alert("L'enfant doit avoir au moins 3 ans pour s'inscrire."); return; }
+                  setForm(p => ({ ...p, enfants: [...p.enfants, { ...newEnfant, id: Date.now() }] }));
+                  setNewEnfant({ prenom: "", nom: "", naissance: "", sexe: "", activite: "club", niveau: "debutant", allergies: "", personnesAutorisees: "" });
+                }
+                if (form.enfants.length === 0 && !(newEnfant.prenom && newEnfant.nom && newEnfant.naissance)) {
+                  alert("Veuillez ajouter au moins un enfant.");
+                  return;
+                }
+                setStep(3);
+              }} style={{ flex: 2 }}>Suivant → Droits 📸</SunBtn>
             </div>
           </Card>
         )}
@@ -8133,4 +8161,4 @@ export default function App() {
     </div>
   );
 }
-// branding eole Sat Apr  4 19:50:19 CEST 2026
+// inscription enfant UX Sat Apr  4 20:06:18 CEST 2026
