@@ -1312,6 +1312,7 @@ function FormulesNatationScreen({ onNav, user, allSeasonSessions, panier, setPan
               {setPanier ? (
                 <button onClick={() => {
                   if (selectedCreneaux.length < nbLecons) return;
+                  if (!selectedEnfants.length) { alert("Veuillez sélectionner au moins un enfant."); return; }
                   const nbEnf = Math.max(1, selectedEnfants.length);
                   const prix = selected.price * nbEnf;
                   setPanier(prev => [...prev, {
@@ -1335,6 +1336,7 @@ function FormulesNatationScreen({ onNav, user, allSeasonSessions, panier, setPan
                   disabled={selectedCreneaux.length < nbLecons}
                   onClick={async () => {
                     if (selectedCreneaux.length < nbLecons) return;
+                    if (!selectedEnfants.length) { alert("Veuillez sélectionner au moins un enfant."); return; }
                     const nbEnf = Math.max(1, selectedEnfants.length);
                     const prix = selected.price * nbEnf;
                     try {
@@ -2300,6 +2302,7 @@ function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSession
   const prixSeance = 20 * nbEnf;
 
   const handleConfirm = async () => {
+    if (!selectedEnfants.length) { alert("Veuillez sélectionner au moins un enfant."); return; }
     if (setAllSeasonSessions) setAllSeasonSessions(prev => prev.map(s => s.id === booking.id ? { ...s, spots: Math.max(0, s.spots-1) } : s));
     const resaDateISO = getDateISO(selectedDay);
     const rappelDate  = getRappelDate(resaDateISO);
@@ -2322,6 +2325,7 @@ function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSession
   };
 
   const handlePanier = () => {
+    if (!selectedEnfants.length) { alert("Veuillez sélectionner au moins un enfant."); return; }
     const resaDateISO = getDateISO(selectedDay);
     setPanier(prev => [...prev, {
       id: `res-${Date.now()}`,
@@ -6580,6 +6584,13 @@ function CartesLiberteTab({ dbMembres }) {
 }
 
 // ── RÉSAS PAR MEMBRE ─────────────────────────────────────
+// Enrichit les prénoms d'enfants avec le nom de famille du membre parent
+const enrichEnfants = (enfants, membres) => {
+  if (!enfants?.length) return [];
+  const nom = membres?.nom ? ` ${NOM(membres.nom)}` : "";
+  return enfants.filter(e => isNaN(Number(e))).map(prenom => prenom + nom);
+};
+
 function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, supprimerResaNatation, supprimerResaClub }) {
   const allWeeks = (() => {
     const ws = []; let wk = [];
@@ -6719,7 +6730,7 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
                         <div>
                           <span style={{ fontWeight:800, color:C.dark, fontSize:12 }}>{r.heure}</span>
                           <span style={{ color:"#aaa", fontSize:11, marginLeft:6 }}>{r.date_seance ? new Date(r.date_seance).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}) : "—"}</span>
-                          {r.enfants?.length > 0 && <span style={{ color:C.ocean, fontSize:10, marginLeft:6, fontWeight:700 }}>{r.enfants.join(", ")}</span>}
+                          {r.enfants?.length > 0 && <span style={{ color:C.ocean, fontSize:10, marginLeft:6, fontWeight:700 }}>{enrichEnfants(r.enfants, r.membres).join(", ")}</span>}
                         </div>
                         <div style={{ display:"flex", gap:4, alignItems:"center" }}>
                           {r.statut === "pending" ? (
@@ -6748,7 +6759,7 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
                               {isLiberte ? `🎟️ Carte ${r.enfants[0]} demi-j.` : isLib ? "🎟️ Liberté" : r.session==="matin"?"☀️ Matin":"🌊 Après-midi"}
                             </span>
                             <span style={{ color:"#aaa", fontSize:11, marginLeft:6 }}>{r.date_reservation ? new Date(r.date_reservation).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}) : "—"}</span>
-                            {r.enfants?.length > 0 && !isLiberte && <span style={{ color:C.coral, fontSize:10, marginLeft:6, fontWeight:700 }}>{r.enfants.join(", ")}</span>}
+                            {r.enfants?.length > 0 && !isLiberte && <span style={{ color:C.coral, fontSize:10, marginLeft:6, fontWeight:700 }}>{enrichEnfants(r.enfants, r.membres).join(", ")}</span>}
                           </div>
                           <div style={{ display:"flex", gap:4, alignItems:"center" }}>
                             {r.statut === "pending" ? (
@@ -6794,7 +6805,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
   const [dbMembres, setDbMembres]     = useState([]);
   const [dbPaiements, setDbPaiements] = useState([]);
   const [showNouvelleResa, setShowNouvelleResa] = useState(false);
-  const [modifierResa, setModifierResa]         = useState(null); // { resa, type }
+  const [modifierResa, setModifierResa]         = useState(null);
 
   const refreshResas = () => {
     sb.from("reservations_natation").select("*, membres(id, prenom, nom, email, tel)").order("date_seance", { ascending: true })
@@ -7299,7 +7310,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                               return (
                                 <div key={i} style={{ background:`${color}15`, color, borderRadius:8, padding:"3px 10px", fontSize:11, fontWeight:700 }}>
                                   {r._label} · {date ? new Date(date).toLocaleDateString("fr-FR",{day:"numeric",month:"short"}) : "—"}
-                                  {r.enfants?.length > 0 && ` · ${r.enfants.join(", ")}`}
+                                  {r.enfants?.length > 0 && ` · ${enrichEnfants(r.enfants, r.membres).join(", ")}`}
                                 </div>
                               );
                             })}
@@ -8027,4 +8038,4 @@ export default function App() {
     </div>
   );
 }
-// montant club label_jour Sat Apr  4 15:26:33 CEST 2026
+// enfant obligatoire + nom famille Sat Apr  4 15:35:27 CEST 2026
