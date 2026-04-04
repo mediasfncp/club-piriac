@@ -2112,7 +2112,7 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser, pa
                           membreId: user?.supabaseId || null,
                           dateReservation: iso,
                           session: formulType === "journee" ? "matin" : formulType,
-                          labelJour: new Date(iso).toLocaleDateString("fr-FR", {weekday:"long",day:"numeric",month:"long"}),
+                          labelJour: `[MONTANT:${Math.round(selectedRow.price / selectedDates.length)}] ${new Date(iso).toLocaleDateString("fr-FR", {weekday:"long",day:"numeric",month:"long"})}`,
                           rappelDate: null,
                           enfants: selectedEnfantsClub.length > 0 ? selectedEnfantsClub : (user?.enfants||[]).filter(e => e.activite==="club"||e.activite==="les deux").map(e=>e.prenom),
                           statut: "pending",
@@ -6075,10 +6075,18 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
           if (!selectedStartDate) { setError("Sélectionnez un jour de début."); setSaving(false); return; }
           const days = getClubWeekDays();
           const sessions = sessionClub === "journee" ? ["matin","apmidi"] : [sessionClub];
+          // Calculer le montant par enfant selon les tarifs
+          const tarifData = sessionClub === "matin" ? TARIFS_MATIN : sessionClub === "apmidi" ? TARIFS_APMIDI : TARIFS_JOURNEE;
+          const nbEnf = selectedEnfants.length || 1;
+          const rowIdx = Math.min(nbSemainesClub, 4); // 0=unité,1=1sem,2=2sem,3=3sem,4=4sem
+          const tarifRow = tarifData.rows[rowIdx] || tarifData.rows[tarifData.rows.length-1];
+          const montantTotal = nbEnf === 1 ? tarifRow.e1 : nbEnf === 2 ? tarifRow.e2 : nbEnf === 3 ? tarifRow.e3 : tarifRow.e3 + (nbEnf-3)*tarifRow.sup;
+          const nbJours = days.length * sessions.length;
+          const montantParJour = nbJours > 0 ? Math.round(montantTotal / nbJours) : 0;
           for (const day of days) {
             const dateStr = `${day.date.getFullYear()}-${String(day.date.getMonth()+1).padStart(2,"0")}-${String(day.date.getDate()).padStart(2,"0")}`;
             for (const sess of sessions) {
-              await creerReservationClub({ membreId: membreId||null, dateReservation:dateStr, session:sess, labelJour:day.date.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"}), rappelDate:getRappelDate(dateStr), enfants:selectedEnfants, statut:statutResa });
+              await creerReservationClub({ membreId: membreId||null, dateReservation:dateStr, session:sess, labelJour:`[MONTANT:${montantParJour}] ${day.date.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}`, rappelDate:getRappelDate(dateStr), enfants:selectedEnfants, statut:statutResa });
             }
           }
         } else if (forfaitClub === "liberte") {
@@ -6100,7 +6108,10 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
           const seancesValides = seancesClub.filter(s => s.date);
           if (!seancesValides.length) { setError("Ajoutez au moins une séance."); setSaving(false); return; }
           for (const s of seancesValides) {
-            await creerReservationClub({ membreId:membreId||null, dateReservation:s.date, session:s.session, labelJour:new Date(s.date).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"}), rappelDate:getRappelDate(s.date), enfants:selectedEnfants, statut:statutResa });
+            const nbEnf = selectedEnfants.length || 1;
+            const tarifRow = (s.session === "matin" ? TARIFS_MATIN : TARIFS_APMIDI).rows[0];
+            const montantUnite = nbEnf === 1 ? tarifRow.e1 : nbEnf === 2 ? tarifRow.e2 : nbEnf === 3 ? tarifRow.e3 : tarifRow.e3 + (nbEnf-3)*tarifRow.sup;
+            await creerReservationClub({ membreId:membreId||null, dateReservation:s.date, session:s.session, labelJour:`[MONTANT:${montantUnite}] ${new Date(s.date).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}`, rappelDate:getRappelDate(s.date), enfants:selectedEnfants, statut:statutResa });
           }
         }
       }
@@ -8016,4 +8027,4 @@ export default function App() {
     </div>
   );
 }
-// fix montant club Sat Apr  4 15:11:59 CEST 2026
+// montant club label_jour Sat Apr  4 15:26:33 CEST 2026
