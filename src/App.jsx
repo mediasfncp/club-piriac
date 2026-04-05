@@ -4276,6 +4276,8 @@ function MembresTab({ allResas, dbMembres, onRefresh }) {
     adresse_vac: m.adresse_vac, ville_vac: m.ville_vac, cp_vac: m.cp_vac,
     color: C.ocean, av: "👤", enfants: m.enfants || [], resa: 0,
     droitImage: m.droit_image, droitDiffusion: m.droit_diffusion, supabase: true,
+    compte_fin_saison: m.compte_fin_saison || false,
+    compte_solde: m.compte_solde || false,
   }));
 
   const tousLesMembres = membresSupabase.length > 0 ? membresSupabase : MEMBRES;
@@ -4306,6 +4308,7 @@ function MembresTab({ allResas, dbMembres, onRefresh }) {
                 <div style={{ background:`${u.color}18`, color:u.color, borderRadius:50, padding:"3px 10px", fontSize:11, fontWeight:800 }}>👧 {u.enfants?.length||0} enfant{(u.enfants?.length||0)>1?"s":""}</div>
                 {u.enfants?.some(e => e.allergies) && <div style={{ background:"#FFF0F0", color:C.sunset, borderRadius:50, padding:"3px 10px", fontSize:11, fontWeight:800 }}>⚠️ Allergie</div>}
                 {u.droitImage && <div style={{ background:`${C.green}18`, color:C.green, borderRadius:50, padding:"3px 10px", fontSize:11, fontWeight:800 }}>📸 OK</div>}
+                {u.compte_fin_saison && <div style={{ background:`${C.ocean}18`, color:C.ocean, borderRadius:50, padding:"3px 10px", fontSize:11, fontWeight:800 }}>📒 Fin de saison</div>}
               </div>
             </div>
             <div style={{ fontSize:20, color:"#ddd" }}>›</div>
@@ -8824,4 +8827,4 @@ export default function App() {
     </div>
   );
 }
-// multi fixes Sun Apr  5 12:08:52 CEST 2026
+// fix compte fin saison Sun Apr  5 12:23:44 CEST 2026
