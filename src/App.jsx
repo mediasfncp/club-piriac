@@ -8046,14 +8046,35 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
   };
 
   const LIBERTE_PRIX = { 6:96, 12:180, 18:252, 24:288, 30:330 };
-  const montantClub = (resas) => resas.reduce((s, r) => {
-    if (r.montant) return s + Number(r.montant); // montant stocké à la validation
-    const nb = Number(Array.isArray(r.enfants) ? r.enfants[0] : 0);
-    if (nb >= 6 && LIBERTE_PRIX[nb]) return s + LIBERTE_PRIX[nb];
-    const match = (r.label_jour || "").match(/\[MONTANT:(\d+)\]/);
-    if (match) return s + Number(match[1]);
-    return s;
-  }, 0);
+  const montantClub = (resas) => {
+    // Grouper par membre + session + enfants + minute comme le reste
+    // pour éviter de compter le montant total × nb de résas du groupe
+    const groups = {};
+    resas.forEach(r => {
+      const enfantsKey = Array.isArray(r.enfants) ? [...r.enfants].sort().join(",") : "";
+      const minute = (r.created_at||"").slice(0,16);
+      const key = `${r.membre_id}-${r.session}-${enfantsKey}-${minute}`;
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(r);
+    });
+    return Object.values(groups).reduce((total, g) => {
+      // Priorité : [MONTANT:XX] dans label_jour (montant par jour × nb jours)
+      const parLabelJour = g.reduce((s, r) => {
+        const match = (r.label_jour||"").match(/\[MONTANT:(\d+)\]/);
+        return s + (match ? Number(match[1]) : 0);
+      }, 0);
+      if (parLabelJour > 0) return total + parLabelJour;
+
+      // Sinon carte liberté
+      const r0 = g[0];
+      const nb = Number(Array.isArray(r0.enfants) ? r0.enfants[0] : 0);
+      if (nb >= 6 && LIBERTE_PRIX[nb]) return total + LIBERTE_PRIX[nb];
+
+      // Sinon montant stocké (1 seule fois pour le groupe)
+      if (r0.montant) return total + Number(r0.montant);
+      return total;
+    }, 0);
+  };
 
   const realTotal = montantNat(confirmedNatToday) + montantClub(confirmedClubToday);
   const pendingCount = dbResas.filter(r => r.statut === "pending").length + dbResasClub.filter(r => r.statut === "pending").length;
@@ -9533,4 +9554,4 @@ export default function App() {
     </div>
   );
 }
-// fix montant nat Sun Apr  5 23:23:02 CEST 2026
+// fix montant club encaissement Sun Apr  5 23:28:22 CEST 2026
