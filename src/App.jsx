@@ -7632,7 +7632,7 @@ ${(membre.enfants||[]).length > 0 ? `
 </table>
 
 <div class="total-box">
-  <span class="label">${solde > 0 ? "SOLDE DÛ" : "MONTANT PAYÉ"}</span>
+  <span class="label">"MONTANT PAYÉ"</span>
   <span class="amount">${solde} €</span>
 </div>
 ${remise > 0 ? `<div style="text-align:center;margin-bottom:8px;color:#EC4899;font-size:12px;font-weight:700">🎁 Remise appliquée : - ${remise} €</div>` : ""}
@@ -7818,7 +7818,7 @@ Plage Saint-Michel · 44420 Piriac-sur-Mer
                   <div style={{ fontSize:10, color:"#bbb" }}>sur {total} €</div>
                   <button onClick={e => { e.stopPropagation(); genererFacture(m); }} disabled={generating===m.id}
                     style={{ background:generating===m.id?"#bbb":`linear-gradient(135deg,${C.ocean},${C.sea})`, border:"none", color:"#fff", borderRadius:8, padding:"6px 10px", cursor:generating===m.id?"not-allowed":"pointer", fontWeight:900, fontSize:11, fontFamily:"inherit", whiteSpace:"nowrap" }}>
-                    {generating===m.id ? "⏳…" : fac ? "🔄 Réimprimer" : "🧾 Générer"}
+                    {generating===m.id ? "⏳…" : fac ? "⬇️ Télécharger" : "🧾 Générer"}
                   </button>
                   {m.email && (
                     <button onClick={e => { e.stopPropagation(); envoyerParMail(m); }} disabled={sendingMail===m.id}
@@ -8928,10 +8928,10 @@ function ProfilConnecte({ user, setUser, setScreen, reservations }) {
       sb.from("reservations_club").select("*").eq("membre_id", user.supabaseId).order("date_reservation"),
       sb.from("membres").select("liberte_balance, liberte_total").eq("id", user.supabaseId).single(),
       sb.from("enfants").select("*").eq("membre_id", user.supabaseId),
-      sb.from("factures_numeros").select("*").eq("membre_id", user.supabaseId).single().catch(() => ({ data: null })),
+      sb.from("factures_numeros").select("*").eq("membre_id", user.supabaseId).order("created_at", { ascending: false }).limit(1),
     ]);
     setEnfants(enf || []);
-    setFacture(fac || null);
+    setFacture(fac?.[0] || null);
     setLiberteBalance(membre?.liberte_balance || 0);
     setLiberteTotal(membre?.liberte_total || 0);
     setLoading(false);
@@ -9435,4 +9435,4 @@ export default function App() {
     </div>
   );
 }
-// fix build error profil Sun Apr  5 22:19:18 CEST 2026
+// facture fixes v2 Sun Apr  5 22:29:34 CEST 2026
