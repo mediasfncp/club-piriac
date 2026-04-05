@@ -964,7 +964,7 @@ function FormulesEveilScreen({ onNav, user, panier, setPanier }) {
                 jour: sun.label,
                 details: `${sun.label} à ${sl.time}`,
               }]);
-              setDone({ sunday: sun.label, slot: sl.time, enfant: selectedEnfant });
+              onNav("panier");
               setBooking(null);
             }} style={{ width:"100%", background:`linear-gradient(135deg,${C.sun},${C.coral})`, border:"none", color:"#fff", borderRadius:14, padding:"12px", cursor:"pointer", fontWeight:900, fontSize:14, fontFamily:"inherit", marginBottom:8 }}>
               🛒 Ajouter au panier
@@ -1333,7 +1333,7 @@ function FormulesNatationScreen({ onNav, user, allSeasonSessions, panier, setPan
                     creneaux: selectedCreneaux,
                     details: `${nbLecons} leçon${nbLecons>1?"s":""} · ${nbEnf} enfant${nbEnf>1?"s":""}`,
                   }]);
-                  setDone(true);
+                  onNav("panier");
                 }} disabled={selectedCreneaux.length < nbLecons}
                 style={{ flex:2, background:selectedCreneaux.length<nbLecons?"#bbb":`linear-gradient(135deg,${C.coral},${C.sun})`, border:"none", color:"#fff", borderRadius:14, padding:"11px", cursor:selectedCreneaux.length<nbLecons?"not-allowed":"pointer", fontWeight:900, fontSize:13, fontFamily:"inherit" }}>
                   🛒 Ajouter au panier · {selected.price * Math.max(1, selectedEnfants.length)} €
@@ -1543,7 +1543,7 @@ function ReservationClubScreen({ onNav, user, setUser, clubPlaces, setClubPlaces
         statut:          "pending",
       });
     } catch(e) { console.warn("Supabase:", e.message); }
-    setDone({ day: dateLabel, session: sessionLabel });
+    onNav("panier");
     setSelectedSession(null);
   };
 
@@ -2129,7 +2129,7 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser, pa
                           dates: selectedDates,
                           details: `${selectedDates.length} jour${selectedDates.length>1?"s":""}`,
                         }]);
-                        setDone("club");
+                        onNav("panier");
                       }} style={{ background:`linear-gradient(135deg,${C.coral},${C.sun})`, border:"none", color:"#fff", borderRadius:14, padding:"14px", cursor:"pointer", fontWeight:900, fontSize:14, fontFamily:"inherit", boxShadow:`0 4px 14px ${C.coral}44` }}>
                         🛒 Ajouter au panier · {selectedRow?.price} €
                       </button>
@@ -8197,7 +8197,6 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
         <div style={{ maxWidth: 1400, margin: "0 auto" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <BackBtn onNav={onNav} />
             <div>
               <div style={{ color: "rgba(255,255,255,0.75)", fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase" }}>🏖️ EOLE BEACH CLUB · Piriac-sur-Mer</div>
               <h2 style={{ color: "#fff", margin: 0, fontWeight: 900, fontSize: 22 }}>Administration</h2>
@@ -8212,6 +8211,9 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
               <div style={{ color: "rgba(255,255,255,0.8)", fontSize: 10, fontWeight:700 }}>En attente</div>
               <div style={{ color: C.sun, fontWeight: 900, fontSize: 20 }}>{pendingCount}</div>
             </div>
+            <button onClick={() => onNav("home")} style={{ background:"rgba(255,255,255,0.2)", border:"none", color:"#fff", borderRadius:14, padding:"8px 14px", cursor:"pointer", fontWeight:800, fontSize:12, fontFamily:"inherit", backdropFilter:"blur(10px)" }}>
+              🚪 Quitter
+            </button>
           </div>
         </div>
         <div style={{ display: "flex", gap: 4 }}>
@@ -8542,7 +8544,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                                 }
                               }
                               refreshResas();
-                            }} style={{
+                            <button onClick={() => setPendingModalConfirm(g)} style={{
                               background:`linear-gradient(135deg,${C.green},#1E8449)`, border:"none",
                               color:"#fff", borderRadius:50, padding:"7px 14px",
                               cursor:"pointer", fontWeight:900, fontSize:12, fontFamily:"inherit",
@@ -9591,4 +9593,4 @@ export default function App() {
     </div>
   );
 }
-// fix comptes montant club Sun Apr  5 23:56:59 CEST 2026
+// multi fixes Mon Apr  6 00:03:06 CEST 2026
