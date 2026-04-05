@@ -8028,15 +8028,18 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
 
   // Montant natation selon forfait (groupé par membre+date_creation)
   const montantNat = (resas) => {
+    // Grouper par membre + enfants (triés) + minute de création = même logique que le reste
     const groups = {};
     resas.forEach(r => {
-      const key = `${r.membre_id}-${(r.created_at||"").slice(0,10)}`;
+      const enfantsKey = Array.isArray(r.enfants) ? [...r.enfants].sort().join(",") : "";
+      const minute = (r.created_at||"").slice(0,16);
+      const key = `${r.membre_id}-${enfantsKey}-${minute}`;
       if (!groups[key]) groups[key] = [];
       groups[key].push(r);
     });
+    const PRIX_NAT = { 1:20, 2:40, 3:60, 4:80, 5:95, 6:113, 7:131, 8:147, 9:162, 10:170 };
     return Object.values(groups).reduce((total, g) => {
       const n = g.length;
-      const PRIX_NAT = { 1:20, 2:40, 3:60, 4:80, 5:95, 6:113, 7:131, 8:147, 9:162, 10:170 };
       const prix = n <= 10 ? (PRIX_NAT[n] || n*20) : 170 + (n-10)*17;
       return total + prix;
     }, 0);
@@ -9530,4 +9533,4 @@ export default function App() {
     </div>
   );
 }
-// debug delete Sun Apr  5 23:18:28 CEST 2026
+// fix montant nat Sun Apr  5 23:23:02 CEST 2026
