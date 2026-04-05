@@ -7504,30 +7504,66 @@ function FacturesTab({ dbMembres, dbResas, dbResasClub }) {
 
   // Regrouper résas natation par forfait
   const grouperNatation = (resasNat, enfantsFilter = null) => {
+    if (resasNat.length === 0) return [];
+
+    // Grouper par enfant pour calculer le bon forfait par enfant
+    const parEnfant = {};
+    resasNat.forEach(r => {
+      const enfs = Array.isArray(r.enfants) && r.enfants.length > 0 ? r.enfants : ["—"];
+      enfs.forEach(prenom => {
+        if (!parEnfant[prenom]) parEnfant[prenom] = [];
+        parEnfant[prenom].push(r);
+      });
+    });
+
+    // Si plusieurs enfants, forfait par enfant
+    const enfantsList = Object.keys(parEnfant);
+    if (enfantsList.length > 1) {
+      return enfantsList.map(prenom => {
+        const n = parEnfant[prenom].length;
+        const prix = getPrixNat(n);
+        return {
+          label: `🏊 École de Natation — Forfait ${n} leçon${n>1?"s":""} (${prenom})`,
+          montant: prix,
+          detail: `${n} séance${n>1?"s":""} · ${prenom}`
+        };
+      });
+    }
+
+    // Un seul enfant ou résas sans distinction
     const total = resasNat.length;
-    if (total === 0) return [];
     const prix = getPrixNat(total);
-    const nomsEnfants = enfantsFilter && enfantsFilter.size > 0
-      ? [...enfantsFilter].join(", ")
-      : [...new Set(resasNat.flatMap(r => Array.isArray(r.enfants) ? r.enfants : []))].join(", ");
-    const detail = `${total} séance${total>1?"s":""}${nomsEnfants ? " · " + nomsEnfants : ""}`;
-    return [{ label: `🏊 École de Natation — Forfait ${total} leçon${total>1?"s":""}`, montant: prix, detail }];
+    const nomsEnfants = enfantsList[0] !== "—" ? enfantsList[0] : "";
+    return [{ label: `🏊 École de Natation — Forfait ${total} leçon${total>1?"s":""}`, montant: prix, detail: `${total} séance${total>1?"s":""}${nomsEnfants?" · "+nomsEnfants:""}` }];
   };
 
-  // Regrouper résas club par session
+  // Regrouper résas club par session et par enfant
   const grouperClub = (resasClub, enfantsFilter = null) => {
-    const matin  = resasClub.filter(r => r.session === "matin");
-    const apmidi = resasClub.filter(r => r.session === "apmidi");
+    if (resasClub.length === 0) return [];
+
+    // Grouper par enfant + session
+    const parEnfantSession = {};
+    resasClub.forEach(r => {
+      const enfs = Array.isArray(r.enfants) && r.enfants.length > 0 ? r.enfants : ["—"];
+      const session = r.session || "matin";
+      enfs.forEach(prenom => {
+        const k = `${prenom}__${session}`;
+        if (!parEnfantSession[k]) parEnfantSession[k] = { prenom, session, resas: [] };
+        parEnfantSession[k].resas.push(r);
+      });
+    });
+
     const groupes = [];
-    const nomsEnfants = enfantsFilter && enfantsFilter.size > 0 ? [...enfantsFilter].join(", ") : "";
-    if (matin.length > 0) {
-      const montant = matin.reduce((s,r) => s + getMontantResa(r,"club"), 0);
-      groupes.push({ label: `☀️ Club de Plage — Matin`, montant, detail: `${matin.length} jour${matin.length>1?"s":""}${nomsEnfants?" · "+nomsEnfants:""}` });
-    }
-    if (apmidi.length > 0) {
-      const montant = apmidi.reduce((s,r) => s + getMontantResa(r,"club"), 0);
-      groupes.push({ label: `🌊 Club de Plage — Après-midi`, montant, detail: `${apmidi.length} jour${apmidi.length>1?"s":""}${nomsEnfants?" · "+nomsEnfants:""}` });
-    }
+    Object.values(parEnfantSession).forEach(({ prenom, session, resas }) => {
+      const montant = resas.reduce((s,r) => s + getMontantResa(r,"club"), 0);
+      const sessionLabel = session === "matin" ? "☀️ Club de Plage — Matin" : "🌊 Club de Plage — Après-midi";
+      const enfantLabel = prenom !== "—" ? ` (${prenom})` : "";
+      groupes.push({
+        label: `${sessionLabel}${enfantLabel}`,
+        montant,
+        detail: `${resas.length} jour${resas.length>1?"s":""}${prenom!=="—"?" · "+prenom:""}`
+      });
+    });
     return groupes;
   };
 
@@ -9484,4 +9520,4 @@ export default function App() {
     </div>
   );
 }
-// fix groupement enfants Sun Apr  5 23:03:08 CEST 2026
+// facture montant par enfant Sun Apr  5 23:12:08 CEST 2026
