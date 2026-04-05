@@ -4078,8 +4078,9 @@ function ModifierMembreModal({ membre, onClose, onSaved }) {
     adresse_vac: membre.adresse_vac || "",
     ville_vac:   membre.ville_vac   || "",
     cp_vac:      membre.cp_vac      || "",
-    droitImage:     membre.droitImage     || false,
-    droitDiffusion: membre.droitDiffusion || false,
+    droitImage:        membre.droitImage        || false,
+    droitDiffusion:    membre.droitDiffusion    || false,
+    comptefinSaison:   membre.compte_fin_saison || false,
   });
   const [saving, setSaving] = useState(false);
   const [error, setError]   = useState("");
@@ -4097,6 +4098,7 @@ function ModifierMembreModal({ membre, onClose, onSaved }) {
         adresse: form.adresse, ville: form.ville, cp: form.cp,
         adresse_vac: form.adresse_vac, ville_vac: form.ville_vac, cp_vac: form.cp_vac,
         droit_image: form.droitImage, droit_diffusion: form.droitDiffusion,
+        compte_fin_saison: form.comptefinSaison,
       }).eq("id", membre.id);
       onSaved();
       onClose();
@@ -4153,6 +4155,17 @@ function ModifierMembreModal({ membre, onClose, onSaved }) {
               </div>
             ))}
           </div>
+
+          <div onClick={() => setForm(prev => ({...prev, comptefinSaison:!prev.comptefinSaison}))}
+            style={{ display:"flex", alignItems:"center", gap:12, background: form.comptefinSaison?`${C.ocean}12`:"#f5f5f5", border:`2px solid ${form.comptefinSaison?C.ocean:"#e0e8f0"}`, borderRadius:14, padding:"12px 14px", cursor:"pointer" }}>
+            <div style={{ fontSize:22 }}>{form.comptefinSaison?"📒":"📒"}</div>
+            <div style={{ flex:1 }}>
+              <div style={{ fontWeight:800, color: form.comptefinSaison?C.ocean:"#555", fontSize:13 }}>📒 Règlement fin de saison</div>
+              <div style={{ fontSize:11, color:"#aaa" }}>Prestations réglées en fin de saison</div>
+            </div>
+            <div style={{ fontSize:18 }}>{form.comptefinSaison?"✅":"⬜"}</div>
+          </div>
+
           {error && <div style={{ background:"#fff0f0", border:"1.5px solid #fca5a5", borderRadius:10, padding:"9px 14px", fontSize:13, color:"#e74c3c", fontWeight:700 }}>⚠️ {error}</div>}
           <SunBtn color={saving?"#aaa":C.coral} full onClick={handleSave} disabled={saving}>
             {saving ? "⏳ Enregistrement..." : "✅ Enregistrer les modifications"}
@@ -7011,7 +7024,7 @@ function ComptesTab({ dbMembres, dbResas, dbResasClub, onRefresh }) {
   const getPrixNat = n => n <= 10 ? (PRIX_NAT[n] || n*20) : 170+(n-10)*17;
 
   // Membres avec compte fin de saison
-  const membresCompte = (dbMembres || []).filter(m => m.compte_fin_saison);
+  const membresCompte = (dbMembres || []).filter(m => m.compte_fin_saison && !m.compte_solde);
 
   const getMontantResa = (r, type) => {
     if (type === "natation") return Number(r.montant || 20);
@@ -7045,15 +7058,18 @@ function ComptesTab({ dbMembres, dbResas, dbResasClub, onRefresh }) {
 
   const addAcompte = async (membreId) => {
     if (!acompteForm.montant || !acompteForm.date_paiement) { alert("Montant et date requis."); return; }
-    const { data } = await sb.from("comptes_acomptes").insert([{
-      membre_id: membreId, montant: Number(acompteForm.montant),
-      date_paiement: acompteForm.date_paiement, label: acompteForm.label || "Acompte",
-    }]).select().single();
-    if (data) {
+    try {
+      const { data, error } = await sb.from("comptes_acomptes").insert([{
+        membre_id: membreId,
+        montant: Number(acompteForm.montant),
+        date_paiement: acompteForm.date_paiement,
+        label: acompteForm.label || "Acompte",
+      }]).select().single();
+      if (error) throw error;
       setAcomptes(prev => ({ ...prev, [membreId]: [...(prev[membreId]||[]), data] }));
       setAcompteForm({ montant:"", date_paiement:"", label:"" });
       setShowAcompte(null);
-    }
+    } catch(e) { alert("Erreur : " + e.message); }
   };
 
   const deleteAcompte = async (membreId, acompteId) => {
@@ -7291,16 +7307,17 @@ Document généré le ${new Date().toLocaleDateString("fr-FR")}
                     🖨️ Générer la facture
                   </button>
                   {compte.solde === 0 ? (
-                    <div style={{ flex:1, background:`${C.green}15`, borderRadius:12, padding:"11px", textAlign:"center", fontWeight:900, fontSize:13, color:C.green }}>✅ Soldé</div>
-                  ) : (
                     <button onClick={async () => {
-                      const montant = prompt(`Solder le compte de ${m.prenom} ${m.nom} ?\nSolde dû : ${compte.solde} €\n\nMontant soldé :`);
-                      if (!montant) return;
-                      const { data } = await sb.from("comptes_acomptes").insert([{
-                        membre_id: m.id, montant: Number(montant),
-                        date_paiement: new Date().toISOString().slice(0,10), label: "Solde final",
-                      }]).select().single();
-                      if (data) setAcomptes(prev => ({ ...prev, [m.id]: [...(prev[m.id]||[]), data] }));
+                      if (!window.confirm(`Marquer le compte de ${m.prenom} ${m.nom} comme soldé ?`)) return;
+                      await sb.from("membres").update({ compte_solde: true }).eq("id", m.id);
+                      onRefresh();
+                    }} style={{ flex:1, background:`linear-gradient(135deg,${C.green},#27AE60)`, border:"none", color:"#fff", borderRadius:12, padding:"11px", cursor:"pointer", fontWeight:900, fontSize:13, fontFamily:"inherit" }}>
+                      ✅ Marquer soldé
+                    </button>
+                  ) : (
+                    <button onClick={() => {
+                      setAcompteForm({ montant: String(compte.solde), date_paiement: new Date().toISOString().slice(0,10), label: "Solde final" });
+                      setShowAcompte(m.id);
                     }} style={{ flex:1, background:`linear-gradient(135deg,${C.green},#27AE60)`, border:"none", color:"#fff", borderRadius:12, padding:"11px", cursor:"pointer", fontWeight:900, fontSize:13, fontFamily:"inherit" }}>
                       💶 Solder le compte
                     </button>
@@ -8710,4 +8727,4 @@ export default function App() {
     </div>
   );
 }
-// cgv update Sun Apr  5 10:31:10 CEST 2026
+// comptes fixes Sun Apr  5 10:40:02 CEST 2026
