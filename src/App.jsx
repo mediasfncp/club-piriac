@@ -8047,8 +8047,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
 
   const LIBERTE_PRIX = { 6:96, 12:180, 18:252, 24:288, 30:330 };
   const montantClub = (resas) => {
-    // Grouper par membre + session + enfants + minute comme le reste
-    // pour éviter de compter le montant total × nb de résas du groupe
+    // Grouper par membre + session + enfants + minute
     const groups = {};
     resas.forEach(r => {
       const enfantsKey = Array.isArray(r.enfants) ? [...r.enfants].sort().join(",") : "";
@@ -8058,21 +8057,18 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
       groups[key].push(r);
     });
     return Object.values(groups).reduce((total, g) => {
-      // Priorité : [MONTANT:XX] dans label_jour (montant par jour × nb jours)
+      const r0 = g[0];
+      // Carte liberté : prix fixe unique
+      const nb = Number(Array.isArray(r0.enfants) ? r0.enfants[0] : 0);
+      if (nb >= 6 && LIBERTE_PRIX[nb]) return total + LIBERTE_PRIX[nb];
+      // Montant stocké sur la première résa = total du groupe (78€ pour la semaine)
+      if (r0.montant) return total + Number(r0.montant);
+      // Fallback : lire [MONTANT:XX] × nb résas (ancien comportement)
       const parLabelJour = g.reduce((s, r) => {
         const match = (r.label_jour||"").match(/\[MONTANT:(\d+)\]/);
         return s + (match ? Number(match[1]) : 0);
       }, 0);
-      if (parLabelJour > 0) return total + parLabelJour;
-
-      // Sinon carte liberté
-      const r0 = g[0];
-      const nb = Number(Array.isArray(r0.enfants) ? r0.enfants[0] : 0);
-      if (nb >= 6 && LIBERTE_PRIX[nb]) return total + LIBERTE_PRIX[nb];
-
-      // Sinon montant stocké (1 seule fois pour le groupe)
-      if (r0.montant) return total + Number(r0.montant);
-      return total;
+      return total + parLabelJour;
     }, 0);
   };
 
@@ -8679,9 +8675,6 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
           if (e) throw e;
         } else if (item.type === "club") {
           const sessions = item.session === "journee" ? ["matin","apmidi"] : [item.session || "matin"];
-          const nbDates = (item.dates || []).length || 1;
-          const nbSessions = sessions.length;
-          const montantParJourParSession = Math.round(item.prix / (nbDates * nbSessions));
           for (const iso of (item.dates || [])) {
             for (const sess of sessions) {
               const { error: e } = await sb.from("reservations_club").insert([{
@@ -8690,7 +8683,7 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
                 session:          sess,
                 statut:           "pending",
                 enfants:          item.enfants || [],
-                label_jour:       `[MONTANT:${montantParJourParSession}] ${new Date(iso).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}`,
+                label_jour:       `[MONTANT:${item.prix}] ${new Date(iso).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}`,
               }]);
               if (e) throw e;
             }
@@ -9557,4 +9550,4 @@ export default function App() {
     </div>
   );
 }
-// fix montant par jour Sun Apr  5 23:38:34 CEST 2026
+// fix montant par jour Sun Apr  5 23:44:59 CEST 2026
