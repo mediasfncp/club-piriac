@@ -8197,6 +8197,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
         <div style={{ maxWidth: 1400, margin: "0 auto" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <BackBtn onNav={onNav} />
             <div>
               <div style={{ color: "rgba(255,255,255,0.75)", fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase" }}>🏖️ EOLE BEACH CLUB · Piriac-sur-Mer</div>
               <h2 style={{ color: "#fff", margin: 0, fontWeight: 900, fontSize: 22 }}>Administration</h2>
@@ -8211,9 +8212,6 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
               <div style={{ color: "rgba(255,255,255,0.8)", fontSize: 10, fontWeight:700 }}>En attente</div>
               <div style={{ color: C.sun, fontWeight: 900, fontSize: 20 }}>{pendingCount}</div>
             </div>
-            <button onClick={() => onNav("home")} style={{ background:"rgba(255,255,255,0.2)", border:"none", color:"#fff", borderRadius:14, padding:"8px 14px", cursor:"pointer", fontWeight:800, fontSize:12, fontFamily:"inherit", backdropFilter:"blur(10px)" }}>
-              🚪 Quitter
-            </button>
           </div>
         </div>
         <div style={{ display: "flex", gap: 4 }}>
@@ -9560,4 +9558,4 @@ export default function App() {
     </div>
   );
 }
-// fix build orphan Mon Apr  6 00:05:20 CEST 2026
+// admin back btn Mon Apr  6 00:11:51 CEST 2026
