@@ -7420,7 +7420,11 @@ function FacturesTab({ dbMembres, dbResas, dbResasClub }) {
 
     // Enfants avec date de naissance
     const enfantsHtml = (membre.enfants||[]).map(e => {
-      const ddn = e.naissance ? new Date(e.naissance.slice(0,10).split("-").join(",")).toLocaleDateString("fr-FR") : "—";
+      let ddn = "—";
+      if (e.naissance) {
+        const parts = e.naissance.slice(0,10).split("-");
+        ddn = `${parts[2]}/${parts[1]}/${parts[0]}`;
+      }
       return `<tr><td>${e.sexe==="M"?"👦":"👧"} ${e.prenom} ${(e.nom||"").toUpperCase()}</td><td style="text-align:center">${ddn}</td></tr>`;
     }).join("");
 
@@ -9195,4 +9199,4 @@ export default function App() {
     </div>
   );
 }
-// facture enfants Sun Apr  5 15:39:31 CEST 2026
+// fix date naissance Sun Apr  5 15:46:52 CEST 2026
