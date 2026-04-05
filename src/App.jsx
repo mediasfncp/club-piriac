@@ -7117,10 +7117,42 @@ function ComptesTab({ dbMembres, dbResas, dbResasClub, onRefresh }) {
   const getCompte = (membre) => {
     const resasNat  = dbResas.filter(r => r.membre_id === membre.id && r.statut === "confirmed" && !exclusions[r.id]);
     const resasClub = dbResasClub.filter(r => r.membre_id === membre.id && r.statut === "confirmed" && !exclusions[r.id]);
-    const totalPrestations = [
-      ...resasNat.map(r => getMontantResa(r, "natation")),
-      ...resasClub.map(r => getMontantResa(r, "club")),
-    ].reduce((s, v) => s + v, 0);
+
+    // Natation : forfait par groupe enfant+minute
+    const natGroups = {};
+    resasNat.forEach(r => {
+      const enfantsKey = Array.isArray(r.enfants) ? [...r.enfants].sort().join(",") : "";
+      const minute = (r.created_at||"").slice(0,16);
+      const k = `${enfantsKey}-${minute}`;
+      if (!natGroups[k]) natGroups[k] = [];
+      natGroups[k].push(r);
+    });
+    const PRIX_NAT = {1:20,2:40,3:60,4:80,5:95,6:113,7:131,8:147,9:162,10:170};
+    const totalNat = Object.values(natGroups).reduce((s, g) => {
+      const n = g.length;
+      return s + (n <= 10 ? (PRIX_NAT[n] || n*20) : 170+(n-10)*17);
+    }, 0);
+
+    // Club : r.montant une seule fois par groupe session+enfants+minute
+    const clubGroups = {};
+    resasClub.forEach(r => {
+      const enfantsKey = Array.isArray(r.enfants) ? [...r.enfants].sort().join(",") : "";
+      const minute = (r.created_at||"").slice(0,16);
+      const k = `${r.session}-${enfantsKey}-${minute}`;
+      if (!clubGroups[k]) clubGroups[k] = [];
+      clubGroups[k].push(r);
+    });
+    const LP = {6:96,12:180,18:252,24:288,30:330};
+    const totalClub = Object.values(clubGroups).reduce((s, g) => {
+      const r0 = g[0];
+      const nb = Number(r0.enfants?.[0]);
+      if (nb >= 6 && LP[nb]) return s + LP[nb];
+      if (r0.montant) return s + Number(r0.montant);
+      const match = (r0.label_jour||"").match(/\[MONTANT:(\d+)\]/);
+      return s + (match ? Number(match[1]) : 0);
+    }, 0);
+
+    const totalPrestations = totalNat + totalClub;
     const totalAcomptes = (acomptes[membre.id] || []).reduce((s, a) => s + a.montant, 0);
     const remise = remises[membre.id] || 0;
     return { resasNat, resasClub, totalPrestations, totalAcomptes, remise, solde: Math.max(0, totalPrestations - totalAcomptes - remise) };
@@ -9559,4 +9591,4 @@ export default function App() {
     </div>
   );
 }
-// fix facture montant club Sun Apr  5 23:53:08 CEST 2026
+// fix comptes montant club Sun Apr  5 23:56:59 CEST 2026
