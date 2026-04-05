@@ -7037,6 +7037,7 @@ const MODES_PAIEMENT = [
   { id:"cheque",           label:"✉️ Chèque",            color:"#3B82F6" },
   { id:"cheques_vacances", label:"🎫 Chèques vacances",  color:"#8B5CF6" },
   { id:"virement",         label:"🏦 Virement",          color:"#10B981" },
+  { id:"offert",           label:"🎁 Offert",            color:"#EC4899" },
 ];
 
 function ModePaiementModal({ onConfirm, onClose, titre }) {
@@ -7069,10 +7070,13 @@ function ModePaiementModal({ onConfirm, onClose, titre }) {
 }
 
 function ComptesTab({ dbMembres, dbResas, dbResasClub, onRefresh }) {
-  const [acomptes, setAcomptes]       = useState({});   // { membreId: [{id, montant, date_paiement, label}] }
-  const [exclusions, setExclusions]   = useState({});   // { resaId: true }
-  const [showAcompte, setShowAcompte] = useState(null); // membreId en cours
+  const [acomptes, setAcomptes]       = useState({});
+  const [exclusions, setExclusions]   = useState({});
+  const [showAcompte, setShowAcompte] = useState(null);
   const [acompteForm, setAcompteForm] = useState({ montant:"", date_paiement:"", label:"" });
+  const [remises, setRemises]         = useState({});   // { membreId: montant }
+  const [showRemise, setShowRemise]   = useState(null);
+  const [remiseForm, setRemiseForm]   = useState("");
   const [loading, setLoading]         = useState(true);
   const [selectedMembre, setSelectedMembre] = useState(null);
 
@@ -7119,7 +7123,8 @@ function ComptesTab({ dbMembres, dbResas, dbResasClub, onRefresh }) {
       ...resasClub.map(r => getMontantResa(r, "club")),
     ].reduce((s, v) => s + v, 0);
     const totalAcomptes = (acomptes[membre.id] || []).reduce((s, a) => s + a.montant, 0);
-    return { resasNat, resasClub, totalPrestations, totalAcomptes, solde: totalPrestations - totalAcomptes };
+    const remise = remises[membre.id] || 0;
+    return { resasNat, resasClub, totalPrestations, totalAcomptes, remise, solde: Math.max(0, totalPrestations - totalAcomptes - remise) };
   };
 
   const toggleExclusion = async (resaId, resaType) => {
@@ -7160,14 +7165,16 @@ function ComptesTab({ dbMembres, dbResas, dbResasClub, onRefresh }) {
   };
 
   const genererFacture = (membre, compte) => {
+    const remise = compte.remise || 0;
     const nomMembre = `${membre.prenom} ${(membre.nom||"").toUpperCase()}`;
     const lignesNat = compte.resasNat.map(r => `<tr><td>🏊 Natation · ${r.heure}</td><td>${r.date_seance ? parseLocalDate(r.date_seance).toLocaleDateString("fr-FR",{day:"numeric",month:"short"}) : "—"}</td><td style="text-align:right;font-weight:700">${getMontantResa(r,"natation")} €</td></tr>`).join("");
     const lignesClub = compte.resasClub.map(r => {
       const isLib = (r.label_jour||"").startsWith("[LIBERTE]");
       const label = isLib ? "🎟️ Liberté" : r.session==="matin" ? "🏖️ Club Matin" : "🏖️ Club Après-midi";
-      return `<tr><td>${label}</td><td>${r.date_reservation ? new Date(r.date_reservation).toLocaleDateString("fr-FR",{day:"numeric",month:"short"}) : "—"}</td><td style="text-align:right;font-weight:700">${getMontantResa(r,"club")} €</td></tr>`;
+      return `<tr><td>${label}</td><td>${r.date_reservation ? parseLocalDate(r.date_reservation).toLocaleDateString("fr-FR",{day:"numeric",month:"short"}) : "—"}</td><td style="text-align:right;font-weight:700">${getMontantResa(r,"club")} €</td></tr>`;
     }).join("");
     const lignesAcomptes = (acomptes[membre.id]||[]).map(a => `<tr style="background:#E8F5E9"><td colspan="2">✅ ${a.label} — ${new Date(a.date_paiement).toLocaleDateString("fr-FR")}</td><td style="text-align:right;font-weight:700;color:#2e7d32">- ${a.montant} €</td></tr>`).join("");
+    const ligneRemise = remise > 0 ? `<tr style="background:#FDF2F8"><td colspan="2">🎁 Remise</td><td style="text-align:right;font-weight:700;color:#EC4899">- ${remise} €</td></tr>` : "";
     const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Facture ${nomMembre}</title>
 <style>body{font-family:Arial,sans-serif;color:#2C3E50;padding:30px;max-width:680px;margin:0 auto}
 .header{background:linear-gradient(135deg,#1A8FE3,#4ECDC4);color:#fff;padding:20px 24px;border-radius:12px;margin-bottom:24px}
@@ -7178,24 +7185,27 @@ th{background:#1A8FE3;color:#fff;padding:9px 12px;text-align:left;font-size:11px
 td{padding:8px 12px;border-bottom:1px solid #f0f0f0;font-size:13px}
 .total-row td{font-weight:900;font-size:15px;background:#f0f4f8;border-top:2px solid #1A8FE3}
 .solde{background:linear-gradient(135deg,#1A8FE3,#4ECDC4);color:#fff;padding:16px 20px;border-radius:12px;display:flex;justify-content:space-between;align-items:center;margin-top:16px}
+.tva{text-align:center;margin-top:12px;padding:8px;background:#fafafa;border:1px solid #e0e0e0;border-radius:6px;font-size:11px;color:#666;font-style:italic}
 .footer{margin-top:24px;text-align:center;font-size:11px;color:#888;line-height:1.8}
 @media print{button{display:none}}</style></head><body>
-<div class="header"><h1>🏖️ Eole Beach Club</h1><p class="sub">Club de Plage · École de Natation · Piriac-sur-Mer · Saison 2026</p></div>
+<div class="header"><h1>🏖️ Eole Beach Club</h1><p class="sub">Club de Plage · École de Natation · Piriac-sur-Mer · Saison 2026 · SIRET : 839 887 072 00024</p></div>
 <h2 style="margin:0 0 4px">Récapitulatif de compte</h2>
-<p style="color:#888;font-size:13px;margin:0 0 20px">Client : <strong>${nomMembre}</strong> · Saison 2026</p>
+<p style="color:#888;font-size:13px;margin:0 0 20px">Client : <strong>${nomMembre}</strong> · ${membre.adresse||""} ${membre.cp||""} ${membre.ville||""}</p>
 <table>
 <thead><tr><th>Prestation</th><th>Date</th><th style="text-align:right">Montant</th></tr></thead>
 <tbody>${lignesNat}${lignesClub}
 <tr class="total-row"><td colspan="2">Sous-total prestations</td><td style="text-align:right">${compte.totalPrestations} €</td></tr>
-${lignesAcomptes}
+${lignesAcomptes}${ligneRemise}
 </tbody></table>
 <div class="solde"><span style="font-size:15px;font-weight:700">SOLDE DÛ</span><span style="font-size:26px;font-weight:900">${compte.solde} €</span></div>
+<div class="tva">TVA non applicable — article 293 B du CGI</div>
 <div class="footer">
-Eole Beach Club · Plage Saint-Michel · 44420 Piriac-sur-Mer<br/>
+Eole Beach Club · SIRET 839 887 072 00024<br/>
+Plage Saint-Michel · Rue des Caps Horniers · 44420 Piriac-sur-Mer<br/>
 📞 07 67 78 69 22 · clubdeplage.piriacsurmer@hotmail.com<br/>
 Document généré le ${new Date().toLocaleDateString("fr-FR")}
 </div>
-<div style="text-align:center;margin-top:20px"><button onclick="window.print()" style="background:#1A8FE3;color:#fff;border:none;padding:10px 24px;border-radius:8px;font-size:14px;cursor:pointer;font-weight:700">🖨️ Imprimer</button></div>
+<div style="text-align:center;margin-top:20px"><button onclick="window.print()" style="background:#1A8FE3;color:#fff;border:none;padding:10px 24px;border-radius:8px;font-size:14px;cursor:pointer;font-weight:700">🖨️ Imprimer / PDF</button></div>
 </body></html>`;
     const win = window.open("","_blank");
     if (win) { win.document.write(html); win.document.close(); }
@@ -7362,7 +7372,7 @@ Document généré le ${new Date().toLocaleDateString("fr-FR")}
                 </div>
 
                 {/* Récap total */}
-                <div style={{ background:`${C.ocean}08`, borderRadius:14, padding:"14px 16px", display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginBottom:14 }}>
+                <div style={{ background:`${C.ocean}08`, borderRadius:14, padding:"14px 16px", display:"grid", gridTemplateColumns:`1fr 1fr${compte.remise > 0 ? " 1fr" : ""} 1fr`, gap:8, marginBottom:14 }}>
                   <div style={{ textAlign:"center" }}>
                     <div style={{ fontWeight:900, fontSize:18, color:C.ocean }}>{compte.totalPrestations} €</div>
                     <div style={{ fontSize:10, color:"#aaa", textTransform:"uppercase" }}>Prestations</div>
@@ -7371,11 +7381,40 @@ Document généré le ${new Date().toLocaleDateString("fr-FR")}
                     <div style={{ fontWeight:900, fontSize:18, color:C.green }}>- {compte.totalAcomptes} €</div>
                     <div style={{ fontSize:10, color:"#aaa", textTransform:"uppercase" }}>Acomptes</div>
                   </div>
+                  {compte.remise > 0 && (
+                    <div style={{ textAlign:"center" }}>
+                      <div style={{ fontWeight:900, fontSize:18, color:"#EC4899" }}>- {compte.remise} €</div>
+                      <div style={{ fontSize:10, color:"#aaa", textTransform:"uppercase" }}>Remise</div>
+                    </div>
+                  )}
                   <div style={{ textAlign:"center" }}>
                     <div style={{ fontWeight:900, fontSize:22, color: compte.solde === 0 ? C.green : C.coral }}>{compte.solde} €</div>
                     <div style={{ fontSize:10, color:"#aaa", textTransform:"uppercase" }}>Solde dû</div>
                   </div>
                 </div>
+
+                {/* Remise */}
+                {showRemise === m.id ? (
+                  <div style={{ background:"#FDF2F8", border:"2px solid #EC4899", borderRadius:12, padding:"12px 14px", marginBottom:10 }}>
+                    <div style={{ fontWeight:800, color:"#EC4899", fontSize:12, marginBottom:8 }}>🎁 Remise supplémentaire</div>
+                    <div style={{ display:"flex", gap:8 }}>
+                      <input type="number" value={remiseForm} onChange={e => setRemiseForm(e.target.value)} placeholder="Montant €"
+                        style={{ flex:1, border:"2px solid #EC489960", borderRadius:8, padding:"8px 10px", fontSize:13, fontFamily:"inherit", outline:"none" }} />
+                      <button onClick={() => {
+                        if (!remiseForm) return;
+                        setRemises(prev => ({ ...prev, [m.id]: Number(remiseForm) }));
+                        setShowRemise(null); setRemiseForm("");
+                      }} style={{ background:"#EC4899", border:"none", color:"#fff", borderRadius:8, padding:"8px 14px", cursor:"pointer", fontWeight:900, fontFamily:"inherit" }}>OK</button>
+                      <button onClick={() => { setShowRemise(null); setRemiseForm(""); }}
+                        style={{ background:"#f0f0f0", border:"none", color:"#888", borderRadius:8, padding:"8px 12px", cursor:"pointer", fontWeight:800, fontFamily:"inherit" }}>✕</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button onClick={() => { setShowRemise(m.id); setRemiseForm(String(compte.remise || "")); }}
+                    style={{ width:"100%", background:"#FDF2F8", border:"2px dashed #EC489960", color:"#EC4899", borderRadius:12, padding:"8px", cursor:"pointer", fontWeight:800, fontSize:12, fontFamily:"inherit", marginBottom:10 }}>
+                    🎁 {compte.remise > 0 ? `Remise : - ${compte.remise} €  (modifier)` : "Ajouter une remise"}
+                  </button>
+                )}
 
                 {/* Actions */}
                 <div style={{ display:"flex", gap:8 }}>
@@ -7487,7 +7526,7 @@ function FacturesTab({ dbMembres, dbResas, dbResasClub }) {
     return groupes;
   };
 
-  const buildFactureHtml = (membre, numFac, dateEmission, modePaiement = null) => {
+  const buildFactureHtml = (membre, numFac, dateEmission, modePaiement = null, remise = 0) => {
     const resasNat  = (dbResas||[]).filter(r => r.membre_id === membre.id && r.statut === "confirmed");
     const resasClub = (dbResasClub||[]).filter(r => r.membre_id === membre.id && r.statut === "confirmed" && !(Number(r.enfants?.[0]) >= 6 && !isNaN(Number(r.enfants?.[0]))));
     const acMembre  = acomptes[membre.id] || [];
@@ -7498,7 +7537,13 @@ function FacturesTab({ dbMembres, dbResas, dbResasClub }) {
 
     const totalPrestations = toutesLignes.reduce((s,l)=>s+l.montant, 0);
     const totalAcomptes    = acMembre.reduce((s,a)=>s+a.montant, 0);
-    const solde            = totalPrestations - totalAcomptes;
+    const solde            = Math.max(0, totalPrestations - totalAcomptes - remise);
+
+    // Résoudre le mode paiement en texte/couleur AVANT le template
+    const mpObj = modePaiement ? MODES_PAIEMENT.find(m => m.id === modePaiement) : null;
+    const mpLabel = mpObj ? mpObj.label : "";
+    const mpColor = mpObj ? mpObj.color : "#888";
+    const mpHtml = mpObj ? `<div style="text-align:center;margin-bottom:8px"><span style="background:${mpColor}22;color:${mpColor};border-radius:50px;padding:5px 16px;font-size:13px;font-weight:800">${mpLabel}</span></div>` : "";
 
     const adresse = [membre.adresse, `${membre.cp||""} ${membre.ville||""}`].filter(Boolean).join("<br/>");
 
@@ -7588,9 +7633,10 @@ ${(membre.enfants||[]).length > 0 ? `
 
 <div class="total-box">
   <span class="label">${solde > 0 ? "SOLDE DÛ" : "MONTANT PAYÉ"}</span>
-  <span class="amount">${totalPrestations - totalAcomptes < 0 ? 0 : solde} €</span>
+  <span class="amount">${solde} €</span>
 </div>
-${modePaiement ? `<div style="text-align:center;margin-bottom:8px"><span style="background:${MODES_PAIEMENT.find(m=>m.id===modePaiement)?.color||'#888'}22;color:${MODES_PAIEMENT.find(m=>m.id===modePaiement)?.color||'#888'};border-radius:50px;padding:5px 16px;font-size:13px;font-weight:800">${MODES_PAIEMENT.find(m=>m.id===modePaiement)?.label||modePaiement}</span></div>` : ""}
+${remise > 0 ? `<div style="text-align:center;margin-bottom:8px;color:#EC4899;font-size:12px;font-weight:700">🎁 Remise appliquée : - ${remise} €</div>` : ""}
+${mpHtml}
 
 <div class="tva">TVA non applicable — article 293 B du CGI</div>
 
@@ -8870,6 +8916,7 @@ function ProfilConnecte({ user, setUser, setScreen, reservations }) {
   const [liberteBalance, setLiberteBalance] = useState(user?.liberteBalance || 0);
   const [liberteTotal, setLiberteTotal]     = useState(user?.liberteTotal   || 0);
   const [enfants, setEnfants]         = useState(user?.enfants || []);
+  const [facture, setFacture]         = useState(null); // facture générée par admin
   const [showAddEnfant, setShowAddEnfant] = useState(false);
   const [editEnfant, setEditEnfant]   = useState(null);
   const [enfantForm, setEnfantForm]   = useState({ prenom:"", nom:"", naissance:"", sexe:"", activite:"club", niveau:"debutant", allergies:"", personnesAutorisees:"" });
@@ -8877,12 +8924,14 @@ function ProfilConnecte({ user, setUser, setScreen, reservations }) {
 
   const loadData = async () => {
     if (!user?.supabaseId) { setLoading(false); return; }
-    const [{ data: club }, { data: membre }, { data: enf }] = await Promise.all([
+    const [{ data: club }, { data: membre }, { data: enf }, { data: fac }] = await Promise.all([
       sb.from("reservations_club").select("*").eq("membre_id", user.supabaseId).order("date_reservation"),
       sb.from("membres").select("liberte_balance, liberte_total").eq("id", user.supabaseId).single(),
       sb.from("enfants").select("*").eq("membre_id", user.supabaseId),
+      sb.from("factures_numeros").select("*").eq("membre_id", user.supabaseId).single().catch(() => ({ data: null })),
     ]);
     setEnfants(enf || []);
+    setFacture(fac || null);
     setLiberteBalance(membre?.liberte_balance || 0);
     setLiberteTotal(membre?.liberte_total || 0);
     setLoading(false);
@@ -9003,6 +9052,101 @@ function ProfilConnecte({ user, setUser, setScreen, reservations }) {
             ➕ {enfants.length === 0 ? "Ajouter un enfant" : "Ajouter un autre enfant"}
           </button>
         </div>
+
+        {/* Facture si disponible */}
+        {facture && (
+          <div style={{ borderTop:"1px solid #f0f0f0", paddingTop:12, marginBottom:12 }}>
+            <div style={{ fontWeight:800, color:C.dark, fontSize:13, marginBottom:8 }}>🧾 Ma facture</div>
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", background:`${C.ocean}08`, border:`1.5px solid ${C.ocean}30`, borderRadius:12, padding:"10px 14px" }}>
+              <div>
+                <div style={{ fontWeight:800, color:C.ocean, fontSize:13 }}>{facture.numero}</div>
+                <div style={{ fontSize:11, color:"#aaa" }}>
+                  {facture.date_emission ? (() => { const p=facture.date_emission.slice(0,10).split("-"); return `Émise le ${p[2]}/${p[1]}/${p[0]}`; })() : ""}
+                  {facture.total ? ` · ${facture.total} €` : ""}
+                </div>
+              </div>
+              <button onClick={() => {
+                const contenu = facture.contenu || {};
+                const lignesNat  = (contenu.groupesNat||[]).map(g => `<tr><td><strong>${g.label}</strong><br/><span style="font-size:11px;color:#888">${g.detail}</span></td><td style="text-align:right;font-weight:700">${g.montant} €</td></tr>`).join("");
+                const lignesClub = (contenu.groupesClub||[]).map(g => `<tr><td><strong>${g.label}</strong><br/><span style="font-size:11px;color:#888">${g.detail}</span></td><td style="text-align:right;font-weight:700">${g.montant} €</td></tr>`).join("");
+                const lignesAc   = (contenu.acomptes||[]).map(a => `<tr style="background:#f0fdf4"><td style="color:#16a34a">✅ ${a.label} — ${new Date(a.date_paiement).toLocaleDateString("fr-FR")}</td><td style="text-align:right;color:#16a34a;font-weight:700">- ${a.montant} €</td></tr>`).join("");
+                const adresse = [user.adresse, `${user.cp||""} ${user.ville||""}`].filter(Boolean).join("<br/>");
+                const enfantsHtml = enfants.map(e => { const p=e.naissance?.slice(0,10).split("-")||[]; const ddn=p.length===3?`${p[2]}/${p[1]}/${p[0]}`:"—"; return `<tr><td>${e.sexe==="M"?"👦":"👧"} ${e.prenom} ${(e.nom||"").toUpperCase()}</td><td style="text-align:center">${ddn}</td></tr>`; }).join("");
+                const dateEm = facture.date_emission ? (() => { const p=facture.date_emission.slice(0,10).split("-"); return `${p[2]}/${p[1]}/${p[0]}`; })() : "";
+                const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${facture.numero}</title>
+<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;color:#1a1a1a;padding:40px;font-size:13px}.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #1A8FE3}.club h1{font-size:18px;color:#1A8FE3;margin-bottom:4px}.club p{font-size:11px;color:#555;line-height:1.7}table{width:100%;border-collapse:collapse;margin-bottom:8px}th{background:#1A8FE3;color:#fff;padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase}td{padding:8px 12px;border-bottom:1px solid #f0f0f0}.total-box{background:linear-gradient(135deg,#1A8FE3,#4ECDC4);color:#fff;padding:14px 18px;border-radius:10px;display:flex;justify-content:space-between;align-items:center;margin:14px 0}.tva{text-align:center;font-size:11px;color:#666;font-style:italic;margin-top:10px}.footer{margin-top:20px;text-align:center;font-size:10px;color:#888;line-height:1.8}@media print{.no-print{display:none}}</style></head><body>
+<div class="header"><div class="club"><h1>🏖️ Eole Beach Club</h1><p>Club de Plage · École de Natation<br/>Plage Saint-Michel · Rue des Caps Horniers · 44420 Piriac-sur-Mer<br/>SIRET : 839 887 072 00024</p></div><div style="text-align:right"><div style="font-size:20px;font-weight:900;color:#1A8FE3">${facture.numero}</div><div style="font-size:11px;color:#888">Émise le ${dateEm}</div></div></div>
+<div style="background:#f8faff;border:1.5px solid #dbe8ff;border-radius:8px;padding:14px 18px;margin-bottom:16px"><div style="font-size:10px;text-transform:uppercase;color:#888;margin-bottom:6px">Facture établie pour</div><div style="font-size:15px;font-weight:900">${user.prenom} ${(user.nom||"").toUpperCase()}</div><div style="font-size:12px;color:#555;line-height:1.7">${adresse}${user.email?"<br/>"+user.email:""}${user.tel?"<br/>📞 "+user.tel:""}</div></div>
+${enfants.length>0?`<div style="font-size:10px;text-transform:uppercase;color:#888;margin-bottom:6px;margin-top:12px">Enfant(s) inscrit(s)</div><table><thead><tr><th>Nom</th><th style="text-align:center">Date de naissance</th></tr></thead><tbody>${enfantsHtml}</tbody></table>`:""}
+<div style="font-size:10px;text-transform:uppercase;color:#888;margin-bottom:6px;margin-top:12px">Prestations — Saison 2026</div>
+<table><thead><tr><th>Prestation</th><th style="text-align:right">Montant</th></tr></thead><tbody>${lignesNat}${lignesClub}${lignesAc}</tbody></table>
+<div class="total-box"><span style="font-weight:700">${(facture.solde||0)===0?"MONTANT PAYÉ":"SOLDE DÛ"}</span><span style="font-size:26px;font-weight:900">${facture.solde||0} €</span></div>
+<div class="tva">TVA non applicable — article 293 B du CGI</div>
+<div class="footer">Eole Beach Club · SIRET 839 887 072 00024<br/>Plage Saint-Michel · 44420 Piriac-sur-Mer · clubdeplage.piriacsurmer@hotmail.com</div>
+<div class="no-print" style="text-align:center;margin-top:16px"><button onclick="window.print()" style="background:#1A8FE3;color:#fff;border:none;padding:10px 24px;border-radius:8px;font-size:13px;cursor:pointer;font-weight:700">🖨️ Télécharger / Imprimer</button></div>
+</body></html>`;
+                const win = window.open("","_blank");
+                if (win) { win.document.write(html); win.document.close(); }
+              }} style={{ background:`linear-gradient(135deg,${C.ocean},${C.sea})`, border:"none", color:"#fff", borderRadius:10, padding:"8px 14px", cursor:"pointer", fontWeight:900, fontSize:12, fontFamily:"inherit" }}>
+                📥 Télécharger
+              </button>
+            </div>
+          </div>
+        )}
+
+        <SunBtn color={C.sunset} full onClick={async () => {
+          try { await sb.auth.signOut(); } catch(e) {}
+          setUser(null); setScreen("home");
+        {/* Facture disponible */}
+        {facture && (
+          <div style={{ borderTop:"1px solid #f0f0f0", paddingTop:12, marginBottom:4 }}>
+            <div style={{ fontWeight:800, color:C.dark, fontSize:13, marginBottom:8 }}>🧾 Ma facture</div>
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", background:`${C.ocean}08`, border:`1.5px solid ${C.ocean}30`, borderRadius:12, padding:"10px 14px" }}>
+              <div>
+                <div style={{ fontWeight:800, color:C.ocean, fontSize:13 }}>{facture.numero}</div>
+                <div style={{ fontSize:11, color:"#aaa" }}>
+                  Émise le {(() => { const p=(facture.date_emission||"").slice(0,10).split("-"); return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:"—"; })()}
+                  {facture.total ? ` · ${facture.total} €` : ""}
+                </div>
+              </div>
+              <button onClick={() => {
+                const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${facture.numero}</title>
+<style>body{font-family:Arial,sans-serif;color:#2C3E50;padding:30px;max-width:680px;margin:0 auto}
+.header{background:linear-gradient(135deg,#1A8FE3,#4ECDC4);color:#fff;padding:20px 24px;border-radius:12px;margin-bottom:24px}
+h1{margin:0 0 4px;font-size:20px}.sub{font-size:12px;opacity:.85;margin:0}
+table{width:100%;border-collapse:collapse;margin-bottom:8px}
+th{background:#1A8FE3;color:#fff;padding:9px 12px;text-align:left;font-size:11px;text-transform:uppercase}
+td{padding:8px 12px;border-bottom:1px solid #f0f0f0;font-size:13px}
+.total-row td{font-weight:900;font-size:15px;background:#f0f4f8;border-top:2px solid #1A8FE3}
+.solde{background:linear-gradient(135deg,#1A8FE3,#4ECDC4);color:#fff;padding:16px 20px;border-radius:12px;display:flex;justify-content:space-between;align-items:center;margin-top:16px}
+.tva{text-align:center;margin-top:12px;padding:8px;background:#fafafa;border:1px solid #e0e0e0;border-radius:6px;font-size:11px;color:#666;font-style:italic}
+.footer{margin-top:24px;text-align:center;font-size:11px;color:#888;line-height:1.8}
+@media print{button{display:none}}</style></head><body>
+<div class="header"><h1>🏖️ Eole Beach Club</h1><p class="sub">Club de Plage · École de Natation · Piriac-sur-Mer · Saison 2026 · SIRET : 839 887 072 00024</p></div>
+<div style="display:flex;justify-content:space-between;margin-bottom:20px">
+  <div><h2 style="margin:0 0 4px">${facture.numero}</h2><p style="color:#888;font-size:12px;margin:0">Émise le ${(() => { const p=(facture.date_emission||"").slice(0,10).split("-"); return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:"—"; })()}</p></div>
+  <div style="text-align:right"><p style="color:#555;font-size:13px;margin:0">${user.prenom} ${(user.nom||"").toUpperCase()}<br/>${user.email||""}</p></div>
+</div>
+${facture.contenu ? `
+<table><thead><tr><th>Prestation</th><th style="text-align:right">Montant</th></tr></thead><tbody>
+${(facture.contenu.groupesNat||[]).map(g=>`<tr><td>${g.label}<br/><span style="font-size:11px;color:#888">${g.detail}</span></td><td style="text-align:right;font-weight:700">${g.montant} €</td></tr>`).join("")}
+${(facture.contenu.groupesClub||[]).map(g=>`<tr><td>${g.label}<br/><span style="font-size:11px;color:#888">${g.detail}</span></td><td style="text-align:right;font-weight:700">${g.montant} €</td></tr>`).join("")}
+<tr class="total-row"><td>Sous-total prestations</td><td style="text-align:right">${facture.total} €</td></tr>
+${(facture.contenu.acomptes||[]).map(a=>`<tr style="background:#E8F5E9"><td style="color:#2e7d32">✅ ${a.label}</td><td style="text-align:right;font-weight:700;color:#2e7d32">- ${a.montant} €</td></tr>`).join("")}
+</tbody></table>` : ""}
+<div class="solde"><span style="font-size:15px;font-weight:700">SOLDE DÛ</span><span style="font-size:26px;font-weight:900">${facture.solde} €</span></div>
+<div class="tva">TVA non applicable — article 293 B du CGI</div>
+<div class="footer">Eole Beach Club · SIRET 839 887 072 00024<br/>Plage Saint-Michel · 44420 Piriac-sur-Mer<br/>clubdeplage.piriacsurmer@hotmail.com</div>
+<div style="text-align:center;margin-top:20px"><button onclick="window.print()" style="background:#1A8FE3;color:#fff;border:none;padding:10px 24px;border-radius:8px;font-size:14px;cursor:pointer;font-weight:700">🖨️ Télécharger / Imprimer</button></div>
+</body></html>`;
+                const win = window.open("","_blank");
+                if (win) { win.document.write(html); win.document.close(); }
+              }} style={{ background:`linear-gradient(135deg,${C.ocean},${C.sea})`, border:"none", color:"#fff", borderRadius:10, padding:"8px 14px", cursor:"pointer", fontWeight:900, fontSize:12, fontFamily:"inherit" }}>
+                🧾 Télécharger
+              </button>
+            </div>
+          </div>
+        )}
 
         <SunBtn color={C.sunset} full onClick={async () => {
           try { await sb.auth.signOut(); } catch(e) {}
@@ -9318,4 +9462,4 @@ export default function App() {
     </div>
   );
 }
-// admin email 3 Sun Apr  5 16:13:57 CEST 2026
+// facture fixes Sun Apr  5 22:15:48 CEST 2026
