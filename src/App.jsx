@@ -7843,6 +7843,16 @@ Plage Saint-Michel · 44420 Piriac-sur-Mer
                     style={{ background:generating===m.id?"#bbb":`linear-gradient(135deg,${C.ocean},${C.sea})`, border:"none", color:"#fff", borderRadius:8, padding:"6px 10px", cursor:generating===m.id?"not-allowed":"pointer", fontWeight:900, fontSize:11, fontFamily:"inherit", whiteSpace:"nowrap" }}>
                     {generating===m.id ? "⏳…" : fac ? "⬇️ Télécharger" : "🧾 Générer"}
                   </button>
+                  {fac && (
+                    <button onClick={async e => {
+                      e.stopPropagation();
+                      if (!window.confirm(`Supprimer la facture ${fac.numero} ?`)) return;
+                      await sb.from("factures_numeros").delete().eq("id", fac.id);
+                      setFactures(prev => { const n = {...prev}; delete n[m.id]; return n; });
+                    }} style={{ background:"#fff0f0", border:"1.5px solid #fca5a5", color:"#e74c3c", borderRadius:8, padding:"5px 10px", cursor:"pointer", fontWeight:800, fontSize:11, fontFamily:"inherit", whiteSpace:"nowrap" }}>
+                      🗑 Supprimer
+                    </button>
+                  )}
                   {m.email && (
                     <button onClick={e => { e.stopPropagation(); envoyerParMail(m); }} disabled={sendingMail===m.id}
                       style={{ background:sendingMail===m.id?`${C.green}50`:`${C.green}15`, border:`1.5px solid ${C.green}40`, color:C.green, borderRadius:8, padding:"5px 10px", cursor:"pointer", fontWeight:800, fontSize:11, fontFamily:"inherit", whiteSpace:"nowrap" }}>
@@ -9431,4 +9441,4 @@ export default function App() {
     </div>
   );
 }
-// fix ternaire Sun Apr  5 22:40:55 CEST 2026
+// delete facture Sun Apr  5 22:47:26 CEST 2026
