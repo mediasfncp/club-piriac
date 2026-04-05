@@ -8970,7 +8970,18 @@ function ProfilConnecte({ user, setUser, setScreen, reservations }) {
     setLoading(false);
   };
 
-  useEffect(() => { loadData().catch(() => setLoading(false)); }, [user?.supabaseId]);
+  useEffect(() => {
+    loadData().catch(() => setLoading(false));
+    // Rafraîchir la facture toutes les 30s (pour détecter suppression côté admin)
+    const interval = setInterval(() => {
+      if (user?.supabaseId) {
+        sb.from("factures_numeros").select("*").eq("membre_id", user.supabaseId).order("created_at", { ascending: false }).limit(1)
+          .then(({ data }) => setFacture(data?.[0] || null))
+          .catch(() => {});
+      }
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [user?.supabaseId]);
 
   const openAddEnfant = () => {
     setEnfantForm({ prenom:"", nom:"", naissance:"", sexe:"", activite:"club", niveau:"debutant", allergies:"", personnesAutorisees:"" });
@@ -9089,7 +9100,10 @@ function ProfilConnecte({ user, setUser, setScreen, reservations }) {
         {/* Facture si disponible */}
         {facture && (
           <div style={{ borderTop:"1px solid #f0f0f0", paddingTop:12, marginBottom:12 }}>
-            <div style={{ fontWeight:800, color:C.dark, fontSize:13, marginBottom:8 }}>🧾 Ma facture</div>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+              <div style={{ fontWeight:800, color:C.dark, fontSize:13 }}>🧾 Ma facture</div>
+              <button onClick={() => loadData()} style={{ background:"none", border:"none", color:"#aaa", cursor:"pointer", fontSize:16, padding:4 }} title="Actualiser">🔄</button>
+            </div>
             <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", background:`${C.ocean}08`, border:`1.5px solid ${C.ocean}30`, borderRadius:12, padding:"10px 14px" }}>
               <div>
                 <div style={{ fontWeight:800, color:C.ocean, fontSize:13 }}>{facture.numero}</div>
@@ -9441,4 +9455,4 @@ export default function App() {
     </div>
   );
 }
-// delete facture Sun Apr  5 22:47:26 CEST 2026
+// facture sync Sun Apr  5 22:50:40 CEST 2026
