@@ -9103,7 +9103,7 @@ function ProfilConnecte({ user, setUser, setScreen, reservations }) {
 ${enfants.length>0?`<div style="font-size:10px;text-transform:uppercase;color:#888;margin-bottom:6px;margin-top:12px">Enfant(s) inscrit(s)</div><table><thead><tr><th>Nom</th><th style="text-align:center">Date de naissance</th></tr></thead><tbody>${enfantsHtml}</tbody></table>`:""}
 <div style="font-size:10px;text-transform:uppercase;color:#888;margin-bottom:6px;margin-top:12px">Prestations — Saison 2026</div>
 <table><thead><tr><th>Prestation</th><th style="text-align:right">Montant</th></tr></thead><tbody>${lignesNat}${lignesClub}${lignesAc}</tbody></table>
-<div class="total-box"><span style="font-weight:700">${(facture.solde||0)===0?MONTANT PAYÉ":"SOLDE DÛ}</span><span style="font-size:26px;font-weight:900">${facture.solde||0} €</span></div>
+<div class="total-box"><span style="font-weight:700">MONTANT PAYÉ</span><span style="font-size:26px;font-weight:900">${facture.solde||0} €</span></div>
 <div class="tva">TVA non applicable — article 293 B du CGI</div>
 <div class="footer">Eole Beach Club · SIRET 839 887 072 00024<br/>Plage Saint-Michel · 44420 Piriac-sur-Mer · clubdeplage.piriacsurmer@hotmail.com</div>
 <div class="no-print" style="text-align:center;margin-top:16px"><button onclick="window.print()" style="background:#1A8FE3;color:#fff;border:none;padding:10px 24px;border-radius:8px;font-size:13px;cursor:pointer;font-weight:700">🖨️ Télécharger / Imprimer</button></div>
@@ -9431,4 +9431,4 @@ export default function App() {
     </div>
   );
 }
-// facture enfants select Sun Apr  5 22:38:54 CEST 2026
+// fix ternaire Sun Apr  5 22:40:55 CEST 2026
