@@ -3177,7 +3177,7 @@ function InscriptionScreen({ onNav, setUser }) {
                 if (!newEnfant.prenom || !newEnfant.nom || !newEnfant.naissance) { alert("Merci de remplir le prénom, nom et date de naissance."); return; }
                 const age = calcAge(newEnfant.naissance);
                 if (age < 3) { alert("L'enfant doit avoir au moins 3 ans pour s'inscrire."); return; }
-                  if (age > 12) { alert("L'inscription est réservée aux enfants de 12 ans maximum."); return; }
+                  if (age > 13) { alert("L'inscription est réservée aux enfants de 13 ans maximum."); return; }
                 setForm(p => ({ ...p, enfants: [...p.enfants, { ...newEnfant, id: Date.now() }] }));
                 setNewEnfant({ prenom:"", nom:"", naissance:"", sexe:"", activite:"club", niveau:"debutant", allergies:"", personnesAutorisees:"" });
               }} style={{ width:"100%", background:`${C.ocean}10`, border:`2px dashed ${C.ocean}40`, color:C.ocean, borderRadius:14, padding:"11px", cursor:"pointer", fontWeight:900, fontSize:13, fontFamily:"inherit", marginBottom:14 }}>
@@ -3192,7 +3192,7 @@ function InscriptionScreen({ onNav, setUser }) {
                 if (newEnfant.prenom && newEnfant.nom && newEnfant.naissance) {
                   const age = calcAge(newEnfant.naissance);
                   if (age < 3) { alert("L'enfant doit avoir au moins 3 ans pour s'inscrire."); return; }
-                  if (age > 12) { alert("L'inscription est réservée aux enfants de 12 ans maximum."); return; }
+                  if (age > 13) { alert("L'inscription est réservée aux enfants de 13 ans maximum."); return; }
                   setForm(p => ({ ...p, enfants: [...p.enfants, { ...newEnfant, id: Date.now() }] }));
                   setNewEnfant({ prenom:"", nom:"", naissance:"", sexe:"", activite:"club", niveau:"debutant", allergies:"", personnesAutorisees:"" });
                 } else if (form.enfants.length === 0) {
@@ -8415,7 +8415,7 @@ function ProfilConnecte({ user, setUser, setScreen, reservations }) {
     if (!enfantForm.prenom || !enfantForm.naissance) { alert("Prénom et date de naissance requis."); return; }
     const age = calcAge(enfantForm.naissance);
     if (age < 2) { alert("L'enfant doit avoir au moins 2 ans."); return; }
-    if (age > 12) { alert("L'inscription est réservée aux enfants de 12 ans maximum."); return; }
+    if (age > 13) { alert("L'inscription est réservée aux enfants de 13 ans maximum."); return; }
     setSavingEnfant(true);
     try {
       if (editEnfant) {
@@ -8827,4 +8827,4 @@ export default function App() {
     </div>
   );
 }
-// cgv fix Sun Apr  5 12:30:10 CEST 2026
+// age max 13 Sun Apr  5 12:33:01 CEST 2026
