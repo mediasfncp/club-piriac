@@ -8679,6 +8679,9 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
           if (e) throw e;
         } else if (item.type === "club") {
           const sessions = item.session === "journee" ? ["matin","apmidi"] : [item.session || "matin"];
+          const nbDates = (item.dates || []).length || 1;
+          const nbSessions = sessions.length;
+          const montantParJourParSession = Math.round(item.prix / (nbDates * nbSessions));
           for (const iso of (item.dates || [])) {
             for (const sess of sessions) {
               const { error: e } = await sb.from("reservations_club").insert([{
@@ -8687,7 +8690,7 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
                 session:          sess,
                 statut:           "pending",
                 enfants:          item.enfants || [],
-                label_jour:       `[MONTANT:${item.prix}] ${new Date(iso).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}`,
+                label_jour:       `[MONTANT:${montantParJourParSession}] ${new Date(iso).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}`,
               }]);
               if (e) throw e;
             }
@@ -9554,4 +9557,4 @@ export default function App() {
     </div>
   );
 }
-// fix montant club encaissement Sun Apr  5 23:28:22 CEST 2026
+// fix montant par jour Sun Apr  5 23:38:34 CEST 2026
