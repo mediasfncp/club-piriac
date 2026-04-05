@@ -7420,8 +7420,8 @@ function FacturesTab({ dbMembres, dbResas, dbResasClub }) {
 
     // Enfants avec date de naissance
     const enfantsHtml = (membre.enfants||[]).map(e => {
-      const ddn = e.naissance ? new Date(e.naissance.slice(0,10).split("-").join(",")).toLocaleDateString("fr-FR") : "";
-      return `<tr><td>${e.sexe==="M"?"👦":"👧"} ${e.prenom} ${(e.nom||"").toUpperCase()}</td><td style="text-align:center">${ddn}</td><td style="text-align:center">${e.activite==="club"?"🏖️ Club":e.activite==="natation"?"🏊 Natation":"🏖️🏊 Les deux"}</td></tr>`;
+      const ddn = e.naissance ? new Date(e.naissance.slice(0,10).split("-").join(",")).toLocaleDateString("fr-FR") : "—";
+      return `<tr><td>${e.sexe==="M"?"👦":"👧"} ${e.prenom} ${(e.nom||"").toUpperCase()}</td><td style="text-align:center">${ddn}</td></tr>`;
     }).join("");
 
     const lignesPrestations = toutesLignes.map(l =>
@@ -7484,7 +7484,7 @@ tr:nth-child(even) td{background:#fafbff}
 ${(membre.enfants||[]).length > 0 ? `
 <div class="section-title">Enfant(s) inscrit(s)</div>
 <table>
-  <thead><tr><th>Nom</th><th style="text-align:center">Date de naissance</th><th style="text-align:center">Activité</th></tr></thead>
+  <thead><tr><th>Nom</th><th style="text-align:center">Date de naissance</th></tr></thead>
   <tbody>${enfantsHtml}</tbody>
 </table>` : ""}
 
@@ -9195,4 +9195,4 @@ export default function App() {
     </div>
   );
 }
-// factures v2 Sun Apr  5 15:33:27 CEST 2026
+// facture enfants Sun Apr  5 15:39:31 CEST 2026
