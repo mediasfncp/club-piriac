@@ -7504,36 +7504,54 @@ function FacturesTab({ dbMembres, dbResas, dbResasClub }) {
   };
 
   // Regrouper résas natation par forfait
-  const grouperNatation = (resasNat) => {
+  const grouperNatation = (resasNat, enfantsFilter = null) => {
     const total = resasNat.length;
     if (total === 0) return [];
     const prix = getPrixNat(total);
-    return [{ label: `🏊 École de Natation — Forfait ${total} leçon${total>1?"s":""}`, montant: prix, detail: `${total} séance${total>1?"s":""} · ${resasNat[0]?.heure||""}` }];
+    const nomsEnfants = enfantsFilter && enfantsFilter.size > 0
+      ? [...enfantsFilter].join(", ")
+      : [...new Set(resasNat.flatMap(r => Array.isArray(r.enfants) ? r.enfants : []))].join(", ");
+    const detail = `${total} séance${total>1?"s":""}${nomsEnfants ? " · " + nomsEnfants : ""}`;
+    return [{ label: `🏊 École de Natation — Forfait ${total} leçon${total>1?"s":""}`, montant: prix, detail }];
   };
 
   // Regrouper résas club par session
-  const grouperClub = (resasClub) => {
+  const grouperClub = (resasClub, enfantsFilter = null) => {
     const matin  = resasClub.filter(r => r.session === "matin");
     const apmidi = resasClub.filter(r => r.session === "apmidi");
     const groupes = [];
+    const nomsEnfants = enfantsFilter && enfantsFilter.size > 0 ? [...enfantsFilter].join(", ") : "";
     if (matin.length > 0) {
       const montant = matin.reduce((s,r) => s + getMontantResa(r,"club"), 0);
-      groupes.push({ label: `☀️ Club de Plage — Matin`, montant, detail: `${matin.length} jour${matin.length>1?"s":""}` });
+      groupes.push({ label: `☀️ Club de Plage — Matin`, montant, detail: `${matin.length} jour${matin.length>1?"s":""}${nomsEnfants?" · "+nomsEnfants:""}` });
     }
     if (apmidi.length > 0) {
       const montant = apmidi.reduce((s,r) => s + getMontantResa(r,"club"), 0);
-      groupes.push({ label: `🌊 Club de Plage — Après-midi`, montant, detail: `${apmidi.length} jour${apmidi.length>1?"s":""}` });
+      groupes.push({ label: `🌊 Club de Plage — Après-midi`, montant, detail: `${apmidi.length} jour${apmidi.length>1?"s":""}${nomsEnfants?" · "+nomsEnfants:""}` });
     }
     return groupes;
   };
 
   const buildFactureHtml = (membre, numFac, dateEmission, modePaiement = null, remise = 0, enfantsFilter = null) => {
-    const resasNat  = (dbResas||[]).filter(r => r.membre_id === membre.id && r.statut === "confirmed");
-    const resasClub = (dbResasClub||[]).filter(r => r.membre_id === membre.id && r.statut === "confirmed" && !(Number(r.enfants?.[0]) >= 6 && !isNaN(Number(r.enfants?.[0]))));
+    // Filtrer les résas selon les enfants sélectionnés
+    const filterByEnfants = (resas) => {
+      if (!enfantsFilter || enfantsFilter.size === 0) return resas;
+      return resas.filter(r => {
+        const enfs = Array.isArray(r.enfants) ? r.enfants : [];
+        // Garder si au moins un enfant de la résa est dans la sélection
+        return enfs.some(e => enfantsFilter.has(e));
+      });
+    };
+
+    const resasNatAll  = (dbResas||[]).filter(r => r.membre_id === membre.id && r.statut === "confirmed");
+    const resasClubAll = (dbResasClub||[]).filter(r => r.membre_id === membre.id && r.statut === "confirmed" && !(Number(r.enfants?.[0]) >= 6 && !isNaN(Number(r.enfants?.[0]))));
+
+    const resasNat  = filterByEnfants(resasNatAll);
+    const resasClub = filterByEnfants(resasClubAll);
     const acMembre  = acomptes[membre.id] || [];
 
-    const groupesNat  = grouperNatation(resasNat);
-    const groupesClub = grouperClub(resasClub);
+    const groupesNat  = grouperNatation(resasNat, enfantsFilter);
+    const groupesClub = grouperClub(resasClub, enfantsFilter);
     const toutesLignes = [...groupesNat, ...groupesClub];
 
     const totalPrestations = toutesLignes.reduce((s,l)=>s+l.montant, 0);
@@ -7660,11 +7678,21 @@ ${mpHtml}
   const genererFacture = async (membre) => {
     setGenerating(membre.id);
     try {
-      const resasNat  = (dbResas||[]).filter(r => r.membre_id === membre.id && r.statut === "confirmed");
-      const resasClub = (dbResasClub||[]).filter(r => r.membre_id === membre.id && r.statut === "confirmed" && !(Number(r.enfants?.[0]) >= 6 && !isNaN(Number(r.enfants?.[0]))));
+      const selEnfants = enfantsSelectionnes[membre.id] || new Set((membre.enfants||[]).map(e => e.prenom));
+      const filterByEnfants = (resas) => {
+        if (!selEnfants || selEnfants.size === 0) return resas;
+        return resas.filter(r => {
+          const enfs = Array.isArray(r.enfants) ? r.enfants : [];
+          return enfs.some(e => selEnfants.has(e));
+        });
+      };
+      const resasNatAll  = (dbResas||[]).filter(r => r.membre_id === membre.id && r.statut === "confirmed");
+      const resasClubAll = (dbResasClub||[]).filter(r => r.membre_id === membre.id && r.statut === "confirmed" && !(Number(r.enfants?.[0]) >= 6 && !isNaN(Number(r.enfants?.[0]))));
+      const resasNat  = filterByEnfants(resasNatAll);
+      const resasClub = filterByEnfants(resasClubAll);
       const acMembre  = acomptes[membre.id] || [];
-      const groupesNat  = grouperNatation(resasNat);
-      const groupesClub = grouperClub(resasClub);
+      const groupesNat  = grouperNatation(resasNat, selEnfants);
+      const groupesClub = grouperClub(resasClub, selEnfants);
       const total = [...groupesNat,...groupesClub].reduce((s,l)=>s+l.montant,0);
       const totalAc = acMembre.reduce((s,a)=>s+a.montant,0);
       const solde = total - totalAc;
@@ -9455,4 +9483,4 @@ export default function App() {
     </div>
   );
 }
-// facture sync Sun Apr  5 22:50:40 CEST 2026
+// facture filter enfants Sun Apr  5 22:56:48 CEST 2026
