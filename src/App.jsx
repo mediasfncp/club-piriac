@@ -3289,6 +3289,7 @@ function InscriptionScreen({ onNav, setUser }) {
                   </div>
                   <div style={{ overflowY:"auto", padding:"16px 20px 32px", display:"flex", flexDirection:"column", gap:14, fontSize:14, color:"#555", lineHeight:1.7 }}>
                     <div><strong style={{ color:C.dark }}>💶 Remboursement</strong><br/>Aucune prestation ne pourra être remboursée, excepté sur présentation d'une attestation médicale justifiant l'impossibilité de participer aux activités.</div>
+                    <div><strong style={{ color:C.dark }}>⛅ Annulation par le club</strong><br/>En cas d'annulation par le club (météo défavorable, force majeure ou tout autre motif indépendant de notre volonté), les séances seront reportées à une date ultérieure.</div>
                     <div><strong style={{ color:C.dark }}>📋 Règlement Club de Plage</strong><br/>Respecter les consignes des animateurs · Prévoir un équipement adapté (casquette, gourde, serviette, maillot) · Pas de nourriture dans l'espace de jeux.</div>
                     <div><strong style={{ color:C.dark }}>🏊 Règlement Natation</strong><br/>Arriver 5 min avant la séance · Enfants accompagnés jusqu'au bassin · Inscription préalable obligatoire.</div>
                     <div><strong style={{ color:C.dark }}>📸 Droit à l'image</strong><br/>Des photos et/ou vidéos pourront être réalisées lors des séances à des fins de communication non commerciale, sous réserve de votre autorisation.</div>
@@ -3302,7 +3303,7 @@ function InscriptionScreen({ onNav, setUser }) {
             <div style={{ background: `${C.deep}08`, border: `1.5px solid ${C.deep}25`, borderRadius: 14, padding: 14, marginBottom: 14 }}>
               <div style={{ fontWeight: 800, color: C.deep, fontSize: 13, marginBottom: 8 }}>📄 Conditions Générales de Vente</div>
               <div style={{ background: `${C.sunset}10`, border: `1px solid ${C.sunset}30`, borderRadius: 10, padding: "9px 12px", marginBottom: 10, fontSize: 12, color: "#555", lineHeight: 1.6 }}>
-                💶 <strong>Remboursement :</strong> Aucune prestation ne pourra être remboursée, excepté sur présentation d'une attestation médicale justifiant l'impossibilité de participer.
+                💶 <strong>Remboursement :</strong> Aucune prestation ne pourra être remboursée, excepté sur présentation d'une attestation médicale justifiant l'impossibilité de participer.<br/><br/>⛅ <strong>Annulation par le club :</strong> En cas d'annulation par le club (météo défavorable, force majeure ou tout autre motif indépendant de notre volonté), les séances seront reportées à une date ultérieure.
               </div>
               <div onClick={() => setForm(p => ({ ...p, cgvAccepted: !p.cgvAccepted }))} style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer" }}>
                 <div style={{ width: 22, height: 22, borderRadius: 8, border: `2.5px solid ${form.cgvAccepted ? C.green : "#ccc"}`, background: form.cgvAccepted ? C.green : "transparent", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 900, fontSize: 13, flexShrink: 0, marginTop: 1, transition: "all .15s" }}>
@@ -8709,4 +8710,4 @@ export default function App() {
     </div>
   );
 }
-// admin btn fix Sat Apr  4 23:38:20 CEST 2026
+// cgv update Sun Apr  5 10:31:10 CEST 2026
