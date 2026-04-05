@@ -9094,33 +9094,6 @@ ${enfants.length>0?`<div style="font-size:10px;text-transform:uppercase;color:#8
           </div>
         )}
 
-        {/* Facture disponible */}
-        {facture && (
-          <div style={{ borderTop:"1px solid #f0f0f0", paddingTop:12, marginBottom:4 }}>
-            <div style={{ fontWeight:800, color:C.dark, fontSize:13, marginBottom:8 }}>🧾 Ma facture</div>
-            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", background:`${C.ocean}08`, border:`1.5px solid ${C.ocean}30`, borderRadius:12, padding:"10px 14px" }}>
-              <div>
-                <div style={{ fontWeight:800, color:C.ocean, fontSize:13 }}>{facture.numero}</div>
-                <div style={{ fontSize:11, color:"#aaa" }}>
-                  Émise le {(() => { const p=(facture.date_emission||"").slice(0,10).split("-"); return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:"—"; })()}
-                  {facture.total ? ` · ${facture.total} €` : ""}
-                </div>
-              </div>
-              <button onClick={() => {
-                const dateF = (() => { const p=(facture.date_emission||"").slice(0,10).split("-"); return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:"—"; })();
-                const lignesNat = (facture.contenu?.groupesNat||[]).map(g=>`<tr><td><strong>${g.label}</strong><br/><span style="font-size:11px;color:#888">${g.detail}</span></td><td style="text-align:right;font-weight:700">${g.montant} €</td></tr>`).join("");
-                const lignesClub = (facture.contenu?.groupesClub||[]).map(g=>`<tr><td><strong>${g.label}</strong><br/><span style="font-size:11px;color:#888">${g.detail}</span></td><td style="text-align:right;font-weight:700">${g.montant} €</td></tr>`).join("");
-                const lignesAc = (facture.contenu?.acomptes||[]).map(a=>`<tr style="background:#E8F5E9"><td style="color:#2e7d32">✅ ${a.label}</td><td style="text-align:right;font-weight:700;color:#2e7d32">- ${a.montant} €</td></tr>`).join("");
-                const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${facture.numero}</title><style>body{font-family:Arial,sans-serif;color:#2C3E50;padding:30px;max-width:680px;margin:0 auto}.header{background:linear-gradient(135deg,#1A8FE3,#4ECDC4);color:#fff;padding:20px 24px;border-radius:12px;margin-bottom:24px}h1{margin:0 0 4px;font-size:20px}.sub{font-size:12px;opacity:.85;margin:0}table{width:100%;border-collapse:collapse;margin-bottom:8px}th{background:#1A8FE3;color:#fff;padding:9px 12px;text-align:left;font-size:11px;text-transform:uppercase}td{padding:8px 12px;border-bottom:1px solid #f0f0f0;font-size:13px}.total-row td{font-weight:900;font-size:15px;background:#f0f4f8;border-top:2px solid #1A8FE3}.solde{background:linear-gradient(135deg,#1A8FE3,#4ECDC4);color:#fff;padding:16px 20px;border-radius:12px;display:flex;justify-content:space-between;align-items:center;margin-top:16px}.tva{text-align:center;margin-top:12px;padding:8px;background:#fafafa;border:1px solid #e0e0e0;border-radius:6px;font-size:11px;color:#666;font-style:italic}.footer{margin-top:24px;text-align:center;font-size:11px;color:#888;line-height:1.8}@media print{button{display:none}}</style></head><body><div class="header"><h1>🏖️ Eole Beach Club</h1><p class="sub">Club de Plage · École de Natation · Piriac-sur-Mer · Saison 2026 · SIRET : 839 887 072 00024</p></div><div style="display:flex;justify-content:space-between;margin-bottom:20px"><div><h2 style="margin:0 0 4px">${facture.numero}</h2><p style="color:#888;font-size:12px;margin:0">Émise le ${dateF}</p></div><div style="text-align:right"><p style="color:#555;font-size:13px;margin:0">${user.prenom} ${(user.nom||"").toUpperCase()}</p></div></div><table><thead><tr><th>Prestation</th><th style="text-align:right">Montant</th></tr></thead><tbody>${lignesNat}${lignesClub}<tr class="total-row"><td>Sous-total prestations</td><td style="text-align:right">${facture.total} €</td></tr>${lignesAc}</tbody></table><div class="solde"><span style="font-size:15px;font-weight:700">SOLDE DÛ</span><span style="font-size:26px;font-weight:900">${facture.solde} €</span></div><div class="tva">TVA non applicable — article 293 B du CGI</div><div class="footer">Eole Beach Club · SIRET 839 887 072 00024<br/>Plage Saint-Michel · 44420 Piriac-sur-Mer<br/>clubdeplage.piriacsurmer@hotmail.com</div><div style="text-align:center;margin-top:20px"><button onclick="window.print()" style="background:#1A8FE3;color:#fff;border:none;padding:10px 24px;border-radius:8px;font-size:14px;cursor:pointer;font-weight:700">🖨️ Télécharger / Imprimer</button></div></body></html>`;
-                const win = window.open("","_blank");
-                if (win) { win.document.write(html); win.document.close(); }
-              }} style={{ background:`linear-gradient(135deg,${C.ocean},${C.sea})`, border:"none", color:"#fff", borderRadius:10, padding:"8px 14px", cursor:"pointer", fontWeight:900, fontSize:12, fontFamily:"inherit" }}>
-                🧾 Télécharger
-              </button>
-            </div>
-          </div>
-        )}
-
         <SunBtn color={C.sunset} full onClick={async () => {
           try { await sb.auth.signOut(); } catch(e) {}
           setUser(null); setScreen("home");
@@ -9435,4 +9408,4 @@ export default function App() {
     </div>
   );
 }
-// facture fixes v2 Sun Apr  5 22:29:34 CEST 2026
+// fix doublon facture Sun Apr  5 22:36:04 CEST 2026
