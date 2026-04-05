@@ -8862,6 +8862,7 @@ const ADMIN_CODE = "club2026";
 const ADMIN_EMAILS = [
   "charlenesauzeau@mac.com",
   "clubdeplage.piriacsurmer@hotmail.com",
+  "charlene-sauzeau@live.fr",
 ];
 
 function ProfilConnecte({ user, setUser, setScreen, reservations }) {
@@ -9317,4 +9318,4 @@ export default function App() {
     </div>
   );
 }
-// fix build error Sun Apr  5 16:10:08 CEST 2026
+// admin email 3 Sun Apr  5 16:13:57 CEST 2026
