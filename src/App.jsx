@@ -8988,6 +8988,10 @@ tr:nth-child(even) td{background:#f8fbff}
               {sending ? "⏳ Envoi en cours..." : `📨 Envoyer la demande · ${total} €`}
             </SunBtn>
 
+            <button onClick={() => onNav("formules")} style={{ width:"100%", background:"transparent", border:`2px solid ${C.ocean}`, color:C.ocean, borderRadius:14, padding:"12px", cursor:"pointer", fontWeight:800, fontSize:14, fontFamily:"inherit" }}>
+              ➕ Ajouter une nouvelle prestation
+            </button>
+
             <div style={{ textAlign:"center", fontSize:12, color:"#aaa" }}>
               ⏳ Vos accès seront activés après réception du paiement
             </div>
@@ -9558,4 +9562,4 @@ export default function App() {
     </div>
   );
 }
-// admin back btn Mon Apr  6 00:11:51 CEST 2026
+// nouvelle prestation btn Mon Apr  6 00:16:41 CEST 2026
