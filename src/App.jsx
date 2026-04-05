@@ -7555,7 +7555,16 @@ function FacturesTab({ dbMembres, dbResas, dbResasClub }) {
 
     const groupes = [];
     Object.values(parEnfantSession).forEach(({ prenom, session, resas }) => {
-      const montant = resas.reduce((s,r) => s + getMontantResa(r,"club"), 0);
+      // Prendre r.montant de la première résa (= total du groupe stocké à la validation)
+      // Si pas de montant stocké, lire [MONTANT:XX] sur la première résa seulement
+      let montant = 0;
+      const r0 = resas[0];
+      if (r0.montant) {
+        montant = Number(r0.montant);
+      } else {
+        const match = (r0.label_jour||"").match(/\[MONTANT:(\d+)\]/);
+        montant = match ? Number(match[1]) : 0;
+      }
       const sessionLabel = session === "matin" ? "☀️ Club de Plage — Matin" : "🌊 Club de Plage — Après-midi";
       const enfantLabel = prenom !== "—" ? ` (${prenom})` : "";
       groupes.push({
@@ -9550,4 +9559,4 @@ export default function App() {
     </div>
   );
 }
-// fix montant club dashboard Sun Apr  5 23:46:26 CEST 2026
+// fix facture montant club Sun Apr  5 23:53:08 CEST 2026
