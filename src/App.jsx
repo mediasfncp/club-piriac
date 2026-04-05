@@ -8322,7 +8322,12 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                             <button onClick={async () => {
                               if (!window.confirm(`Supprimer ${g.resas.length} réservation${g.resas.length>1?"s":""} en attente ?`)) return;
                               const table = g.type === "natation" ? "reservations_natation" : "reservations_club";
-                              await Promise.all(g.resas.map(r => sb.from(table).delete().eq("id", r.id)));
+                              const results = await Promise.all(g.resas.map(r => sb.from(table).delete().eq("id", r.id)));
+                              const errors = results.filter(r => r.error);
+                              if (errors.length > 0) {
+                                alert("Erreur suppression : " + errors[0].error.message);
+                                return;
+                              }
                               refreshResas();
                             }} style={{ background:"#FFF0F0", border:"1.5px solid #fca5a5", color:"#e74c3c", borderRadius:50, padding:"5px 12px", cursor:"pointer", fontWeight:900, fontSize:12, fontFamily:"inherit", flexShrink:0, marginLeft:4 }}>🗑</button>
                           </div>
@@ -8485,7 +8490,12 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                             <button onClick={async () => {
                               if (!window.confirm(`Supprimer ${g.resas.length} réservation${g.resas.length>1?"s":""} ?`)) return;
                               const table = g.type === "natation" ? "reservations_natation" : "reservations_club";
-                              await Promise.all(g.resas.map(r => sb.from(table).delete().eq("id", r.id)));
+                              const results = await Promise.all(g.resas.map(r => sb.from(table).delete().eq("id", r.id)));
+                              const errors = results.filter(r => r.error);
+                              if (errors.length > 0) {
+                                alert("Erreur suppression : " + errors[0].error.message);
+                                return;
+                              }
                               refreshResas();
                             }} style={{ background:"#FFF0F0", border:"1.5px solid #fca5a5", color:"#e74c3c", borderRadius:50, padding:"7px 12px", cursor:"pointer", fontWeight:900, fontSize:12, fontFamily:"inherit", flexShrink:0, marginLeft:4 }}>🗑</button>
                           </div>
@@ -9520,4 +9530,4 @@ export default function App() {
     </div>
   );
 }
-// facture montant par enfant Sun Apr  5 23:12:08 CEST 2026
+// debug delete Sun Apr  5 23:18:28 CEST 2026
