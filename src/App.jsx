@@ -8511,39 +8511,6 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                               {g.membre?.email && <div style={{ fontSize:10, color:"#bbb", marginTop:2 }}>{g.membre.email}</div>}
                               {g.resas[0]?.created_at && <div style={{ fontSize:10, color:"#bbb", marginTop:1 }}>📅 Envoyé le {new Date(g.resas[0].created_at).toLocaleDateString("fr-FR",{day:"numeric",month:"short",year:"numeric"})}</div>}
                             </div>
-                            <button onClick={async () => {
-                              const table = g.type === "natation" ? "reservations_natation" : "reservations_club";
-                              if (g.type === "club") {
-                                const LIBERTE_PRIX_V = { 6:96, 12:180, 18:252, 24:288, 30:330 };
-                                for (const r of g.resas) {
-                                  let montant = 0;
-                                  const isLib = !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6;
-                                  if (isLib) { montant = LIBERTE_PRIX_V[Number(r.enfants[0])] || 0; }
-                                  else { const m2 = (r.label_jour||"").match(/\[MONTANT:(\d+)\]/); montant = m2 ? Number(m2[1]) : 0; }
-                                  await sb.from(table).update({ statut:"confirmed", validated_at:new Date().toISOString(), montant }).eq("id", r.id);
-                                }
-                              } else {
-                                await Promise.all(g.resas.map(r => sb.from(table).update({ statut:"confirmed", validated_at:new Date().toISOString() }).eq("id", r.id)));
-                              }
-                              // Achat carte liberté → créditer
-                              if (g.type === "club" && g.resas.some(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6)) {
-                                const r0 = g.resas[0];
-                                const credit = Number(r0.enfants?.[0]) || 0;
-                                if (credit > 0 && r0.membre_id) {
-                                  const { data: m } = await sb.from("membres").select("liberte_balance, liberte_total").eq("id", r0.membre_id).single();
-                                  if (m) await sb.from("membres").update({ liberte_balance: (m.liberte_balance||0)+credit, liberte_total: (m.liberte_total||0)+credit }).eq("id", r0.membre_id);
-                                }
-                              }
-                              // Utilisation carte liberté → décrémenter
-                              if (g.type === "club" && g.resas.some(r => (r.label_jour||"").startsWith("[LIBERTE]"))) {
-                                const membreId = g.resas[0]?.membre_id;
-                                const nbUtil = g.resas.filter(r => (r.label_jour||"").startsWith("[LIBERTE]")).length;
-                                if (membreId && nbUtil > 0) {
-                                  const { data: m } = await sb.from("membres").select("liberte_balance").eq("id", membreId).single();
-                                  if (m) await sb.from("membres").update({ liberte_balance: Math.max(0, (m.liberte_balance||0) - nbUtil) }).eq("id", membreId);
-                                }
-                              }
-                              refreshResas();
                             <button onClick={() => setPendingModalConfirm(g)} style={{
                               background:`linear-gradient(135deg,${C.green},#1E8449)`, border:"none",
                               color:"#fff", borderRadius:50, padding:"7px 14px",
@@ -9593,4 +9560,4 @@ export default function App() {
     </div>
   );
 }
-// multi fixes Mon Apr  6 00:03:06 CEST 2026
+// fix build orphan Mon Apr  6 00:05:20 CEST 2026
