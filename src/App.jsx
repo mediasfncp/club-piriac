@@ -3422,8 +3422,8 @@ function InfosScreen({ onNav }) {
                 </div>
                 {[
                   { icon:"📅", title:"Validité", text:"Les forfaits et cartes Liberté sont valables uniquement sur la saison 2026, du 6 juillet au 22 août. Aucun report sur une saison ultérieure n'est possible." },
-                  { icon:"🔄", title:"Report de séance", text:"En cas d'annulation par le club (météo, force majeure), les séances seront reportées ou remboursées au prorata." },
-                  { icon:"👶", title:"Responsabilité", text:"Les enfants sont placés sous la responsabilité des moniteurs diplômés pendant la durée de la prestation. Les parents sont responsables avant et après la séance." },
+                  { icon:"🔄", title:"Report de séance", text:"En cas d'annulation par le club (météo, force majeure), les séances seront reportées." },
+                  { icon:"👶", title:"Responsabilité", text:"Les enfants sont placés sous la responsabilité des moniteurs diplômés pendant la durée de la prestation. Les parents sont responsables avant et après." },
                   { icon:"⚠️", title:"Informations médicales", text:"Tout problème de santé, allergie ou contre-indication doit être signalé lors de l'inscription. Le club se réserve le droit de refuser un enfant pour des raisons de sécurité." },
                 ].map(item => (
                   <div key={item.title} style={{ background:"#fff", borderRadius:14, padding:"12px 14px" }}>
@@ -8827,4 +8827,4 @@ export default function App() {
     </div>
   );
 }
-// fix compte fin saison Sun Apr  5 12:23:44 CEST 2026
+// cgv fix Sun Apr  5 12:30:10 CEST 2026
