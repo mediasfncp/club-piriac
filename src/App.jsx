@@ -7452,11 +7452,12 @@ Document généré le ${new Date().toLocaleDateString("fr-FR")}
 function FacturesTab({ dbMembres, dbResas, dbResasClub }) {
   const [selectedIds, setSelectedIds]   = useState(new Set());
   const [acomptes, setAcomptes]         = useState({});
-  const [factures, setFactures]         = useState({}); // { membreId: { numero, date_emission, total, solde } }
+  const [factures, setFactures]         = useState({});
   const [search, setSearch]             = useState("");
   const [loading, setLoading]           = useState(true);
   const [generating, setGenerating]     = useState(null);
   const [sendingMail, setSendingMail]   = useState(null);
+  const [enfantsSelectionnes, setEnfantsSelectionnes] = useState({}); // { membreId: Set(prenom) }
 
   const PRIX_NAT = {1:20,2:40,3:60,4:80,5:95,6:113,7:131,8:147,9:162,10:170};
   const getPrixNat = n => n<=10?(PRIX_NAT[n]||n*20):170+(n-10)*17;
@@ -7526,7 +7527,7 @@ function FacturesTab({ dbMembres, dbResas, dbResasClub }) {
     return groupes;
   };
 
-  const buildFactureHtml = (membre, numFac, dateEmission, modePaiement = null, remise = 0) => {
+  const buildFactureHtml = (membre, numFac, dateEmission, modePaiement = null, remise = 0, enfantsFilter = null) => {
     const resasNat  = (dbResas||[]).filter(r => r.membre_id === membre.id && r.statut === "confirmed");
     const resasClub = (dbResasClub||[]).filter(r => r.membre_id === membre.id && r.statut === "confirmed" && !(Number(r.enfants?.[0]) >= 6 && !isNaN(Number(r.enfants?.[0]))));
     const acMembre  = acomptes[membre.id] || [];
@@ -7548,7 +7549,10 @@ function FacturesTab({ dbMembres, dbResas, dbResasClub }) {
     const adresse = [membre.adresse, `${membre.cp||""} ${membre.ville||""}`].filter(Boolean).join("<br/>");
 
     // Enfants avec date de naissance
-    const enfantsHtml = (membre.enfants||[]).map(e => {
+    const enfantsFiltres = enfantsFilter && enfantsFilter.size > 0
+      ? (membre.enfants||[]).filter(e => enfantsFilter.has(e.prenom))
+      : (membre.enfants||[]);
+    const enfantsHtml = enfantsFiltres.map(e => {
       let ddn = "—";
       if (e.naissance) {
         const parts = e.naissance.slice(0,10).split("-");
@@ -7614,7 +7618,7 @@ tr:nth-child(even) td{background:#fafbff}
   <div class="info">${adresse}${membre.email?"<br/>"+membre.email:""}${membre.tel?"<br/>📞 "+membre.tel:""}</div>
 </div>
 
-${(membre.enfants||[]).length > 0 ? `
+${enfantsFiltres.length > 0 ? `
 <div class="section-title">Enfant(s) inscrit(s)</div>
 <table>
   <thead><tr><th>Nom</th><th style="text-align:center">Date de naissance</th></tr></thead>
@@ -7632,7 +7636,7 @@ ${(membre.enfants||[]).length > 0 ? `
 </table>
 
 <div class="total-box">
-  <span class="label">"MONTANT PAYÉ"</span>
+  <span class="label">MONTANT PAYÉ</span>
   <span class="amount">${solde} €</span>
 </div>
 ${remise > 0 ? `<div style="text-align:center;margin-bottom:8px;color:#EC4899;font-size:12px;font-weight:700">🎁 Remise appliquée : - ${remise} €</div>` : ""}
@@ -7691,7 +7695,7 @@ ${mpHtml}
         ? (() => { const p=existing.date_emission.slice(0,10).split("-"); return `${p[2]}/${p[1]}/${p[0]}`; })()
         : new Date().toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"});
 
-      const html = buildFactureHtml(membre, numFac, dateEmission, modePaiement);
+      const html = buildFactureHtml(membre, numFac, dateEmission, modePaiement, 0, enfantsSelectionnes[membre.id]);
       const win = window.open("","_blank");
       if (win) { win.document.write(html); win.document.close(); }
     } catch(e) { alert("Erreur : " + e.message); }
@@ -7710,7 +7714,7 @@ ${mpHtml}
       const dateEmission = fac
         ? (() => { const p=fac.date_emission.slice(0,10).split("-"); return `${p[2]}/${p[1]}/${p[0]}`; })()
         : new Date().toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"});
-      const html = buildFactureHtml(membre, numFac, dateEmission, modePaiement);
+      const html = buildFactureHtml(membre, numFac, dateEmission, modePaiement, 0, enfantsSelectionnes[membre.id]);
 
       // Ouvrir la facture dans un nouvel onglet (pour impression/sauvegarde PDF)
       // + ouvrir le client mail avec les infos
@@ -7788,7 +7792,16 @@ Plage Saint-Michel · 44420 Piriac-sur-Mer
           const solde = total - totalAc;
           const sel = selectedIds.has(m.id);
           const fac = factures[m.id];
-          const enfants = (m.enfants||[]).map(e => e.prenom).join(", ");
+          const enfantsListe = m.enfants || [];
+          const selEnfants = enfantsSelectionnes[m.id] || new Set(enfantsListe.map(e => e.prenom));
+          const toggleEnfant = (e, prenom) => {
+            e.stopPropagation();
+            setEnfantsSelectionnes(prev => {
+              const cur = new Set(prev[m.id] || enfantsListe.map(e2 => e2.prenom));
+              cur.has(prenom) ? cur.delete(prenom) : cur.add(prenom);
+              return { ...prev, [m.id]: cur };
+            });
+          };
 
           return (
             <div key={m.id} onClick={() => toggleSelect(m.id)} style={{ background:"#fff", borderRadius:16, padding:"14px 16px", boxShadow:"0 2px 10px rgba(0,0,0,0.06)", cursor:"pointer", border:`2px solid ${sel ? C.ocean : "#f0f0f0"}`, transition:"all .15s" }}>
@@ -7801,7 +7814,17 @@ Plage Saint-Michel · 44420 Piriac-sur-Mer
                     <div style={{ fontWeight:900, color:C.dark, fontSize:14 }}>{m.prenom} {(m.nom||"").toUpperCase()}</div>
                   </div>
                   <div style={{ fontSize:11, color:"#aaa", marginBottom:4 }}>{m.email}</div>
-                  {enfants && <div style={{ fontSize:11, color:C.ocean, fontWeight:700, marginBottom:6 }}>👧 {enfants}</div>}
+                  {enfantsListe.length > 0 && (
+                    <div style={{ display:"flex", gap:5, flexWrap:"wrap", marginBottom:6 }}>
+                      {enfantsListe.map(e => (
+                        <div key={e.prenom} onClick={ev => toggleEnfant(ev, e.prenom)}
+                          style={{ display:"flex", alignItems:"center", gap:4, background: selEnfants.has(e.prenom) ? `${C.ocean}15` : "#f0f0f0", border:`1.5px solid ${selEnfants.has(e.prenom) ? C.ocean : "#ddd"}`, borderRadius:50, padding:"2px 10px", cursor:"pointer", fontSize:11, fontWeight:700, color: selEnfants.has(e.prenom) ? C.ocean : "#aaa" }}>
+                          <span>{selEnfants.has(e.prenom) ? "✓" : "○"}</span>
+                          <span>{e.sexe==="M"?"👦":"👧"} {e.prenom}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
                     {gNat.map((g,i) => <span key={i} style={{ background:`${C.ocean}15`, color:C.ocean, borderRadius:50, padding:"2px 8px", fontSize:10, fontWeight:800 }}>{g.detail}</span>)}
                     {gClub.map((g,i) => <span key={i} style={{ background:`${C.coral}15`, color:C.coral, borderRadius:50, padding:"2px 8px", fontSize:10, fontWeight:800 }}>{g.label.replace("Club de Plage — ","")}: {g.detail}</span>)}
@@ -9080,7 +9103,7 @@ function ProfilConnecte({ user, setUser, setScreen, reservations }) {
 ${enfants.length>0?`<div style="font-size:10px;text-transform:uppercase;color:#888;margin-bottom:6px;margin-top:12px">Enfant(s) inscrit(s)</div><table><thead><tr><th>Nom</th><th style="text-align:center">Date de naissance</th></tr></thead><tbody>${enfantsHtml}</tbody></table>`:""}
 <div style="font-size:10px;text-transform:uppercase;color:#888;margin-bottom:6px;margin-top:12px">Prestations — Saison 2026</div>
 <table><thead><tr><th>Prestation</th><th style="text-align:right">Montant</th></tr></thead><tbody>${lignesNat}${lignesClub}${lignesAc}</tbody></table>
-<div class="total-box"><span style="font-weight:700">${(facture.solde||0)===0?"MONTANT PAYÉ":"SOLDE DÛ"}</span><span style="font-size:26px;font-weight:900">${facture.solde||0} €</span></div>
+<div class="total-box"><span style="font-weight:700">${(facture.solde||0)===0?MONTANT PAYÉ":"SOLDE DÛ}</span><span style="font-size:26px;font-weight:900">${facture.solde||0} €</span></div>
 <div class="tva">TVA non applicable — article 293 B du CGI</div>
 <div class="footer">Eole Beach Club · SIRET 839 887 072 00024<br/>Plage Saint-Michel · 44420 Piriac-sur-Mer · clubdeplage.piriacsurmer@hotmail.com</div>
 <div class="no-print" style="text-align:center;margin-top:16px"><button onclick="window.print()" style="background:#1A8FE3;color:#fff;border:none;padding:10px 24px;border-radius:8px;font-size:13px;cursor:pointer;font-weight:700">🖨️ Télécharger / Imprimer</button></div>
@@ -9408,4 +9431,4 @@ export default function App() {
     </div>
   );
 }
-// fix doublon facture Sun Apr  5 22:36:04 CEST 2026
+// facture enfants select Sun Apr  5 22:38:54 CEST 2026
