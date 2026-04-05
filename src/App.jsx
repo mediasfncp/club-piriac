@@ -4758,7 +4758,10 @@ function PaiementsTab({ onValidate }) {
   };
 
   const filtered = (() => {
-    let g = filter === "tous" ? allGroups : allGroups.filter(g => g.statut === filter);
+    let g = filter === "tous" ? allGroups
+      : filter === "pending" ? allGroups.filter(g => g.statut === "pending")
+      : filter === "confirmed" ? allGroups.filter(g => g.statut === "confirmed")
+      : allGroups.filter(g => g.statut === "confirmed" && g.resas.some(r => r.mode_paiement === filter));
     if (dateFilter) {
       g = g.filter(gr => {
         const d = gr.resas[0]?._date?.slice(0,10);
@@ -4786,15 +4789,31 @@ function PaiementsTab({ onValidate }) {
         ))}
       </div>
 
-      {/* Filtres statut + date */}
+      {/* Filtres statut */}
       <div style={{ display:"flex", gap:6, background:"#fff", borderRadius:14, padding:5, boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
-        {[["tous","Toutes"],["pending","⏳ En attente"],["confirmed","✓ Payées"]].map(([k,l]) => (
+        {[["tous","Toutes"],["pending","⏳ Attente"],["confirmed","✓ Payées"]].map(([k,l]) => (
           <button key={k} onClick={() => setFilter(k)} style={{
             flex:1, background: filter===k ? `linear-gradient(135deg,${C.ocean},${C.sea})` : "transparent",
             color: filter===k?"#fff":"#888", border:"none", borderRadius:10,
             padding:"8px 4px", cursor:"pointer", fontWeight:900, fontSize:11, fontFamily:"inherit",
           }}>{l}</button>
         ))}
+      </div>
+
+      {/* Filtres par mode de paiement */}
+      <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+        {MODES_PAIEMENT.map(m => {
+          const count = allGroups.filter(g => g.statut==="confirmed" && g.resas.some(r => r.mode_paiement===m.id)).length;
+          return (
+            <button key={m.id} onClick={() => setFilter(filter===m.id?"tous":m.id)} style={{
+              background: filter===m.id ? m.color : "#fff",
+              color: filter===m.id ? "#fff" : "#555",
+              border: `1.5px solid ${filter===m.id ? m.color : "#e0e0e0"}`,
+              borderRadius:50, padding:"5px 12px", cursor:"pointer", fontWeight:800, fontSize:11, fontFamily:"inherit",
+              boxShadow: filter===m.id ? `0 2px 8px ${m.color}44` : "none",
+            }}>{m.label} {count > 0 && `(${count})`}</button>
+          );
+        })}
       </div>
       <div style={{ display:"flex", gap:8, alignItems:"center" }}>
         <div style={{ fontSize:11, fontWeight:900, color:"#888", whiteSpace:"nowrap" }}>📅 Date :</div>
@@ -4851,6 +4870,16 @@ function PaiementsTab({ onValidate }) {
                     );
                   })}
                 </div>
+
+                {/* Mode paiement badge */}
+                {isPaid && g.resas[0]?.mode_paiement && (
+                  <div style={{ marginBottom:8 }}>
+                    {(() => {
+                      const mp = MODES_PAIEMENT.find(m => m.id === g.resas[0].mode_paiement);
+                      return mp ? <span style={{ background:`${mp.color}15`, color:mp.color, borderRadius:50, padding:"3px 12px", fontSize:11, fontWeight:800 }}>{mp.label}</span> : null;
+                    })()}
+                  </div>
+                )}
 
                 {/* Bouton toggle */}
                 <button onClick={() => toggleStatut(g)} style={{
@@ -6775,6 +6804,7 @@ const enrichEnfants = (enfants, membres) => {
 };
 
 function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, supprimerResaNatation, supprimerResaClub }) {
+  const [modePaiementConfirm, setModePaiementConfirm] = useState(null); // { resa, type }
   const allWeeks = (() => {
     const ws = []; let wk = [];
     ALL_SEASON_DAYS.forEach((d, i) => {
@@ -6857,6 +6887,27 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
 
   return (
     <>
+      {/* Modal mode de paiement */}
+      {modePaiementConfirm && (
+        <ModePaiementModal
+          titre={`Valider la réservation de ${modePaiementConfirm.resa.membre_id}`}
+          onClose={() => setModePaiementConfirm(null)}
+          onConfirm={async (mode) => {
+            const { resa, type } = modePaiementConfirm;
+            if (type === "natation") {
+              await sb.from("reservations_natation").update({ statut:"confirmed", validated_at:new Date().toISOString(), mode_paiement:mode }).eq("id", resa.id);
+            } else {
+              let montant = 0;
+              const isLib = !isNaN(Number(resa.enfants?.[0])) && Number(resa.enfants?.[0]) >= 6;
+              if (isLib) { const LP={6:96,12:180,18:252,24:288,30:330}; montant = LP[Number(resa.enfants[0])]||0; }
+              else { const m2=(resa.label_jour||"").match(/\[MONTANT:(\d+)\]/); montant=m2?Number(m2[1]):0; }
+              await sb.from("reservations_club").update({ statut:"confirmed", validated_at:new Date().toISOString(), montant, mode_paiement:mode }).eq("id", resa.id);
+            }
+            setModePaiementConfirm(null);
+            refreshResas();
+          }}
+        />
+      )}
       {/* Nav semaine + filtre */}
       <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
         <div style={{ background:"#fff", borderRadius:14, padding:"9px 14px", display:"flex", alignItems:"center", justifyContent:"space-between", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
@@ -6918,9 +6969,13 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
                         </div>
                         <div style={{ display:"flex", gap:4, alignItems:"center" }}>
                           {r.statut === "pending" ? (
-                            <button onClick={async () => { await sb.from("reservations_natation").update({statut:"confirmed", validated_at:new Date().toISOString()}).eq("id",r.id); refreshResas(); }}
+                            <button onClick={() => setModePaiementConfirm({ resa:r, type:"natation" })}
                               style={{ background:C.green, border:"none", color:"#fff", borderRadius:8, padding:"3px 8px", cursor:"pointer", fontWeight:900, fontSize:10, fontFamily:"inherit" }}>✅</button>
-                          ) : <span style={{ fontSize:10, color:C.green, fontWeight:800 }}>✓</span>}
+                          ) : (
+                            <span style={{ fontSize:10, color:C.green, fontWeight:800, display:"flex", alignItems:"center", gap:3 }}>
+                              ✓{r.mode_paiement && <span style={{ fontSize:9, color:"#aaa" }}>{MODES_PAIEMENT.find(m=>m.id===r.mode_paiement)?.label.split(" ")[0]}</span>}
+                            </span>
+                          )}
                           <button onClick={() => setModifierResa({ resa: r, type:"natation" })}
                             style={{ background:`${C.ocean}15`, border:"none", color:C.ocean, borderRadius:8, width:24, height:24, cursor:"pointer", fontSize:11, fontFamily:"inherit" }}>✏️</button>
                           <button onClick={() => { if(window.confirm("Supprimer ?")) supprimerResaNatation(r.id); }}
@@ -6948,21 +7003,13 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
                           </div>
                           <div style={{ display:"flex", gap:4, alignItems:"center" }}>
                             {r.statut === "pending" ? (
-                              <button onClick={async () => {
-                                let montant = 0;
-                                const isLiberte = !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6;
-                                if (isLiberte) {
-                                  const LP = { 6:96, 12:180, 18:252, 24:288, 30:330 };
-                                  montant = LP[Number(r.enfants[0])] || 0;
-                                } else {
-                                  const match = (r.label_jour || "").match(/\[MONTANT:(\d+)\]/);
-                                  montant = match ? Number(match[1]) : 0;
-                                }
-                                await sb.from("reservations_club").update({ statut:"confirmed", validated_at:new Date().toISOString(), montant }).eq("id",r.id);
-                                refreshResas();
-                              }}
+                              <button onClick={() => setModePaiementConfirm({ resa:r, type:"club" })}
                                 style={{ background:C.green, border:"none", color:"#fff", borderRadius:8, padding:"3px 8px", cursor:"pointer", fontWeight:900, fontSize:10, fontFamily:"inherit" }}>✅</button>
-                            ) : <span style={{ fontSize:10, color:C.green, fontWeight:800 }}>✓</span>}
+                            ) : (
+                              <span style={{ fontSize:10, color:C.green, fontWeight:800, display:"flex", alignItems:"center", gap:3 }}>
+                                ✓{r.mode_paiement && <span style={{ fontSize:9, color:"#aaa" }}>{MODES_PAIEMENT.find(m=>m.id===r.mode_paiement)?.label.split(" ")[0]}</span>}
+                              </span>
+                            )}
                             <button onClick={() => setModifierResa({ resa: r, type:"club" })}
                               style={{ background:`${C.coral}15`, border:"none", color:C.coral, borderRadius:8, width:24, height:24, cursor:"pointer", fontSize:11, fontFamily:"inherit" }}>✏️</button>
                             <button onClick={() => { if(window.confirm("Supprimer ?")) supprimerResaClub(r.id); }}
@@ -6984,6 +7031,43 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
 }
 
 // ── ONGLET COMPTES FIN DE SAISON ─────────────────────────
+// ── MODAL MODE DE PAIEMENT ───────────────────────────────
+const MODES_PAIEMENT = [
+  { id:"especes",          label:"💶 Espèces",           color:"#F59E0B" },
+  { id:"cheque",           label:"✉️ Chèque",            color:"#3B82F6" },
+  { id:"cheques_vacances", label:"🎫 Chèques vacances",  color:"#8B5CF6" },
+  { id:"virement",         label:"🏦 Virement",          color:"#10B981" },
+];
+
+function ModePaiementModal({ onConfirm, onClose, titre }) {
+  const [mode, setMode] = useState("");
+  return (
+    <div style={{ position:"fixed", inset:0, zIndex:1200, display:"flex", alignItems:"center", justifyContent:"center", padding:"0 20px" }}>
+      <div onClick={onClose} style={{ position:"absolute", inset:0, background:"rgba(0,20,50,0.65)", backdropFilter:"blur(5px)" }} />
+      <div style={{ position:"relative", background:"#fff", borderRadius:24, padding:"24px 20px", width:"100%", maxWidth:380, boxShadow:"0 24px 64px rgba(0,0,0,0.3)" }}>
+        <div style={{ fontWeight:900, color:C.dark, fontSize:16, marginBottom:4 }}>💳 Mode de paiement</div>
+        <div style={{ fontSize:12, color:"#aaa", marginBottom:16 }}>{titre || "Choisissez le mode de règlement"}</div>
+        <div style={{ display:"flex", flexDirection:"column", gap:8, marginBottom:20 }}>
+          {MODES_PAIEMENT.map(m => (
+            <div key={m.id} onClick={() => setMode(m.id)}
+              style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 14px", borderRadius:14, cursor:"pointer", border:`2px solid ${mode===m.id ? m.color : "#e0e8f0"}`, background: mode===m.id ? `${m.color}12` : "#f8fbff", transition:"all .15s" }}>
+              <div style={{ width:20, height:20, borderRadius:"50%", border:`3px solid ${mode===m.id ? m.color : "#ddd"}`, background: mode===m.id ? m.color : "transparent", flexShrink:0 }} />
+              <span style={{ fontWeight:800, color: mode===m.id ? m.color : "#555", fontSize:14 }}>{m.label}</span>
+            </div>
+          ))}
+        </div>
+        <div style={{ display:"flex", gap:8 }}>
+          <button onClick={onClose} style={{ flex:1, background:"#f0f0f0", border:"none", color:"#888", borderRadius:12, padding:"11px", cursor:"pointer", fontWeight:800, fontFamily:"inherit" }}>Annuler</button>
+          <button onClick={() => { if (!mode) { alert("Choisissez un mode de paiement."); return; } onConfirm(mode); }}
+            style={{ flex:2, background: mode ? `linear-gradient(135deg,${C.green},#27AE60)` : "#ddd", border:"none", color:"#fff", borderRadius:12, padding:"11px", cursor: mode ? "pointer" : "not-allowed", fontWeight:900, fontFamily:"inherit", fontSize:14 }}>
+            ✅ Confirmer
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ComptesTab({ dbMembres, dbResas, dbResasClub, onRefresh }) {
   const [acomptes, setAcomptes]       = useState({});   // { membreId: [{id, montant, date_paiement, label}] }
   const [exclusions, setExclusions]   = useState({});   // { resaId: true }
@@ -7403,7 +7487,7 @@ function FacturesTab({ dbMembres, dbResas, dbResasClub }) {
     return groupes;
   };
 
-  const buildFactureHtml = (membre, numFac, dateEmission) => {
+  const buildFactureHtml = (membre, numFac, dateEmission, modePaiement = null) => {
     const resasNat  = (dbResas||[]).filter(r => r.membre_id === membre.id && r.statut === "confirmed");
     const resasClub = (dbResasClub||[]).filter(r => r.membre_id === membre.id && r.statut === "confirmed" && !(Number(r.enfants?.[0]) >= 6 && !isNaN(Number(r.enfants?.[0]))));
     const acMembre  = acomptes[membre.id] || [];
@@ -7503,9 +7587,10 @@ ${(membre.enfants||[]).length > 0 ? `
 </table>
 
 <div class="total-box">
-  <span class="label">SOLDE DÛ</span>
-  <span class="amount">${solde} €</span>
+  <span class="label">${solde > 0 ? "SOLDE DÛ" : "MONTANT PAYÉ"}</span>
+  <span class="amount">${totalPrestations - totalAcomptes < 0 ? 0 : solde} €</span>
 </div>
+${modePaiement ? `<div style="text-align:center;margin-bottom:8px"><span style="background:${MODES_PAIEMENT.find(m=>m.id===modePaiement)?.color||'#888'}22;color:${MODES_PAIEMENT.find(m=>m.id===modePaiement)?.color||'#888'};border-radius:50px;padding:5px 16px;font-size:13px;font-weight:800">${MODES_PAIEMENT.find(m=>m.id===modePaiement)?.label||modePaiement}</span></div>` : ""}
 
 <div class="tva">TVA non applicable — article 293 B du CGI</div>
 
@@ -7534,12 +7619,16 @@ ${(membre.enfants||[]).length > 0 ? `
       const totalAc = acMembre.reduce((s,a)=>s+a.montant,0);
       const solde = total - totalAc;
 
+      // Détecter le mode de paiement (premier trouvé parmi les résas confirmées)
+      const modePaiement = [...resasNat,...resasClub].find(r => r.mode_paiement)?.mode_paiement || null;
+
       // Numéro de facture
-      let numFac, facId;
+      let numFac;
       const existing = factures[membre.id];
       if (existing) {
         numFac = existing.numero;
-        facId  = existing.id;
+        // Mettre à jour le contenu si nécessaire
+        await sb.from("factures_numeros").update({ total, solde, contenu:{ groupesNat, groupesClub, acomptes:acMembre } }).eq("id", existing.id);
       } else {
         const count = Object.keys(factures).length + 1;
         numFac = `FAC-2026-${String(count).padStart(3,"0")}`;
@@ -7549,43 +7638,59 @@ ${(membre.enfants||[]).length > 0 ? `
           membre_id: membre.id, numero: numFac,
           date_emission: dateEmission, total, solde, contenu
         }]).select().single();
-        if (data) {
-          setFactures(prev => ({ ...prev, [membre.id]: data }));
-          facId = data.id;
-        }
+        if (data) setFactures(prev => ({ ...prev, [membre.id]: data }));
       }
 
       const dateEmission = existing
-        ? new Date(existing.date_emission).toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"})
+        ? (() => { const p=existing.date_emission.slice(0,10).split("-"); return `${p[2]}/${p[1]}/${p[0]}`; })()
         : new Date().toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"});
 
-      const html = buildFactureHtml(membre, numFac, dateEmission);
+      const html = buildFactureHtml(membre, numFac, dateEmission, modePaiement);
       const win = window.open("","_blank");
       if (win) { win.document.write(html); win.document.close(); }
     } catch(e) { alert("Erreur : " + e.message); }
     setGenerating(null);
   };
 
-  const envoyerParMail = (membre) => {
+  const envoyerParMail = async (membre) => {
     setSendingMail(membre.id);
-    const fac = factures[membre.id];
-    const num = fac ? fac.numero : "votre facture";
-    const subject = encodeURIComponent(`Facture Eole Beach Club ${num} — Saison 2026`);
-    const body = encodeURIComponent(
+    try {
+      const resasNat  = (dbResas||[]).filter(r => r.membre_id === membre.id && r.statut === "confirmed");
+      const resasClub = (dbResasClub||[]).filter(r => r.membre_id === membre.id && r.statut === "confirmed" && !(Number(r.enfants?.[0]) >= 6 && !isNaN(Number(r.enfants?.[0]))));
+      const acMembre  = acomptes[membre.id] || [];
+      const modePaiement = [...resasNat,...resasClub].find(r => r.mode_paiement)?.mode_paiement || null;
+      const fac = factures[membre.id];
+      const numFac = fac?.numero || "FAC-2026-000";
+      const dateEmission = fac
+        ? (() => { const p=fac.date_emission.slice(0,10).split("-"); return `${p[2]}/${p[1]}/${p[0]}`; })()
+        : new Date().toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"});
+      const html = buildFactureHtml(membre, numFac, dateEmission, modePaiement);
+
+      // Ouvrir la facture dans un nouvel onglet (pour impression/sauvegarde PDF)
+      // + ouvrir le client mail avec les infos
+      const win = window.open("","_blank");
+      if (win) { win.document.write(html); win.document.close(); }
+
+      const subject = encodeURIComponent(`Facture ${numFac} — Eole Beach Club Saison 2026`);
+      const body = encodeURIComponent(
 `Bonjour ${membre.prenom},
 
-Veuillez trouver ci-joint votre facture ${num} pour la saison 2026 au Club de Plage Eole Beach Club.
+Votre facture ${numFac} a été générée pour la saison 2026.
 
-Pour accéder à votre facture, merci de vous connecter à votre espace personnel sur :
-https://fncp-club.vercel.app
+Veuillez trouver votre facture dans l'onglet qui vient de s'ouvrir dans votre navigateur. Vous pouvez l'imprimer ou la sauvegarder en PDF depuis cet onglet.
+
+Montant : ${fac?.total||"—"} € ${modePaiement ? "— Réglé par " + (MODES_PAIEMENT.find(m=>m.id===modePaiement)?.label||modePaiement) : ""}
 
 Cordialement,
 L'équipe Eole Beach Club
 Plage Saint-Michel · 44420 Piriac-sur-Mer
-📞 07 67 78 69 22`
-    );
-    window.location.href = `mailto:${membre.email}?subject=${subject}&body=${body}`;
-    setTimeout(() => setSendingMail(null), 1500);
+📞 07 67 78 69 22 · clubdeplage.piriacsurmer@hotmail.com`
+      );
+      setTimeout(() => {
+        window.location.href = `mailto:${membre.email}?subject=${subject}&body=${body}`;
+      }, 500);
+    } catch(e) { alert("Erreur : " + e.message); }
+    setSendingMail(null);
   };
 
   if (loading) return <div style={{ textAlign:"center", padding:40, color:"#bbb" }}>Chargement…</div>;
@@ -7699,6 +7804,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
   const [dbPaiements, setDbPaiements] = useState([]);
   const [showNouvelleResa, setShowNouvelleResa] = useState(false);
   const [modifierResa, setModifierResa]         = useState(null);
+  const [pendingModalConfirm, setPendingModalConfirm] = useState(null); // { groupe } pour dashboard
 
   const refreshResas = () => {
     sb.from("reservations_natation").select("*, membres(id, prenom, nom, email, tel)").order("date_seance", { ascending: true })
@@ -7839,6 +7945,51 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
 
   return (
     <div style={{ background: "#F0F4F8", minHeight: "100%" }}>
+
+      {/* Modal mode paiement — Dashboard pending */}
+      {pendingModalConfirm && (
+        <ModePaiementModal
+          titre={`Valider ${pendingModalConfirm.resas?.length} réservation${pendingModalConfirm.resas?.length>1?"s":""}`}
+          onClose={() => setPendingModalConfirm(null)}
+          onConfirm={async (mode) => {
+            const g = pendingModalConfirm;
+            const table = g.type === "natation" ? "reservations_natation" : "reservations_club";
+            if (g.type === "club") {
+              const LIBERTE_PRIX_V = {6:96,12:180,18:252,24:288,30:330};
+              for (const r of g.resas) {
+                let montant = 0;
+                const isLib = !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6;
+                if (isLib) { montant = LIBERTE_PRIX_V[Number(r.enfants[0])]||0; }
+                else { const m2=(r.label_jour||"").match(/\[MONTANT:(\d+)\]/); montant=m2?Number(m2[1]):0; }
+                await sb.from(table).update({ statut:"confirmed", validated_at:new Date().toISOString(), montant, mode_paiement:mode }).eq("id", r.id);
+              }
+            } else {
+              await Promise.all(g.resas.map(r => sb.from(table).update({ statut:"confirmed", validated_at:new Date().toISOString(), mode_paiement:mode }).eq("id", r.id)));
+            }
+            // Carte liberté → créditer
+            if (g.type === "club" && g.resas.some(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6)) {
+              const r0 = g.resas[0];
+              const credit = Number(r0.enfants?.[0])||0;
+              if (credit > 0 && r0.membre_id) {
+                const { data: m } = await sb.from("membres").select("liberte_balance, liberte_total").eq("id", r0.membre_id).single();
+                if (m) await sb.from("membres").update({ liberte_balance:(m.liberte_balance||0)+credit, liberte_total:(m.liberte_total||0)+credit }).eq("id", r0.membre_id);
+              }
+            }
+            // Liberté → décrémenter
+            if (g.type === "club" && g.resas.some(r => (r.label_jour||"").startsWith("[LIBERTE]"))) {
+              const membreId = g.resas[0]?.membre_id;
+              const nbUtil = g.resas.filter(r => (r.label_jour||"").startsWith("[LIBERTE]")).length;
+              if (membreId && nbUtil > 0) {
+                const { data: m } = await sb.from("membres").select("liberte_balance").eq("id", membreId).single();
+                if (m) await sb.from("membres").update({ liberte_balance:Math.max(0,(m.liberte_balance||0)-nbUtil) }).eq("id", membreId);
+              }
+            }
+            setPendingModalConfirm(null);
+            refreshResas();
+          }}
+        />
+      )}
+
       <div style={{ background: `linear-gradient(135deg, ${C.ocean}, ${C.sea}, ${C.sky})`, padding: "24px 24px 0" }}>
         <div style={{ maxWidth: 1400, margin: "0 auto" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
@@ -8057,7 +8208,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                                 }
                               }
                               refreshResas();
-                            }} style={{ background:`linear-gradient(135deg,${C.green},#1E8449)`, border:"none", color:"#fff", borderRadius:50, padding:"5px 14px", cursor:"pointer", fontWeight:900, fontSize:12, fontFamily:"inherit", boxShadow:`0 3px 10px ${C.green}44`, flexShrink:0, marginLeft:8 }}>✅ Valider</button>
+                            <button onClick={() => setPendingModalConfirm(g)} style={{ background:`linear-gradient(135deg,${C.green},#1E8449)`, border:"none", color:"#fff", borderRadius:50, padding:"5px 14px", cursor:"pointer", fontWeight:900, fontSize:12, fontFamily:"inherit", boxShadow:`0 3px 10px ${C.green}44`, flexShrink:0, marginLeft:8 }}>✅ Valider</button>
                             <button onClick={async () => {
                               if (!window.confirm(`Supprimer ${g.resas.length} réservation${g.resas.length>1?"s":""} en attente ?`)) return;
                               const table = g.type === "natation" ? "reservations_natation" : "reservations_club";
@@ -9166,8 +9317,8 @@ export default function App() {
               </div>
             </Card>
           )}
-          {/* Accès Admin — visible uniquement si connecté */}
-          {user?.supabaseId && (
+          {/* Accès Admin — visible uniquement pour les emails admin */}
+          {user?.supabaseId && ADMIN_EMAILS.includes((user?.email||"").toLowerCase()) && (
             <AdminCodeAccess onUnlock={() => setScreen("admin")} user={user} />
           )}
         </div>
@@ -9199,4 +9350,4 @@ export default function App() {
     </div>
   );
 }
-// fix date naissance Sun Apr  5 15:46:52 CEST 2026
+// mode paiement + facture v3 Sun Apr  5 16:07:08 CEST 2026
