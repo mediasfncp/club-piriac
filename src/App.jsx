@@ -8738,7 +8738,7 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
         <div style="margin-bottom:14px;padding:14px 16px;background:#EEF8FF;border-left:4px solid #1A8FE3;border-radius:8px">
           <div style="font-weight:700;color:#1A8FE3;font-size:13px;margin-bottom:6px">🏊 École de Natation</div>
           <div style="font-size:13px;color:#555;line-height:1.7">
-            Le règlement s'effectue avant la première séance, directement au club ou par virement.<br/>
+            Le règlement s'effectue avant la première séance, par virement ou sur place.<br/>
             Vos séances seront confirmées dès réception du paiement.<br/>
             <strong>Rappel :</strong> Arriver 5 minutes avant le créneau. Prévoir maillot de bain, serviette et bonnet.
           </div>
@@ -8747,7 +8747,6 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
         <div style="margin-bottom:14px;padding:14px 16px;background:#FFF0EC;border-left:4px solid #FF8E53;border-radius:8px">
           <div style="font-weight:700;color:#FF8E53;font-size:13px;margin-bottom:6px">🏖️ Club de Plage</div>
           <div style="font-size:13px;color:#555;line-height:1.7">
-            Le règlement peut s'effectuer en une fois ou en plusieurs fois selon votre convenance.<br/>
             L'accès au club sera activé dès réception du paiement.<br/>
             <strong>Rappel :</strong> Prévoir casquette, gourde, serviette de bain et crème solaire.
           </div>
@@ -8804,7 +8803,7 @@ tr:nth-child(even) td{background:#f8fbff}
   <div class="payment-box">
     <h3>💳 Comment régler votre inscription ?</h3>
     <div style="font-size:13px;color:#555;line-height:1.7">
-      Vous pouvez régler votre inscription directement au club ou à distance selon les modes de paiement suivants :
+      Vous pouvez régler votre inscription selon les modes de paiement suivants :
     </div>
     <div class="payment-methods">
       <span class="payment-method">🏦 Virement bancaire</span>
@@ -8814,7 +8813,11 @@ tr:nth-child(even) td{background:#f8fbff}
     </div>
     <div style="margin-top:12px;font-size:12px;color:#888;font-style:italic">
       Pour le virement ou chèque, merci de préciser le nom de votre enfant et la prestation en référence.<br/>
-      Le chèque est à libeller à l'ordre de : <strong>Eole Beach Club</strong>
+      Le chèque est à libeller à l'ordre de : <strong>SAUZEAU Charlène</strong><br/>
+      En avant saison, le chèque est à envoyer à :<br/>
+      <strong>Mme SAUZEAU Charlène<br/>
+      4 allée des Roitelets<br/>
+      44500 LA BAULE</strong>
     </div>
   </div>
 
@@ -9562,4 +9565,4 @@ export default function App() {
     </div>
   );
 }
-// nouvelle prestation btn Mon Apr  6 00:16:41 CEST 2026
+// email reglement Mon Apr  6 00:25:10 CEST 2026
