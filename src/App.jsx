@@ -1305,7 +1305,7 @@ function FormulesNatationScreen({ onNav, user, allSeasonSessions, panier, setPan
             {selectedCreneaux.length > 0 && (
               <div style={{ background:`${C.ocean}10`, borderRadius:12, padding:"10px 12px", marginBottom:12 }}>
                 <div style={{ fontSize:12, color:C.ocean, fontWeight:700, marginBottom:4 }}>
-                  ✓ {selectedCreneaux.map(c => `${c.time} · ${new Date(c.dayISO).toLocaleDateString("fr-FR",{day:"numeric",month:"short"})}`).join("  ·  ")}
+                  ✓ {selectedCreneaux.map(c => `${c.time} · ${parseLocalDate(c.dayISO).toLocaleDateString("fr-FR",{day:"numeric",month:"short"})}`).join("  ·  ")}
                 </div>
                 <div style={{ fontSize:14, fontWeight:900, color:C.coral }}>
                   Total : {prixTotal} €
@@ -1358,7 +1358,7 @@ function FormulesNatationScreen({ onNav, user, allSeasonSessions, panier, setPan
                             enfants:     enfantsCreneau,
                             statut:      "pending",
                             montant:     Math.round(prix / nbLecons),
-                            jour:        new Date(c.dayISO).toLocaleDateString("fr-FR",{weekday:"short"}),
+                            jour:        parseLocalDate(c.dayISO).toLocaleDateString("fr-FR",{weekday:"short"}),
                           }]);
                         }
                       }
@@ -2133,26 +2133,7 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser, pa
                       }} style={{ background:`linear-gradient(135deg,${C.coral},${C.sun})`, border:"none", color:"#fff", borderRadius:14, padding:"14px", cursor:"pointer", fontWeight:900, fontSize:14, fontFamily:"inherit", boxShadow:`0 4px 14px ${C.coral}44` }}>
                         🛒 Ajouter au panier · {selectedRow?.price} €
                       </button>
-                      <button onClick={async () => {
-                        if (!selectedEnfantsClub.length) { alert("Veuillez sélectionner au moins un enfant."); return; }
-                        try {
-                          for (const iso of selectedDates) {
-                            await creerReservationClub({
-                              membreId: user?.supabaseId || null,
-                              dateReservation: iso,
-                              session: formulType === "journee" ? "matin" : formulType,
-                              labelJour: `[MONTANT:${Math.round(selectedRow.price / selectedDates.length)}] ${new Date(iso).toLocaleDateString("fr-FR", {weekday:"long",day:"numeric",month:"long"})}`,
-                              rappelDate: null,
-                              enfants: selectedEnfantsClub,
-                              statut: "pending",
-                            });
-                          }
-                        } catch(e) { console.warn(e); }
-                        if (setClubPlaces) setClubPlaces(prev => ({ ...prev, [formulType]: Math.max(0, (prev[formulType]||45) - nbEnfants) }));
-                        setDone("club");
-                      }} style={{ background:"transparent", border:`2px solid ${tarifData.color}`, color:tarifData.color, borderRadius:14, padding:"10px", cursor:"pointer", fontWeight:800, fontSize:12, fontFamily:"inherit" }}>
-                        📨 Envoyer directement
-                      </button>
+
                     </>
                   ) : (
                     <SunBtn color={tarifData.color} onClick={async () => {
@@ -2498,9 +2479,7 @@ function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSession
               }}>
                 🛒 Ajouter au panier · {prixSeance} €
               </button>
-              <button onClick={handleConfirm} style={{ background:"transparent", border:`2px solid ${C.green}`, color:C.green, borderRadius:14, padding:"10px", cursor:"pointer", fontWeight:800, fontSize:12, fontFamily:"inherit" }}>
-                📨 Envoyer directement
-              </button>
+
             </>
           ) : (
             <SunBtn color={C.green} full onClick={handleConfirm}>📨 Envoyer · {prixSeance} €</SunBtn>
@@ -2788,7 +2767,7 @@ function MesReservationsScreen({ onNav, user }) {
                     <div style={{ fontSize:13, fontWeight:800, color: r.statut==="pending" ? "#b45309" : C.ocean }}>{r.heure}</div>
                     {r.enfants?.length > 0 && <div style={{ fontSize:11, color:"#888", fontWeight:700 }}>{r.enfants.join(", ")}</div>}
                   </div>
-                  <div style={{ fontSize:11, color:"#888" }}>{r.date_seance ? new Date(r.date_seance).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}) : "—"}</div>
+                  <div style={{ fontSize:11, color:"#888" }}>{r.date_seance ? parseLocalDate(r.date_seance).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}) : "—"}</div>
                   {r.statut === "pending"
                     ? <span style={{ background:`${C.sun}20`, color:"#b45309", borderRadius:50, padding:"2px 8px", fontSize:10, fontWeight:800 }}>⏳</span>
                     : <Pill color={C.green}>✓</Pill>}
@@ -3198,6 +3177,7 @@ function InscriptionScreen({ onNav, setUser }) {
                 if (!newEnfant.prenom || !newEnfant.nom || !newEnfant.naissance) { alert("Merci de remplir le prénom, nom et date de naissance."); return; }
                 const age = calcAge(newEnfant.naissance);
                 if (age < 3) { alert("L'enfant doit avoir au moins 3 ans pour s'inscrire."); return; }
+                  if (age > 12) { alert("L'inscription est réservée aux enfants de 12 ans maximum."); return; }
                 setForm(p => ({ ...p, enfants: [...p.enfants, { ...newEnfant, id: Date.now() }] }));
                 setNewEnfant({ prenom:"", nom:"", naissance:"", sexe:"", activite:"club", niveau:"debutant", allergies:"", personnesAutorisees:"" });
               }} style={{ width:"100%", background:`${C.ocean}10`, border:`2px dashed ${C.ocean}40`, color:C.ocean, borderRadius:14, padding:"11px", cursor:"pointer", fontWeight:900, fontSize:13, fontFamily:"inherit", marginBottom:14 }}>
@@ -3212,6 +3192,7 @@ function InscriptionScreen({ onNav, setUser }) {
                 if (newEnfant.prenom && newEnfant.nom && newEnfant.naissance) {
                   const age = calcAge(newEnfant.naissance);
                   if (age < 3) { alert("L'enfant doit avoir au moins 3 ans pour s'inscrire."); return; }
+                  if (age > 12) { alert("L'inscription est réservée aux enfants de 12 ans maximum."); return; }
                   setForm(p => ({ ...p, enfants: [...p.enfants, { ...newEnfant, id: Date.now() }] }));
                   setNewEnfant({ prenom:"", nom:"", naissance:"", sexe:"", activite:"club", niveau:"debutant", allergies:"", personnesAutorisees:"" });
                 } else if (form.enfants.length === 0) {
@@ -3942,7 +3923,7 @@ function FicheModal({ membre, onClose }) {
                       {resasNat.slice(0,5).map((r,i) => (
                         <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", background:`${C.ocean}08`, borderRadius:10, padding:"7px 10px" }}>
                           <div style={{ fontWeight:800, color:C.ocean, fontSize:13 }}>{r.heure}</div>
-                          <div style={{ fontSize:11, color:"#888" }}>{r.date_seance ? new Date(r.date_seance).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}) : "—"}</div>
+                          <div style={{ fontSize:11, color:"#888" }}>{r.date_seance ? parseLocalDate(r.date_seance).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}) : "—"}</div>
                           {r.enfants?.length > 0 && <div style={{ fontSize:11, color:C.ocean, fontWeight:700 }}>{r.enfants.join(", ")}</div>}
                           <Pill color={C.green}>✓</Pill>
                         </div>
@@ -4891,6 +4872,14 @@ function PaiementsTab({ onValidate }) {
 
 // ── PLANNING TAB ──────────────────────────────────────────
 // ── PLANNING TAB ──────────────────────────────────────────
+
+// Parse ISO date string sans décalage UTC
+function parseLocalDate(iso) {
+  if (!iso) return new Date();
+  const [y,m,d] = iso.slice(0,10).split("-").map(Number);
+  return new Date(y, m-1, d);
+}
+
 function calcAge(naissance) {
   const today = new Date(2026, 6, 6); // référence saison
   const [y, m, d] = naissance.split("-").map(Number);
@@ -6256,7 +6245,7 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
         for (const c of selectedCreneaux) {
           await creerReservationNatation({
             membreId: membreId || null,
-            jour: new Date(c.dayISO).toLocaleDateString("fr-FR", { weekday: "short" }),
+            jour: parseLocalDate(c.dayISO).toLocaleDateString("fr-FR", { weekday: "short" }),
             heure: c.time,
             dateSeance: c.dayISO,
             enfants: selectedEnfants,
@@ -6439,7 +6428,7 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
 
                 {selectedCreneaux.length > 0 && (
                   <div style={{ background:`${C.ocean}10`, borderRadius:10, padding:"8px 10px", marginTop:8, fontSize:11, color:C.ocean, fontWeight:700 }}>
-                    ✓ {selectedCreneaux.map(c => `${c.time} (${new Date(c.dayISO).toLocaleDateString("fr-FR",{day:"numeric",month:"short"})})`).join(" · ")}
+                    ✓ {selectedCreneaux.map(c => `${c.time} (${parseLocalDate(c.dayISO).toLocaleDateString("fr-FR",{day:"numeric",month:"short"})})`).join(" · ")}
                   </div>
                 )}
               </div>
@@ -6920,7 +6909,7 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
                       <div key={r.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", background:`${C.ocean}08`, borderRadius:10, padding:"7px 10px", marginBottom:4, borderLeft:`3px solid ${r.statut==="pending"?C.sun:C.ocean}` }}>
                         <div>
                           <span style={{ fontWeight:800, color:C.dark, fontSize:12 }}>{r.heure}</span>
-                          <span style={{ color:"#aaa", fontSize:11, marginLeft:6 }}>{r.date_seance ? new Date(r.date_seance).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}) : "—"}</span>
+                          <span style={{ color:"#aaa", fontSize:11, marginLeft:6 }}>{r.date_seance ? parseLocalDate(r.date_seance).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}) : "—"}</span>
                           {r.enfants?.length > 0 && <span style={{ color:C.ocean, fontSize:10, marginLeft:6, fontWeight:700 }}>{enrichEnfants(r.enfants, r.membres).join(", ")}</span>}
                           {r.created_at && <div style={{ fontSize:9, color:"#bbb", marginTop:2 }}>Envoyé le {new Date(r.created_at).toLocaleDateString("fr-FR",{day:"numeric",month:"short",year:"numeric"})}</div>}
                         </div>
@@ -7085,7 +7074,7 @@ function ComptesTab({ dbMembres, dbResas, dbResasClub, onRefresh }) {
 
   const genererFacture = (membre, compte) => {
     const nomMembre = `${membre.prenom} ${(membre.nom||"").toUpperCase()}`;
-    const lignesNat = compte.resasNat.map(r => `<tr><td>🏊 Natation · ${r.heure}</td><td>${r.date_seance ? new Date(r.date_seance).toLocaleDateString("fr-FR",{day:"numeric",month:"short"}) : "—"}</td><td style="text-align:right;font-weight:700">${getMontantResa(r,"natation")} €</td></tr>`).join("");
+    const lignesNat = compte.resasNat.map(r => `<tr><td>🏊 Natation · ${r.heure}</td><td>${r.date_seance ? parseLocalDate(r.date_seance).toLocaleDateString("fr-FR",{day:"numeric",month:"short"}) : "—"}</td><td style="text-align:right;font-weight:700">${getMontantResa(r,"natation")} €</td></tr>`).join("");
     const lignesClub = compte.resasClub.map(r => {
       const isLib = (r.label_jour||"").startsWith("[LIBERTE]");
       const label = isLib ? "🎟️ Liberté" : r.session==="matin" ? "🏖️ Club Matin" : "🏖️ Club Après-midi";
@@ -7192,7 +7181,7 @@ Document généré le ${new Date().toLocaleDateString("fr-FR")}
                       <div key={r.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"7px 10px", background: exclusions[r.id] ? "#f8f8f8" : `${C.ocean}06`, borderRadius:10, marginBottom:4, opacity: exclusions[r.id] ? 0.5 : 1 }}>
                         <div>
                           <span style={{ fontWeight:700, fontSize:13, color: exclusions[r.id] ? "#aaa" : C.dark }}>{r.heure}</span>
-                          <span style={{ fontSize:11, color:"#aaa", marginLeft:8 }}>{r.date_seance ? new Date(r.date_seance).toLocaleDateString("fr-FR",{day:"numeric",month:"short"}) : "—"}</span>
+                          <span style={{ fontSize:11, color:"#aaa", marginLeft:8 }}>{r.date_seance ? parseLocalDate(r.date_seance).toLocaleDateString("fr-FR",{day:"numeric",month:"short"}) : "—"}</span>
                           {r.enfants?.length > 0 && <span style={{ fontSize:10, color:C.ocean, marginLeft:6 }}>{r.enfants.join(", ")}</span>}
                         </div>
                         <div style={{ display:"flex", gap:8, alignItems:"center" }}>
@@ -7999,7 +7988,7 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
             enfants:     groupe.enfants.filter(e => e !== "_"),
             statut:      "pending",
             montant:     montantParSeance,
-            jour:        new Date(c.dayISO).toLocaleDateString("fr-FR", {weekday:"short"}),
+            jour:        parseLocalDate(c.dayISO).toLocaleDateString("fr-FR", {weekday:"short"}),
           }]);
           if (e) throw e;
         }
@@ -8050,7 +8039,7 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
       const lignesNat = Object.entries(natGroupes).map(([, g]) => {
         const nb = g.creneaux.length;
         const prix = getPrixNat(nb);
-        const creneauxStr = g.creneaux.map(c => `${c.time} – ${new Date(c.dayISO).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}`).join("<br/>      ");
+        const creneauxStr = g.creneaux.map(c => `${c.time} – ${parseLocalDate(c.dayISO).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}`).join("<br/>      ");
         const enfantsStr = g.enfants.filter(e => e !== "_").join(", ") || "—";
         return `<tr><td style="padding:8px 12px;font-weight:700;color:#1A8FE3">🏊 Natation</td><td style="padding:8px 12px">${enfantsStr}</td><td style="padding:8px 12px;font-size:12px;color:#555">${creneauxStr}</td><td style="padding:8px 12px;font-weight:900;color:#FF8E53;text-align:right">${prix} €</td></tr>`;
       }).join("");
@@ -8263,7 +8252,7 @@ tr:nth-child(even) td{background:#f8fbff}
                             <div style={{ display:"flex", flexWrap:"wrap", gap:4, marginTop:6 }}>
                               {totalCreneaux.map((c,i) => (
                                 <span key={i} style={{ background:`${C.ocean}15`, color:C.ocean, borderRadius:8, padding:"2px 8px", fontSize:10, fontWeight:700 }}>
-                                  {c.time} · {new Date(c.dayISO).toLocaleDateString("fr-FR",{day:"numeric",month:"short"})}
+                                  {c.time} · {parseLocalDate(c.dayISO).toLocaleDateString("fr-FR",{day:"numeric",month:"short"})}
                                 </span>
                               ))}
                             </div>
@@ -8383,55 +8372,149 @@ const ADMIN_EMAILS = [
 ];
 
 function ProfilConnecte({ user, setUser, setScreen, reservations }) {
-  const [resasNat, setResasNat]       = useState([]);
-  const [resasClub, setResasClub]     = useState([]);
   const [loading, setLoading]         = useState(true);
-  const [refreshing, setRefreshing]   = useState(false);
   const [liberteBalance, setLiberteBalance] = useState(user?.liberteBalance || 0);
   const [liberteTotal, setLiberteTotal]     = useState(user?.liberteTotal   || 0);
-  const [hasCarteActive, setHasCarteActive] = useState(false);
+  const [enfants, setEnfants]         = useState(user?.enfants || []);
+  const [showAddEnfant, setShowAddEnfant] = useState(false);
+  const [editEnfant, setEditEnfant]   = useState(null);
+  const [enfantForm, setEnfantForm]   = useState({ prenom:"", nom:"", naissance:"", sexe:"", activite:"club", niveau:"debutant", allergies:"", personnesAutorisees:"" });
+  const [savingEnfant, setSavingEnfant] = useState(false);
 
-  const loadResas = async () => {
+  const loadData = async () => {
     if (!user?.supabaseId) { setLoading(false); return; }
-    const [{ data: nat }, { data: club }, { data: membre }] = await Promise.all([
-      sb.from("reservations_natation").select("*").eq("membre_id", user.supabaseId).order("date_seance"),
+    const [{ data: club }, { data: membre }, { data: enf }] = await Promise.all([
       sb.from("reservations_club").select("*").eq("membre_id", user.supabaseId).order("date_reservation"),
       sb.from("membres").select("liberte_balance, liberte_total").eq("id", user.supabaseId).single(),
+      sb.from("enfants").select("*").eq("membre_id", user.supabaseId),
     ]);
-    setResasNat(nat || []);
-    setResasClub(club || []);
-    // Solde liberté depuis Supabase (source de vérité)
-    const balance = membre?.liberte_balance || 0;
-    const total   = membre?.liberte_total   || 0;
-    setLiberteBalance(balance);
-    setLiberteTotal(total);
-    // Carte active = résas liberté confirmées ET solde > 0
-    const carteConfirmee = (club || []).some(r =>
-      r.statut === "confirmed" &&
-      !isNaN(Number(r.enfants?.[0])) &&
-      Number(r.enfants?.[0]) >= 6
-    );
-    setHasCarteActive(carteConfirmee && balance > 0);
+    setEnfants(enf || []);
+    setLiberteBalance(membre?.liberte_balance || 0);
+    setLiberteTotal(membre?.liberte_total || 0);
     setLoading(false);
-    setRefreshing(false);
   };
 
-  useEffect(() => { loadResas().catch(() => setLoading(false)); }, [user?.supabaseId]);
+  useEffect(() => { loadData().catch(() => setLoading(false)); }, [user?.supabaseId]);
+
+  const openAddEnfant = () => {
+    setEnfantForm({ prenom:"", nom:"", naissance:"", sexe:"", activite:"club", niveau:"debutant", allergies:"", personnesAutorisees:"" });
+    setEditEnfant(null);
+    setShowAddEnfant(true);
+  };
+
+  const openEditEnfant = (e) => {
+    setEnfantForm({ prenom:e.prenom||"", nom:e.nom||"", naissance:e.naissance||"", sexe:e.sexe||"", activite:e.activite||"club", niveau:e.niveau||"debutant", allergies:e.allergies||"", personnesAutorisees:e.personnes_autorisees||"" });
+    setEditEnfant(e);
+    setShowAddEnfant(true);
+  };
+
+  const saveEnfant = async () => {
+    if (!enfantForm.prenom || !enfantForm.naissance) { alert("Prénom et date de naissance requis."); return; }
+    const age = calcAge(enfantForm.naissance);
+    if (age < 2) { alert("L'enfant doit avoir au moins 2 ans."); return; }
+    if (age > 12) { alert("L'inscription est réservée aux enfants de 12 ans maximum."); return; }
+    setSavingEnfant(true);
+    try {
+      if (editEnfant) {
+        await sb.from("enfants").update({ prenom:enfantForm.prenom, nom:enfantForm.nom, naissance:enfantForm.naissance, sexe:enfantForm.sexe, activite:enfantForm.activite, niveau:enfantForm.niveau, allergies:enfantForm.allergies, personnes_autorisees:enfantForm.personnesAutorisees }).eq("id", editEnfant.id);
+      } else {
+        await sb.from("enfants").insert([{ membre_id:user.supabaseId, prenom:enfantForm.prenom, nom:enfantForm.nom||user.nom, naissance:enfantForm.naissance, sexe:enfantForm.sexe, activite:enfantForm.activite, niveau:enfantForm.niveau, allergies:enfantForm.allergies, personnes_autorisees:enfantForm.personnesAutorisees }]);
+      }
+      await loadData();
+      setShowAddEnfant(false);
+    } catch(e) { alert("Erreur : " + e.message); }
+    setSavingEnfant(false);
+  };
 
   return (
     <>
-      <Card style={{ marginTop:14, textAlign:"center" }}>
-        <div style={{ width:80, height:80, borderRadius:26, background:`linear-gradient(135deg,${C.ocean},${C.sea})`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:40, margin:"0 auto 14px" }}>👤</div>
-        <h2 style={{ color:C.dark, margin:"0 0 4px" }}>{user.prenom} {NOM(user.nom)}</h2>
-        <p style={{ color:"#888", fontSize:14, margin:"0 0 2px" }}>{user.email}</p>
-        <p style={{ color:"#888", fontSize:14, margin:"0 0 16px" }}><a href={`tel:${user.tel}`} style={{ color:C.ocean, fontWeight:700, textDecoration:"none" }}>📞 {user.tel}</a></p>
-        {user.enfants?.length > 0 && <div style={{ marginBottom:16, display:"flex", gap:6, flexWrap:"wrap", justifyContent:"center" }}>{user.enfants.map(e => <Pill key={e.id} color={C.sea}>{e.prenom}</Pill>)}</div>}
-        <SunBtn color={C.sunset} onClick={async () => {
+      {/* Modal ajout/modification enfant */}
+      {showAddEnfant && (
+        <div style={{ position:"fixed", inset:0, zIndex:1100, display:"flex", flexDirection:"column" }}>
+          <div onClick={() => setShowAddEnfant(false)} style={{ position:"absolute", inset:0, background:"rgba(0,20,50,0.65)", backdropFilter:"blur(5px)" }} />
+          <div style={{ position:"relative", marginTop:"auto", background:"#F0F4F8", borderRadius:"28px 28px 0 0", maxHeight:"92vh", display:"flex", flexDirection:"column", boxShadow:"0 -12px 48px rgba(0,0,0,0.3)" }}>
+            <div style={{ display:"flex", justifyContent:"center", padding:"12px 0 4px" }}>
+              <div style={{ width:40, height:5, borderRadius:10, background:"#ddd" }} />
+            </div>
+            <div style={{ background:`linear-gradient(135deg,${C.ocean},${C.sea})`, margin:"0 16px", borderRadius:20, padding:"14px 18px", position:"relative" }}>
+              <button onClick={() => setShowAddEnfant(false)} style={{ position:"absolute", top:10, right:12, background:"rgba(255,255,255,0.25)", border:"none", color:"#fff", borderRadius:"50%", width:30, height:30, cursor:"pointer", fontWeight:900, fontSize:16, fontFamily:"inherit" }}>✕</button>
+              <div style={{ color:"#fff", fontWeight:900, fontSize:17 }}>{editEnfant ? "✏️ Modifier l'enfant" : "➕ Ajouter un enfant"}</div>
+              <div style={{ color:"rgba(255,255,255,0.85)", fontSize:13, marginTop:2 }}>{editEnfant ? editEnfant.prenom : user.prenom}</div>
+            </div>
+            <div style={{ overflowY:"auto", padding:"16px 16px 32px", display:"flex", flexDirection:"column", gap:10 }}>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+                <FInput label="Prénom *" value={enfantForm.prenom} onChange={v => setEnfantForm(p => ({...p, prenom:v}))} required />
+                <FInput label="Nom" value={enfantForm.nom} onChange={v => setEnfantForm(p => ({...p, nom:v}))} />
+              </div>
+              <FInput label="Date de naissance *" type="date" value={enfantForm.naissance} onChange={v => setEnfantForm(p => ({...p, naissance:v}))} required />
+              <div>
+                <label style={{ fontSize:11, fontWeight:900, color:C.deep, display:"block", marginBottom:6, textTransform:"uppercase" }}>Sexe</label>
+                <div style={{ display:"flex", gap:8 }}>
+                  {[["M","👦 Garçon"],["F","👧 Fille"]].map(([val, label]) => (
+                    <div key={val} onClick={() => setEnfantForm(p => ({...p, sexe:val}))} style={{ flex:1, textAlign:"center", padding:"10px", borderRadius:14, cursor:"pointer", fontWeight:800, fontSize:13, background:enfantForm.sexe===val?(val==="M"?C.green:"#9B59B6"):"#f0f0f0", color:enfantForm.sexe===val?"#fff":"#888" }}>{label}</div>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label style={{ fontSize:11, fontWeight:900, color:C.deep, display:"block", marginBottom:6, textTransform:"uppercase" }}>Activité</label>
+                <div style={{ display:"flex", gap:8 }}>
+                  {[["club","🏖️ Club"],["natation","🏊 Natation"],["les deux","🏖️🏊 Les deux"]].map(([val, label]) => (
+                    <div key={val} onClick={() => setEnfantForm(p => ({...p, activite:val}))} style={{ flex:1, textAlign:"center", padding:"9px 4px", borderRadius:14, cursor:"pointer", fontWeight:800, fontSize:11, background:enfantForm.activite===val?C.sea:"#f0f0f0", color:enfantForm.activite===val?"#fff":"#888" }}>{label}</div>
+                  ))}
+                </div>
+              </div>
+              {(enfantForm.activite==="natation"||enfantForm.activite==="les deux") && (
+                <div>
+                  <label style={{ fontSize:11, fontWeight:900, color:C.deep, display:"block", marginBottom:5, textTransform:"uppercase" }}>Niveau 🏊</label>
+                  <div style={{ display:"flex", gap:6 }}>
+                    {[["debutant","🌱 Débutant"],["intermediaire","🌊 Intermédiaire"],["avance","🏊 Avancé"]].map(([val, label]) => (
+                      <div key={val} onClick={() => setEnfantForm(p => ({...p, niveau:val}))} style={{ flex:1, textAlign:"center", padding:"8px 4px", borderRadius:12, cursor:"pointer", fontWeight:800, fontSize:11, background:enfantForm.niveau===val?C.ocean:"#f0f0f0", color:enfantForm.niveau===val?"#fff":"#888" }}>{label}</div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <FInput label="Allergies / infos médicales" value={enfantForm.allergies} onChange={v => setEnfantForm(p => ({...p, allergies:v}))} placeholder="Aucune si vide" />
+              <FInput label="Personnes autorisées à récupérer l'enfant" value={enfantForm.personnesAutorisees} onChange={v => setEnfantForm(p => ({...p, personnesAutorisees:v}))} placeholder="Ex: Marie Dupont (grand-mère)…" />
+              <SunBtn color={savingEnfant?"#aaa":C.ocean} full onClick={saveEnfant} disabled={savingEnfant}>
+                {savingEnfant ? "⏳ Enregistrement..." : editEnfant ? "✅ Enregistrer les modifications" : "✅ Ajouter l'enfant"}
+              </SunBtn>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <Card style={{ marginTop:14 }}>
+        <div style={{ textAlign:"center", marginBottom:16 }}>
+          <div style={{ width:72, height:72, borderRadius:24, background:`linear-gradient(135deg,${C.ocean},${C.sea})`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:36, margin:"0 auto 12px" }}>👤</div>
+          <h2 style={{ color:C.dark, margin:"0 0 4px" }}>{user.prenom} {NOM(user.nom)}</h2>
+          <p style={{ color:"#888", fontSize:13, margin:"0 0 2px" }}>{user.email}</p>
+          <p style={{ margin:0 }}><a href={`tel:${user.tel}`} style={{ color:C.ocean, fontWeight:700, textDecoration:"none", fontSize:13 }}>📞 {user.tel}</a></p>
+        </div>
+
+        {/* Enfants */}
+        <div style={{ borderTop:"1px solid #f0f0f0", paddingTop:12, marginBottom:12 }}>
+          <div style={{ fontWeight:800, color:C.dark, fontSize:13, marginBottom:8 }}>👧 Mes enfants inscrits</div>
+          {enfants.length === 0 ? (
+            <div style={{ fontSize:12, color:"#bbb", fontStyle:"italic", marginBottom:8 }}>Aucun enfant inscrit</div>
+          ) : enfants.map(e => (
+            <div key={e.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", background:`${C.sea}10`, border:`1.5px solid ${C.sea}30`, borderRadius:12, padding:"8px 12px", marginBottom:6 }}>
+              <div>
+                <span style={{ fontWeight:700, color:C.dark, fontSize:13 }}>{e.sexe==="M"?"👦":"👧"} {e.prenom} {NOM(e.nom)}</span>
+                <div style={{ fontSize:11, color:"#aaa" }}>{e.activite==="club"?"🏖️ Club":e.activite==="natation"?"🏊 Natation":"🏖️🏊 Club & Natation"}</div>
+              </div>
+              <button onClick={() => openEditEnfant(e)} style={{ background:`${C.ocean}15`, border:"none", color:C.ocean, borderRadius:8, padding:"5px 10px", cursor:"pointer", fontWeight:800, fontSize:11, fontFamily:"inherit" }}>✏️ Modifier</button>
+            </div>
+          ))}
+          <button onClick={openAddEnfant} style={{ width:"100%", background:`${C.ocean}08`, border:`2px dashed ${C.ocean}30`, color:C.ocean, borderRadius:12, padding:"10px", cursor:"pointer", fontWeight:900, fontSize:13, fontFamily:"inherit" }}>
+            ➕ {enfants.length === 0 ? "Ajouter un enfant" : "Ajouter un autre enfant"}
+          </button>
+        </div>
+
+        <SunBtn color={C.sunset} full onClick={async () => {
           try { await sb.auth.signOut(); } catch(e) {}
           setUser(null); setScreen("home");
         }}>Se déconnecter</SunBtn>
       </Card>
-
     </>
   );
 }
@@ -8673,7 +8756,21 @@ export default function App() {
       case "reservation-club": return <ReservationClubScreen {...props} />;
       case "mes-reservations": return <MesReservationsScreen {...props} />;
       case "panier":            return <PanierScreen {...props} />;
-      case "inscription":      return <InscriptionScreen {...props} />;
+      case "inscription":      return user?.supabaseId ? (
+        <div style={{ padding:24, background:C.shell, minHeight:"100%", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center" }}>
+          <div style={{ fontSize:60, marginBottom:16 }}>👋</div>
+          <h3 style={{ color:C.dark, margin:"0 0 8px", textAlign:"center" }}>Vous êtes déjà inscrit !</h3>
+          <p style={{ color:"#888", fontSize:13, textAlign:"center", margin:"0 0 20px", lineHeight:1.6 }}>
+            Votre compte est actif. Vous pouvez directement accéder aux réservations ou consulter votre profil.
+          </p>
+          <SunBtn color={C.ocean} full onClick={() => setScreen("home")}>🏖️ Retour à l'accueil</SunBtn>
+          <div style={{ marginTop:10 }}>
+            <button onClick={() => setScreen("profil")} style={{ background:"none", border:"none", color:C.coral, fontSize:13, cursor:"pointer", fontFamily:"inherit", fontWeight:700 }}>
+              👤 Voir mon profil →
+            </button>
+          </div>
+        </div>
+      ) : <InscriptionScreen {...props} />;
       case "infos":            return <InfosScreen {...props} />;
       case "admin":            return <AdminScreen {...props} />;
       case "profil":           return (
@@ -8727,4 +8824,4 @@ export default function App() {
     </div>
   );
 }
-// comptes fixes Sun Apr  5 10:40:02 CEST 2026
+// multi fixes Sun Apr  5 12:08:52 CEST 2026
