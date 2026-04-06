@@ -3553,18 +3553,15 @@ function SeancesTab({ sessions, setSessions }) {
 
   const doCancel = (id) => {
     const slot = sessions.find(s => s.id === id);
-    console.log("doCancel id:", id, "slot:", slot, "sessions count:", sessions.length);
-    if (!slot) { console.warn("Slot not found!"); return; }
+    if (!slot) return;
     const dayObj = ALL_SEASON_DAYS.find(d => d.id === slot.day);
-    console.log("dayObj:", dayObj);
     if (dayObj?.date) {
       const d = dayObj.date;
       const dateISO = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
-      console.log("Upserting to Supabase:", dateISO, slot.time);
-      sb.from("seances_natation").upsert(
-        { date: dateISO, heure: slot.time, spots: -1 },
-        { onConflict: "date,heure" }
-      ).then(r => console.log("Supabase result:", r)).catch(err => console.warn("Supabase error:", err));
+      // Supprimer si existe, puis insérer avec spots=-1
+      sb.from("seances_natation").delete().eq("date", dateISO).eq("heure", slot.time)
+        .then(() => sb.from("seances_natation").insert({ date: dateISO, heure: slot.time, spots: -1 }))
+        .catch(err => console.warn("Supabase seances:", err));
     }
     setSessions(prev => prev.filter(x => x.id !== id));
     setConfirmCancel(null);
@@ -3594,10 +3591,9 @@ function SeancesTab({ sessions, setSessions }) {
     if (dayObj?.date) {
       const d = dayObj.date;
       const dateISO = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
-      sb.from("seances_natation").upsert(
-        { date: dateISO, heure: newHeure, spots: 2 },
-        { onConflict: "date,heure" }
-      ).catch(err => console.warn("Supabase seances:", err));
+      sb.from("seances_natation").delete().eq("date", dateISO).eq("heure", newHeure)
+        .then(() => sb.from("seances_natation").insert({ date: dateISO, heure: newHeure, spots: 2 }))
+        .catch(err => console.warn("Supabase seances add:", err));
     }
     setSessions(prev => [...prev, newSlot].sort((a, b) => {
       if (a.day !== b.day) return 0;
@@ -10024,4 +10020,4 @@ export default function App() {
     </div>
   );
 }
-// debug cancel Mon Apr  6 22:41:13 CEST 2026
+// seances delete insert Mon Apr  6 22:44:11 CEST 2026
