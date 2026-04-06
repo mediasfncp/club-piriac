@@ -1317,9 +1317,17 @@ function FormulesNatationScreen({ onNav, user, allSeasonSessions, panier, setPan
             <div style={{ display:"flex", gap:8 }}>
               <button onClick={() => setStep("formule")} style={{ flex:1, background:"#f0f0f0", border:"none", color:"#888", borderRadius:14, padding:"11px", cursor:"pointer", fontWeight:800, fontFamily:"inherit" }}>← Retour</button>
               {setPanier ? (
-                <button onClick={() => {
+                <button onClick={async () => {
                   if (selectedCreneaux.length < nbLecons) return;
                   if (!selectedEnfants.length) { alert("Veuillez sélectionner au moins un enfant."); return; }
+                  // Basculer les enfants "club" sur "les deux"
+                  for (const prenom of selectedEnfants) {
+                    const enf = (enfantsDB.length > 0 ? enfantsDB : user?.enfants||[]).find(e => e.prenom === prenom);
+                    if (enf && enf.activite === "club" && enf.id) {
+                      try { await sb.from("enfants").update({ activite: "les deux" }).eq("id", enf.id); }
+                      catch(e) { console.warn("update activite nat:", e); }
+                    }
+                  }
                   const nbEnf = Math.max(1, selectedEnfants.length);
                   const prix = selected.price * nbEnf;
                   setPanier(prev => [...prev, {
@@ -1708,13 +1716,12 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser, pa
     }
   }, [user?.supabaseId]);
 
-  const enfantsClub = enfantsDB.length > 0
-    ? enfantsDB.filter(e => e.activite === "club" || e.activite === "les deux")
-    : (user?.enfants || []).filter(e => e.activite === "club" || e.activite === "les deux");
+  // Tous les enfants sont éligibles au club — si natation seulement, on bascule sur "les deux"
+  const enfantsClub = enfantsDB.length > 0 ? enfantsDB : (user?.enfants || []);
 
   const toggleEnfantClub = (prenom) => setSelectedEnfantsClub(prev => {
     if (prev.includes(prenom)) return prev.filter(x => x !== prenom);
-    if (prev.length >= nbEnfants) return prev; // bloquer si déjà au max
+    if (prev.length >= nbEnfants) return prev;
     return [...prev, prenom];
   });
 
@@ -1888,12 +1895,17 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser, pa
             </Card>
 
             {/* Sélection des enfants concernés */}
-            {enfantsClub.length > 0 && (
-              <div style={{ background:"#fff", borderRadius:18, padding:16, marginBottom:14, boxShadow:"0 2px 10px rgba(0,0,0,0.05)" }}>
-                <div style={{ fontWeight:800, color:C.dark, fontSize:14, marginBottom:10 }}>
-                  👧 Enfant(s) concernés
-                  {selectedEnfantsClub.length > 0 && <span style={{ fontSize:12, color:tarifData.color, fontWeight:700 }}> · {selectedEnfantsClub.join(", ")}</span>}
+            <div style={{ background:"#fff", borderRadius:18, padding:16, marginBottom:14, boxShadow:"0 2px 10px rgba(0,0,0,0.05)" }}>
+              <div style={{ fontWeight:800, color:C.dark, fontSize:14, marginBottom:10 }}>
+                👧 Enfant(s) concernés
+                {selectedEnfantsClub.length > 0 && <span style={{ fontSize:12, color:tarifData.color, fontWeight:700 }}> · {selectedEnfantsClub.join(", ")}</span>}
+              </div>
+              {enfantsClub.length === 0 ? (
+                <div style={{ fontSize:13, color:"#aaa", fontStyle:"italic" }}>
+                  Aucun enfant inscrit pour le Club.<br/>
+                  <span style={{ color:C.ocean, fontWeight:700, cursor:"pointer" }} onClick={() => {}}>Ajoutez un enfant dans votre profil.</span>
                 </div>
+              ) : (
                 <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
                   {enfantsClub.map(e => {
                     const sel = selectedEnfantsClub.includes(e.prenom);
@@ -1910,18 +1922,18 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser, pa
                     );
                   })}
                 </div>
-                {selectedEnfantsClub.length < nbEnfants && (
-                  <div style={{ fontSize:11, color:"#aaa", marginTop:8, fontStyle:"italic" }}>
-                    Sélectionnez encore {nbEnfants - selectedEnfantsClub.length} enfant{nbEnfants - selectedEnfantsClub.length > 1 ? "s" : ""}
-                  </div>
-                )}
-                {selectedEnfantsClub.length === nbEnfants && (
-                  <div style={{ fontSize:11, color:C.green, marginTop:8, fontWeight:700 }}>
-                    ✓ Sélection complète
-                  </div>
-                )}
-              </div>
-            )}
+              )}
+              {enfantsClub.length > 0 && selectedEnfantsClub.length < nbEnfants && (
+                <div style={{ fontSize:11, color:"#aaa", marginTop:8, fontStyle:"italic" }}>
+                  Sélectionnez encore {nbEnfants - selectedEnfantsClub.length} enfant{nbEnfants - selectedEnfantsClub.length > 1 ? "s" : ""}
+                </div>
+              )}
+              {enfantsClub.length > 0 && selectedEnfantsClub.length === nbEnfants && (
+                <div style={{ fontSize:11, color:C.green, marginTop:8, fontWeight:700 }}>
+                  ✓ Sélection complète
+                </div>
+              )}
+            </div>
 
             {/* Tarif rows */}
             <div style={{ marginBottom: 16 }}>
@@ -2131,8 +2143,17 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser, pa
                   <button onClick={() => setStep("dates")} style={{ background:"#f0f0f0", border:"none", color:"#888", borderRadius:14, padding:"11px", cursor:"pointer", fontWeight:800, fontFamily:"inherit" }}>← Dates</button>
                   {setPanier && selectedDates.length > 0 ? (
                     <>
-                      <button onClick={() => {
+                      <button onClick={async () => {
                         if (!selectedEnfantsClub.length) { alert("Veuillez sélectionner au moins un enfant."); return; }
+                        // Basculer les enfants "natation" sur "les deux"
+                        for (const prenom of selectedEnfantsClub) {
+                          const enf = enfantsClub.find(e => e.prenom === prenom);
+                          if (enf && enf.activite === "natation" && enf.id) {
+                            try {
+                              await sb.from("enfants").update({ activite: "les deux" }).eq("id", enf.id);
+                            } catch(e) { console.warn("update activite:", e); }
+                          }
+                        }
                         setPanier(prev => [...prev, {
                           id: `club-${Date.now()}`,
                           type: "club",
@@ -2149,7 +2170,6 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser, pa
                       }} style={{ background:`linear-gradient(135deg,${C.coral},${C.sun})`, border:"none", color:"#fff", borderRadius:14, padding:"14px", cursor:"pointer", fontWeight:900, fontSize:14, fontFamily:"inherit", boxShadow:`0 4px 14px ${C.coral}44` }}>
                         🛒 Ajouter au panier · {selectedRow?.price} €
                       </button>
-
                     </>
                   ) : (
                     <SunBtn color={tarifData.color} onClick={async () => {
@@ -9930,4 +9950,4 @@ export default function App() {
     </div>
   );
 }
-// enfants refresh + club obligatoire Mon Apr  6 22:06:29 CEST 2026
+// enfants tous visibles + activite les deux Mon Apr  6 22:15:08 CEST 2026
