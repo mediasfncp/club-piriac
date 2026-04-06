@@ -8806,10 +8806,10 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
   const [done, setDone]         = useState(false);
   const [error, setError]       = useState("");
 
-  // Si panier vide et pas en mode "done", retourner aux formules
+  // Si panier vide et pas en mode "done" ni en cours d'envoi, retourner aux formules
   useEffect(() => {
-    if (panier.length === 0 && !done) onNav("formules");
-  }, [panier.length, done]);
+    if (panier.length === 0 && !done && !sending) onNav("formules");
+  }, [panier.length, done, sending]);
 
   const removeItem = (id) => setPanier(prev => prev.filter(item => item.id !== id));
 
@@ -8935,6 +8935,7 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
           if (e) throw e;
         }
       }
+      setDone(true); // Marquer comme envoyé AVANT de vider le panier
       setPanier([]);
 
       // Générer l'email de confirmation
@@ -9132,7 +9133,6 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
         }
       }
 
-      setDone(true);
     } catch(e) { setError("Erreur : " + e.message); }
     setSending(false);
   };
@@ -9884,4 +9884,4 @@ export default function App() {
     </div>
   );
 }
-// email + panier fixes Mon Apr  6 16:06:22 CEST 2026
+// done before panier clear Mon Apr  6 16:10:21 CEST 2026
