@@ -8788,7 +8788,7 @@ tr:nth-child(even) td{background:#f8fbff}
   </div>
 
   <p style="font-size:14px;margin:0 0 16px;line-height:1.7">Bonjour <strong>${nomMembre}</strong>,<br/>
-  Merci pour votre inscription ! Votre demande a bien été enregistrée. Voici le récapitulatif de votre commande ainsi que les informations de règlement.</p>
+  Merci pour votre inscription ! Votre demande a bien été pré-enregistrée. Voici le récapitulatif de votre commande ainsi que les informations de règlement.</p>
 
   <table>
     <thead><tr><th>Prestation</th><th>Enfant(s)</th><th>Détails</th><th style="text-align:right">Prix</th></tr></thead>
@@ -9566,4 +9566,4 @@ export default function App() {
     </div>
   );
 }
-// email text fixes Mon Apr  6 11:16:55 CEST 2026
+// email pre-enregistree Mon Apr  6 11:21:32 CEST 2026
