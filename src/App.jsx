@@ -9670,7 +9670,11 @@ export default function App() {
                 sb.from("membres").select("*, enfants(*)").eq("email", session.user.email).single()
                   .then(({ data: d }) => {
                     if (d) setUser({ ...d, supabaseId: d.id });
-                    else setUser({ email: session.user.email, prenom: "", nom: "", supabaseId: session.user.id });
+                    else {
+                      setUser({ email: session.user.email, prenom: "", nom: "", supabaseId: session.user.id });
+                      // Admins sans fiche membre → accueil, pas inscription
+                      if (ADMIN_EMAILS.includes((session.user.email||"").toLowerCase())) setScreen("home");
+                    }
                   });
               }
             });
@@ -9702,7 +9706,9 @@ export default function App() {
                 }
               } else {
                 setUser({ email: session.user.email, prenom: "", nom: "", supabaseId: session.user.id });
-                setScreen("inscription");
+                // Admins → accueil, clients sans fiche → inscription
+                const isAdminEmail = ADMIN_EMAILS.includes((session.user.email||"").toLowerCase());
+                setScreen(isAdminEmail ? "home" : "inscription");
               }
             });
         }
@@ -9806,4 +9812,4 @@ export default function App() {
     </div>
   );
 }
-// skip inscrit admin Mon Apr  6 12:37:18 CEST 2026
+// admin home not inscription Mon Apr  6 12:40:45 CEST 2026
