@@ -7324,29 +7324,53 @@ Document généré le ${new Date().toLocaleDateString("fr-FR")}
                   </div>
                 )}
 
-                {/* Résas club */}
+                {/* Résas club — groupées pour afficher le bon montant */}
                 {compte.resasClub.length > 0 && (
                   <div style={{ marginBottom:16 }}>
                     <div style={{ fontWeight:800, color:C.coral, fontSize:12, textTransform:"uppercase", marginBottom:8 }}>🏖️ Club de Plage</div>
-                    {compte.resasClub.map(r => {
-                      const isLib = (r.label_jour||"").startsWith("[LIBERTE]");
-                      const label = isLib ? "🎟️ Liberté" : r.session==="matin" ? "☀️ Matin" : "🌊 Après-midi";
-                      return (
-                        <div key={r.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"7px 10px", background: exclusions[r.id] ? "#f8f8f8" : `${C.coral}06`, borderRadius:10, marginBottom:4, opacity: exclusions[r.id] ? 0.5 : 1 }}>
-                          <div>
-                            <span style={{ fontWeight:700, fontSize:13, color: exclusions[r.id] ? "#aaa" : C.dark }}>{label}</span>
-                            <span style={{ fontSize:11, color:"#aaa", marginLeft:8 }}>{r.date_reservation ? new Date(r.date_reservation).toLocaleDateString("fr-FR",{day:"numeric",month:"short"}) : "—"}</span>
+                    {(() => {
+                      // Grouper par session+enfants+minute pour montant correct
+                      const groups = {};
+                      compte.resasClub.forEach(r => {
+                        const enfantsKey = Array.isArray(r.enfants) ? [...r.enfants].sort().join(",") : "";
+                        const minute = (r.created_at||"").slice(0,16);
+                        const k = `${r.session}-${enfantsKey}-${minute}`;
+                        if (!groups[k]) groups[k] = [];
+                        groups[k].push(r);
+                      });
+                      const LP = {6:96,12:180,18:252,24:288,30:330};
+                      return Object.values(groups).map((g, gi) => {
+                        const r0 = g[0];
+                        const isLib = (r0.label_jour||"").startsWith("[LIBERTE]");
+                        const label = isLib ? "🎟️ Liberté" : r0.session==="matin" ? "☀️ Matin" : "🌊 Après-midi";
+                        // Montant du groupe
+                        const nb = Number(r0.enfants?.[0]);
+                        let montant = 0;
+                        if (nb >= 6 && LP[nb]) montant = LP[nb];
+                        else if (r0.montant) montant = Number(r0.montant);
+                        else { const m2=(r0.label_jour||"").match(/\[MONTANT:(\d+)\]/); montant=m2?Number(m2[1]):0; }
+                        const allExcluded = g.every(r => exclusions[r.id]);
+                        const someExcluded = g.some(r => exclusions[r.id]);
+                        const dateLabel = g.length > 1
+                          ? `${g.length} jour${g.length>1?"s":""}`
+                          : (r0.date_reservation ? new Date(r0.date_reservation).toLocaleDateString("fr-FR",{day:"numeric",month:"short"}) : "—");
+                        return (
+                          <div key={gi} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"7px 10px", background: allExcluded ? "#f8f8f8" : `${C.coral}06`, borderRadius:10, marginBottom:4, opacity: allExcluded ? 0.5 : 1 }}>
+                            <div>
+                              <span style={{ fontWeight:700, fontSize:13, color: allExcluded ? "#aaa" : C.dark }}>{label}</span>
+                              <span style={{ fontSize:11, color:"#aaa", marginLeft:8 }}>{dateLabel}</span>
+                            </div>
+                            <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                              <span style={{ fontWeight:700, color: allExcluded ? "#aaa" : C.coral, fontSize:13, textDecoration: allExcluded ? "line-through" : "none" }}>{montant} €</span>
+                              <button onClick={() => g.forEach(r => toggleExclusion(r.id, "club"))} title={allExcluded ? "Inclure" : "Exclure"}
+                                style={{ background: allExcluded ? `${C.green}20` : "#fff0f0", border:"none", borderRadius:6, padding:"3px 8px", cursor:"pointer", fontSize:11, fontWeight:700, color: allExcluded ? C.green : C.sunset, fontFamily:"inherit" }}>
+                                {allExcluded ? "↩ Inclure" : "✕ Exclure"}
+                              </button>
+                            </div>
                           </div>
-                          <div style={{ display:"flex", gap:8, alignItems:"center" }}>
-                            <span style={{ fontWeight:700, color: exclusions[r.id] ? "#aaa" : C.coral, fontSize:13, textDecoration: exclusions[r.id] ? "line-through" : "none" }}>{getMontantResa(r,"club")} €</span>
-                            <button onClick={() => toggleExclusion(r.id, "club")} title={exclusions[r.id] ? "Inclure" : "Exclure"}
-                              style={{ background: exclusions[r.id] ? `${C.green}20` : "#fff0f0", border:"none", borderRadius:6, padding:"3px 8px", cursor:"pointer", fontSize:11, fontWeight:700, color: exclusions[r.id] ? C.green : C.sunset, fontFamily:"inherit" }}>
-                              {exclusions[r.id] ? "↩ Inclure" : "✕ Exclure"}
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      });
+                    })()}
                   </div>
                 )}
 
@@ -9578,4 +9602,4 @@ export default function App() {
     </div>
   );
 }
-// persist admin screen Mon Apr  6 11:35:14 CEST 2026
+// comptes club groupes Mon Apr  6 11:43:14 CEST 2026
