@@ -2358,28 +2358,26 @@ function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSession
   }, [weekIdx]);
 
   useEffect(() => {
-    sb.from("reservations_natation").select("date_seance, heure, statut")
-      .eq("statut", "confirmed")
-      .then(({ data }) => {
-        if (setAllSeasonSessions) {
-          setAllSeasonSessions(() => {
-            const next = ALL_SEASON_SLOTS_INIT.map(s => ({ ...s, spots: 2 }));
-            data.forEach(r => {
-              if (!r.date_seance || !r.heure) return;
-              const dateResa = r.date_seance.slice(0, 10);
-              for (let i = 0; i < next.length; i++) {
-                if (next[i].time !== r.heure || next[i].spots <= 0) continue;
-                const dayObj = ALL_SEASON_DAYS.find(d => d.id === next[i].day);
-                if (dayObj?.date) {
-                  const iso = `${dayObj.date.getFullYear()}-${String(dayObj.date.getMonth()+1).padStart(2,"0")}-${String(dayObj.date.getDate()).padStart(2,"0")}`;
-                  if (iso === dateResa) { next[i] = { ...next[i], spots: next[i].spots - 1 }; break; }
-                }
-              }
-            });
-            return next;
-          });
-        }
-      }).catch(() => {});
+    // Charger créneaux actifs depuis Supabase (source de vérité)
+    Promise.all([
+      sb.from("seances_natation").select("date, heure, spots").gte("spots", 0),
+      sb.from("reservations_natation").select("date_seance, heure, statut").eq("statut", "confirmed"),
+    ]).then(([{ data: seances }, { data: resas }]) => {
+      if (!seances || seances.length === 0) return;
+      const newSessions = seances.map(({ date, heure, spots }) => {
+        const dayObj = ALL_SEASON_DAYS.find(d => {
+          const dd = d.date;
+          if (!dd) return false;
+          const iso = `${dd.getFullYear()}-${String(dd.getMonth()+1).padStart(2,"0")}-${String(dd.getDate()).padStart(2,"0")}`;
+          return iso === date;
+        });
+        if (!dayObj) return null;
+        // Déduire les places prises
+        const taken = (resas||[]).filter(r => r.date_seance?.slice(0,10) === date && r.heure === heure).length;
+        return { id: `sb-${date}-${heure}`, day: dayObj.id, time: heure, spots: Math.max(0, 2 - taken) };
+      }).filter(Boolean);
+      if (setAllSeasonSessions && newSessions.length > 0) setAllSeasonSessions(newSessions);
+    }).catch(() => {});
   }, []);
 
   const allForDay = (allSeasonSessions || []).filter(s => s.day === effectiveDayId);
@@ -10101,4 +10099,4 @@ export default function App() {
     </div>
   );
 }
-// seances from supabase Mon Apr  6 23:00:27 CEST 2026
+// seances from supabase reservation Mon Apr  6 23:05:11 CEST 2026
