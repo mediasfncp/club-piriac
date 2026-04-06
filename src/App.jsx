@@ -1957,9 +1957,25 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser, pa
             </div>
 
             {selectedRow && step === "choix" && (
-              <SunBtn color={tarifData.color} full onClick={() => { setStep("dates"); setSelectedDates([]); }}>
-                Choisir mes dates →
-              </SunBtn>
+              <>
+                {enfantsClub.length === 0 && (
+                  <div style={{ background:"#FFF0EC", border:"1.5px solid #FF8E53", borderRadius:12, padding:"10px 14px", fontSize:13, color:"#c0392b", fontWeight:700, textAlign:"center" }}>
+                    ⚠️ Aucun enfant inscrit pour le Club. Ajoutez d'abord un enfant dans votre profil.
+                  </div>
+                )}
+                {enfantsClub.length > 0 && selectedEnfantsClub.length === 0 && (
+                  <div style={{ background:"#FFF9F0", border:"1.5px solid #FFD93D", borderRadius:12, padding:"10px 14px", fontSize:13, color:"#b45309", fontWeight:700, textAlign:"center" }}>
+                    👆 Sélectionnez au moins un enfant pour continuer
+                  </div>
+                )}
+                <SunBtn color={enfantsClub.length === 0 || selectedEnfantsClub.length === 0 ? "#ccc" : tarifData.color} full onClick={() => {
+                  if (enfantsClub.length === 0) { alert("Aucun enfant inscrit pour le Club. Ajoutez d'abord un enfant dans votre profil."); return; }
+                  if (selectedEnfantsClub.length === 0) { alert("Veuillez sélectionner au moins un enfant."); return; }
+                  setStep("dates"); setSelectedDates([]);
+                }}>
+                  Choisir mes dates →
+                </SunBtn>
+              </>
             )}
 
             {/* Étape 2 — Sélection des dates */}
@@ -9744,6 +9760,20 @@ export default function App() {
     } catch {}
   }, [user]);
 
+  // Rafraîchir les données membre au focus de la fenêtre
+  useEffect(() => {
+    const refreshUser = async () => {
+      try {
+        const { data: { session } } = await sb.auth.getSession();
+        if (!session?.user) return;
+        const { data } = await sb.from("membres").select("*, enfants(*)").eq("id", session.user.id).single();
+        if (data) setUser(prev => prev ? { ...prev, ...data, enfants: data.enfants, supabaseId: data.id } : null);
+      } catch {}
+    };
+    window.addEventListener("focus", refreshUser);
+    return () => window.removeEventListener("focus", refreshUser);
+  }, []);
+
   // Écouter les changements d'authentification Supabase (magic link)
   useEffect(() => {
     // Vérifier si déjà connecté (session Supabase active)
@@ -9900,4 +9930,4 @@ export default function App() {
     </div>
   );
 }
-// facture email header Mon Apr  6 16:19:24 CEST 2026
+// enfants refresh + club obligatoire Mon Apr  6 22:06:29 CEST 2026
