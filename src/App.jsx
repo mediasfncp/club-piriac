@@ -9865,6 +9865,27 @@ export default function App() {
   const [sessions, setSessions] = useState(INIT_SESSIONS);
   const [allSeasonSessions, setAllSeasonSessions] = useState(ALL_SEASON_SLOTS_INIT);
 
+  // Charger les créneaux depuis Supabase (source de vérité)
+  useEffect(() => {
+    sb.from("seances_natation").select("date, heure, spots").then(({ data }) => {
+      if (!data || data.length === 0) return;
+      // Reconstruire allSeasonSessions depuis Supabase
+      const actifs = data.filter(s => s.spots >= 0);
+      if (actifs.length === 0) return;
+      const newSessions = actifs.map(({ date, heure, spots }) => {
+        const dayObj = ALL_SEASON_DAYS.find(d => {
+          const dd = d.date;
+          if (!dd) return false;
+          const iso = `${dd.getFullYear()}-${String(dd.getMonth()+1).padStart(2,"0")}-${String(dd.getDate()).padStart(2,"0")}`;
+          return iso === date;
+        });
+        if (!dayObj) return null;
+        return { id: `sb-${date}-${heure}`, day: dayObj.id, time: heure, spots };
+      }).filter(Boolean);
+      if (newSessions.length > 0) setAllSeasonSessions(newSessions);
+    }).catch(() => {});
+  }, []);
+
   // Synchroniser les créneaux natation avec Supabase (suppressions/ajouts admin)
   useEffect(() => {
     sb.from("seances_natation").select("date, heure, spots").then(({ data }) => {
@@ -10080,4 +10101,4 @@ export default function App() {
     </div>
   );
 }
-// seances load supabase Mon Apr  6 22:55:20 CEST 2026
+// seances from supabase Mon Apr  6 23:00:27 CEST 2026
