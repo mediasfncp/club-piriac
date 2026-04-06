@@ -8982,87 +8982,111 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
           </div>
         </div>`);
 
-      const emailHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Confirmation Eole Beach Club</title>
-<style>
-body{font-family:Arial,sans-serif;color:#2C3E50;margin:0;padding:20px;background:#f0f4f8}
-.card{background:#fff;border-radius:16px;padding:28px;max-width:620px;margin:0 auto;box-shadow:0 4px 20px rgba(0,0,0,0.1)}
-.header{background:linear-gradient(135deg,#1A8FE3,#4ECDC4);border-radius:12px;padding:20px 24px;margin-bottom:20px;color:#fff}
-.header h1{margin:0 0 4px;font-size:22px}
-.header p{margin:0;font-size:13px;opacity:.85}
-table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:16px}
-th{background:#1A8FE3;color:#fff;padding:10px 12px;text-align:left;font-size:11px;text-transform:uppercase}
-td{padding:9px 12px;border-bottom:1px solid #f0f0f0}
-tr:nth-child(even) td{background:#f8fbff}
-.total-box{background:linear-gradient(135deg,#1A8FE3,#4ECDC4);color:#fff;padding:14px 18px;border-radius:12px;display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
-.total-box .label{font-size:14px;font-weight:700}
-.total-box .amount{font-size:22px;font-weight:900}
-.payment-box{background:#FFF9F0;border:2px solid #FFD93D;border-radius:12px;padding:16px 18px;margin-bottom:20px}
-.payment-box h3{margin:0 0 10px;color:#b45309;font-size:14px}
-.payment-methods{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
-.payment-method{background:#fff;border:1.5px solid #e0e0e0;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;color:#555}
-.footer{margin-top:20px;padding:14px;background:#F0F4F8;border-radius:10px;font-size:11px;color:#888;text-align:center;line-height:1.8}
-</style></head><body>
-<div class="card">
-  <div class="header">
-    <h1>🏖️ Eole Beach Club</h1>
-    <p>Club de Plage · École de Natation · Piriac-sur-Mer · Saison 2026</p>
-  </div>
+      const emailHtml = `<!DOCTYPE html>
+<html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Confirmation Eole Beach Club</title></head>
+<body style="margin:0;padding:0;background-color:#f0f4f8;font-family:Arial,Helvetica,sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f0f4f8;padding:20px 0">
+<tr><td align="center">
+<table width="620" cellpadding="0" cellspacing="0" border="0" style="max-width:620px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.1)">
 
-  <p style="font-size:14px;margin:0 0 16px;line-height:1.7">Bonjour <strong>${nomMembre}</strong>,<br/>
-  Merci pour votre inscription ! Votre demande a bien été pré-enregistrée. Voici le récapitulatif de votre commande ainsi que les informations de règlement.</p>
+  <!-- HEADER -->
+  <tr><td style="background:linear-gradient(135deg,#1A8FE3,#4ECDC4);padding:24px 28px">
+    <p style="margin:0 0 4px;font-size:22px;font-weight:900;color:#ffffff">🏖️ Eole Beach Club</p>
+    <p style="margin:0;font-size:13px;color:rgba(255,255,255,0.85)">Club de Plage · École de Natation · Piriac-sur-Mer · Saison 2026</p>
+  </td></tr>
 
-  <table>
-    <thead><tr><th>Prestation</th><th>Enfant(s)</th><th>Détails</th><th style="text-align:right">Prix</th></tr></thead>
-    <tbody>${lignesNat}${lignesAutres}</tbody>
-  </table>
+  <!-- BODY -->
+  <tr><td style="padding:24px 28px">
+    <p style="font-size:14px;color:#2C3E50;line-height:1.7;margin:0 0 20px">Bonjour <strong>${nomMembre}</strong>,<br/>
+    Merci pour votre inscription ! Votre demande a bien été pré-enregistrée. Voici le récapitulatif de votre commande ainsi que les informations de règlement.</p>
 
-  <div class="total-box">
-    <span class="label">Total à régler</span>
-    <span class="amount">${total} €</span>
-  </div>
+    <!-- TABLEAU PRESTATIONS -->
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-size:13px;margin-bottom:20px">
+      <tr>
+        <th style="background:#1A8FE3;color:#fff;padding:10px 12px;text-align:left;font-size:11px;text-transform:uppercase">Prestation</th>
+        <th style="background:#1A8FE3;color:#fff;padding:10px 12px;text-align:left;font-size:11px;text-transform:uppercase">Enfant(s)</th>
+        <th style="background:#1A8FE3;color:#fff;padding:10px 12px;text-align:left;font-size:11px;text-transform:uppercase">Détails</th>
+        <th style="background:#1A8FE3;color:#fff;padding:10px 12px;text-align:right;font-size:11px;text-transform:uppercase">Prix</th>
+      </tr>
+      ${lignesNat}${lignesAutres}
+    </table>
 
-  <div class="payment-box">
-    <h3>💳 Comment régler votre inscription ?</h3>
-    <div style="font-size:13px;color:#555;line-height:1.7">
-      Vous pouvez régler votre inscription selon les modes de paiement suivants :
-    </div>
-    <div class="payment-methods">
-      <span class="payment-method">🏦 Virement bancaire</span>
-      <span class="payment-method">✉️ Chèque</span>
-      <span class="payment-method">💶 Espèces</span>
-      <span class="payment-method">🎫 Chèques vacances</span>
-    </div>
-    <div style="margin-top:12px;font-size:12px;color:#888;font-style:italic">
-      Pour le virement ou chèque, merci de préciser le nom de votre enfant en référence.<br/>
-      <div style="text-align:center;margin-top:6px">Le chèque est à libeller à l'ordre de : <strong>SAUZEAU Charlène</strong></div>
-      <br/>
-      <div style="text-align:center">En avant saison, celui-ci est à envoyer à :<br/>
-      <strong>Mme SAUZEAU Charlène<br/>
-      4 allée des Roitelets<br/>
-      44500 LA BAULE</strong></div>
-    </div>
-  </div>
+    <!-- TOTAL -->
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:20px">
+      <tr>
+        <td style="background:#1A8FE3;padding:16px 20px;border-radius:12px">
+          <table width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr>
+              <td style="color:#ffffff;font-size:15px;font-weight:700">Total à régler</td>
+              <td align="right" style="color:#ffffff;font-size:24px;font-weight:900">${total} €</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
 
-  ${reglementSections.join("")}
+    <!-- PAIEMENT -->
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:20px">
+      <tr>
+        <td style="background:#FFF9F0;border:2px solid #FFD93D;border-radius:12px;padding:18px 20px">
+          <p style="margin:0 0 10px;color:#b45309;font-size:14px;font-weight:700">💳 Comment régler votre inscription ?</p>
+          <p style="margin:0 0 12px;font-size:13px;color:#555;line-height:1.7">Vous pouvez régler votre inscription selon les modes de paiement suivants :</p>
+          <table cellpadding="0" cellspacing="4" border="0">
+            <tr>
+              <td style="background:#fff;border:1.5px solid #e0e0e0;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;color:#555">🏦 Virement bancaire</td>
+              <td width="4"></td>
+              <td style="background:#fff;border:1.5px solid #e0e0e0;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;color:#555">✉️ Chèque</td>
+              <td width="4"></td>
+              <td style="background:#fff;border:1.5px solid #e0e0e0;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;color:#555">💶 Espèces</td>
+              <td width="4"></td>
+              <td style="background:#fff;border:1.5px solid #e0e0e0;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;color:#555">🎫 Chèques vacances</td>
+            </tr>
+          </table>
+          <p style="margin:12px 0 0;font-size:12px;color:#888;line-height:1.8">
+            Pour le virement ou chèque, merci de préciser le nom de votre enfant en référence.<br/>
+            <span style="display:block;text-align:center;margin-top:8px">Le chèque est à libeller à l'ordre de : <strong>SAUZEAU Charlène</strong></span>
+            <span style="display:block;text-align:center;margin-top:8px">En avant saison, celui-ci est à envoyer à :<br/>
+            <strong>Mme SAUZEAU Charlène<br/>4 allée des Roitelets<br/>44500 LA BAULE</strong></span>
+          </p>
+        </td>
+      </tr>
+    </table>
 
-  <div style="padding:14px 16px;background:#E8F5E9;border-left:4px solid #6BCB77;border-radius:8px;margin-bottom:20px">
-    <div style="font-size:13px;color:#2e7d32;font-weight:700">✅ Prochaines étapes</div>
-    <ol style="font-size:13px;color:#555;line-height:1.9;margin:8px 0 0;padding-left:18px">
-      <li>Effectuez le règlement selon l'un des modes ci-dessus</li>
-      <li>L'équipe Eole Beach Club valide votre pré-réservation</li>
-      <li>Votre accès est activé dans l'application</li>
-      <li>À vous la plage ! 🏖️</li>
-    </ol>
-  </div>
+    ${reglementSections.join("")}
 
-  <div class="footer">
-    <strong>Eole Beach Club · Club de Plage / École de Natation</strong><br/>
-    Plage Saint-Michel · Rue des Caps Horniers · 44420 Piriac-sur-Mer<br/>
-    📞 07 67 78 69 22 &nbsp;·&nbsp; ✉️ clubdeplage.piriacsurmer@hotmail.com<br/>
-    🌐 www.clubdeplage-piriacsurmer.fr<br/><br/>
-    <em>Cet email est généré automatiquement depuis l'application Eole Beach Club.</em>
-  </div>
-</div></body></html>`;
+    <!-- PROCHAINES ÉTAPES -->
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:20px">
+      <tr>
+        <td style="background:#E8F5E9;border-left:4px solid #6BCB77;border-radius:8px;padding:16px 18px">
+          <p style="margin:0 0 8px;font-size:13px;color:#2e7d32;font-weight:700">✅ Prochaines étapes</p>
+          <ol style="font-size:13px;color:#555;line-height:1.9;margin:0;padding-left:18px">
+            <li>Effectuez le règlement selon l'un des modes ci-dessus</li>
+            <li>L'équipe Eole Beach Club valide votre pré-réservation</li>
+            <li>Votre accès est activé dans l'application</li>
+            <li>À vous la plage ! 🏖️</li>
+          </ol>
+        </td>
+      </tr>
+    </table>
+
+    <!-- FOOTER -->
+    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+      <tr>
+        <td style="background:#F0F4F8;border-radius:10px;padding:14px;text-align:center;font-size:11px;color:#888;line-height:1.8">
+          <strong>Eole Beach Club · Club de Plage / École de Natation</strong><br/>
+          Plage Saint-Michel · Rue des Caps Horniers · 44420 Piriac-sur-Mer<br/>
+          📞 07 67 78 69 22 · clubdeplage.piriacsurmer@hotmail.com<br/>
+          🌐 www.clubdeplage-piriacsurmer.fr<br/><br/>
+          <em>Cet email est généré automatiquement depuis l'application Eole Beach Club.</em>
+        </td>
+      </tr>
+    </table>
+
+  </td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>`;
 
       // Envoyer l'email via Brevo (Edge Function Supabase)
       const emailDest = user.email || "";
@@ -9839,4 +9863,4 @@ export default function App() {
     </div>
   );
 }
-// brevo auth fix Mon Apr  6 15:17:59 CEST 2026
+// email table layout Mon Apr  6 15:42:04 CEST 2026
