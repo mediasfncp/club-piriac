@@ -9657,7 +9657,14 @@ export default function App() {
             .then(({ data }) => {
               if (data) {
                 setUser({ ...data, prenom: data.prenom, nom: data.nom, email: data.email, tel: data.tel, supabaseId: data.id });
-                setScreen("home"); // Toujours atterrir sur l'accueil
+                // Admins → rester sur admin, sinon accueil
+                const isAdmin = ADMIN_EMAILS.includes((session.user.email||"").toLowerCase());
+                const savedScreen = localStorage.getItem("fncp_screen");
+                if (isAdmin && savedScreen === "admin") {
+                  setScreen("admin");
+                } else {
+                  setScreen("home");
+                }
               } else {
                 setUser({ email: session.user.email, prenom: "", nom: "", supabaseId: session.user.id });
                 setScreen("inscription");
@@ -9765,4 +9772,4 @@ export default function App() {
     </div>
   );
 }
-// cahier suivi Mon Apr  6 11:53:33 CEST 2026
+// admin persist signin Mon Apr  6 11:59:15 CEST 2026
