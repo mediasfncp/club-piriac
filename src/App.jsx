@@ -946,9 +946,23 @@ function FormulesEveilScreen({ onNav, user, panier, setPanier }) {
             ))}
             <div style={{ fontSize:11, color:"#aaa", marginTop:6, fontStyle:"italic" }}>Votre accès sera activé à réception du paiement.</div>
           </div>
-          {setPanier && enfantsEveil.length === 0 || selectedEnfant ? (
-            <button onClick={() => {
-              if (enfantsEveil.length > 0 && !selectedEnfant) return;
+          {/* Bouton ajouter au panier - enfant obligatoire */}
+          {enfantsEveil.length === 0 ? (
+            <div style={{ background:`${C.sunset}10`, border:`2px solid ${C.sunset}30`, borderRadius:12, padding:"10px 14px", fontSize:13, color:"#c0392b", fontWeight:700, textAlign:"center" }}>
+              ⚠️ Aucun enfant éligible (2-5 ans). Vérifiez les dates de naissance dans votre profil.
+            </div>
+          ) : !selectedEnfant ? (
+            <div style={{ background:"#FFF9F0", border:"1.5px solid #FFD93D", borderRadius:12, padding:"10px 14px", fontSize:13, color:"#b45309", fontWeight:700, textAlign:"center" }}>
+              👆 Sélectionnez un enfant pour continuer
+            </div>
+          ) : (
+            <button onClick={async () => {
+              // Basculer l'enfant sur "les deux" si nécessaire
+              const enf = enfantsEveil.find(e => e.prenom === selectedEnfant);
+              if (enf && enf.activite === "club" && enf.id) {
+                try { await sb.from("enfants").update({ activite: "les deux" }).eq("id", enf.id); }
+                catch(e) { console.warn(e); }
+              }
               const sun = eveilSundays[booking.sundayIdx];
               const sl = sun.slots.find(s => s.id === booking.slotId);
               setPanier(prev => [...prev, {
@@ -967,9 +981,9 @@ function FormulesEveilScreen({ onNav, user, panier, setPanier }) {
               onNav("panier");
               setBooking(null);
             }} style={{ width:"100%", background:`linear-gradient(135deg,${C.sun},${C.coral})`, border:"none", color:"#fff", borderRadius:14, padding:"12px", cursor:"pointer", fontWeight:900, fontSize:14, fontFamily:"inherit", marginBottom:8 }}>
-              🛒 Ajouter au panier
+              🛒 Ajouter au panier · {selectedEnfant}
             </button>
-          ) : null}
+          )}
           <SunBtn color={!selectedEnfant ? "#bbb" : "#9B59B6"} full
             onClick={() => { if (!selectedEnfant) return; confirmBook(); }}>
             {!selectedEnfant ? (enfantsEveil.length === 0 ? "⚠️ Aucun enfant 2-5 ans" : "👆 Sélectionnez un enfant") : "📨 Envoyer la demande · 20 €"}
@@ -8860,7 +8874,7 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
 
   // Si panier vide et pas en mode "done" ni en cours d'envoi, retourner aux formules
   useEffect(() => {
-    if (panier.length === 0 && !done && !sending) onNav("formules");
+    // Ne pas rediriger si panier vide — afficher l'écran panier vide
   }, [panier.length, done, sending]);
 
   const removeItem = (id) => setPanier(prev => prev.filter(item => item.id !== id));
@@ -9950,4 +9964,4 @@ export default function App() {
     </div>
   );
 }
-// enfants tous visibles + activite les deux Mon Apr  6 22:15:08 CEST 2026
+// panier vide + eveil enfant Mon Apr  6 22:22:28 CEST 2026
