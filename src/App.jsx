@@ -9662,13 +9662,21 @@ export default function App() {
 
   // Écouter les changements d'authentification Supabase (magic link)
   useEffect(() => {
-      // Vérifier si déjà connecté (session Supabase active)
+    // Vérifier si déjà connecté (session Supabase active)
       sb.auth.getSession().then(({ data: { session } }) => {
         if (session?.user) {
-          sb.from("membres").select("*, enfants(*)").eq("email", session.user.email).single()
+          // Chercher par id Supabase Auth pour avoir les données fraîches (même si admin a modifié l'email)
+          sb.from("membres").select("*, enfants(*)").eq("id", session.user.id).single()
             .then(({ data }) => {
-              if (data) setUser({ ...data, prenom: data.prenom, nom: data.nom, email: data.email, tel: data.tel, supabaseId: data.id });
-              else setUser({ email: session.user.email, prenom: "", nom: "", supabaseId: session.user.id });
+              if (data) setUser({ ...data, supabaseId: data.id });
+              else {
+                // Fallback par email
+                sb.from("membres").select("*, enfants(*)").eq("email", session.user.email).single()
+                  .then(({ data: d }) => {
+                    if (d) setUser({ ...d, supabaseId: d.id });
+                    else setUser({ email: session.user.email, prenom: "", nom: "", supabaseId: session.user.id });
+                  });
+              }
             });
         }
       });
@@ -9684,12 +9692,12 @@ export default function App() {
       // Écouter les connexions (magic link cliqué)
       const { data: { subscription } } = sb.auth.onAuthStateChange((event, session) => {
         if (event === "SIGNED_IN" && session?.user) {
-          sb.from("membres").select("*, enfants(*)").eq("email", session.user.email).single()
+          sb.from("membres").select("*, enfants(*)").eq("id", session.user.id).single()
             .then(({ data }) => {
-              if (data) {
-                setUser({ ...data, prenom: data.prenom, nom: data.nom, email: data.email, tel: data.tel, supabaseId: data.id });
-                // Admins → rester sur admin, sinon accueil
-                const isAdmin = ADMIN_EMAILS.includes((session.user.email||"").toLowerCase());
+              const membre = data || null;
+              if (membre) {
+                setUser({ ...membre, supabaseId: membre.id });
+                const isAdmin = ADMIN_EMAILS.includes((membre.email||"").toLowerCase());
                 const savedScreen = localStorage.getItem("fncp_screen");
                 if (isAdmin && savedScreen === "admin") {
                   setScreen("admin");
@@ -9708,8 +9716,7 @@ export default function App() {
           setScreen("home");
         }
         if (event === "TOKEN_REFRESHED" && session?.user) {
-          // Rafraîchir les données membre silencieusement
-          sb.from("membres").select("*, enfants(*)").eq("email", session.user.email).single()
+          sb.from("membres").select("*, enfants(*)").eq("id", session.user.id).single()
             .then(({ data }) => {
               if (data) setUser(prev => prev ? { ...prev, ...data, supabaseId: data.id } : null);
             }).catch(() => {});
@@ -9803,4 +9810,4 @@ export default function App() {
     </div>
   );
 }
-// offerts + doublons Mon Apr  6 12:10:42 CEST 2026
+// fetch by id Mon Apr  6 12:20:27 CEST 2026
