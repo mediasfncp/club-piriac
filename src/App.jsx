@@ -9253,7 +9253,7 @@ ${enfants.length>0?`<div style="font-size:10px;text-transform:uppercase;color:#8
 
         <SunBtn color={C.sunset} full onClick={async () => {
           try { await sb.auth.signOut(); } catch(e) {}
-          setUser(null); setScreen("home");
+          setUser(null); setScreenPersist("home");
         }}>Se déconnecter</SunBtn>
       </Card>
     </>
@@ -9405,7 +9405,20 @@ function AdminCodeAccess({ onUnlock, user }) {
 
 // ── ROOT ──────────────────────────────────────────────────
 export default function App() {
-  const [screen, setScreen] = useState("home");
+  const [screen, setScreen] = useState(() => {
+    try {
+      const savedScreen = localStorage.getItem("fncp_screen");
+      const savedUser = localStorage.getItem("fncp_user");
+      return savedScreen === "admin" && savedUser ? "admin" : "home";
+    }
+    catch { return "home"; }
+  });
+
+  const setScreenPersist = (s) => {
+    setScreen(s);
+    try { if (s === "admin") localStorage.setItem("fncp_screen", "admin"); else localStorage.removeItem("fncp_screen"); }
+    catch {}
+  };
 
   // Restaurer user depuis localStorage si disponible
   const [user, setUser] = useState(() => {
@@ -9483,7 +9496,7 @@ export default function App() {
         clearInterval(refreshInterval);
       };
   }, []);
-  const props = { onNav: setScreen, user, setUser, sessions, setSessions, reservations, setReservations, allSeasonSessions, setAllSeasonSessions, clubPlaces, setClubPlaces, panier, setPanier };
+  const props = { onNav: setScreenPersist, user, setUser, sessions, setSessions, reservations, setReservations, allSeasonSessions, setAllSeasonSessions, clubPlaces, setClubPlaces, panier, setPanier };
 
   const renderScreen = () => {
     switch (screen) {
@@ -9534,7 +9547,7 @@ export default function App() {
           )}
           {/* Accès Admin — visible uniquement pour les emails admin */}
           {user?.supabaseId && ADMIN_EMAILS.includes((user?.email||"").toLowerCase()) && (
-            <AdminCodeAccess onUnlock={() => setScreen("admin")} user={user} />
+            <AdminCodeAccess onUnlock={() => setScreenPersist("admin")} user={user} />
           )}
         </div>
       );
@@ -9561,8 +9574,8 @@ export default function App() {
         button { font-family: 'Nunito', sans-serif; }
       `}</style>
       <div style={{ flex:1, overflowY:"auto" }}>{renderScreen()}</div>
-      {screen !== "inscription" && <BottomNav current={screen} onNav={setScreen} panierCount={screen === "admin" ? 0 : panier.length} hidepanier={screen === "admin"} />}
+      {screen !== "inscription" && <BottomNav current={screen} onNav={setScreenPersist} panierCount={screen === "admin" ? 0 : panier.length} hidepanier={screen === "admin"} />}
     </div>
   );
 }
-// email natation fixes Mon Apr  6 11:28:32 CEST 2026
+// persist admin screen Mon Apr  6 11:35:14 CEST 2026
