@@ -9285,16 +9285,19 @@ function ProfilConnecte({ user, setUser, setScreen, reservations }) {
 
   const loadData = async () => {
     if (!user?.supabaseId) { setLoading(false); return; }
-    const [{ data: club }, { data: membre }, { data: enf }, { data: fac }] = await Promise.all([
-      sb.from("reservations_club").select("*").eq("membre_id", user.supabaseId).order("date_reservation"),
-      sb.from("membres").select("liberte_balance, liberte_total").eq("id", user.supabaseId).single(),
+    const [{ data: membreFrais }, { data: enf }, { data: fac }] = await Promise.all([
+      sb.from("membres").select("*").eq("id", user.supabaseId).single(),
       sb.from("enfants").select("*").eq("membre_id", user.supabaseId),
       sb.from("factures_numeros").select("*").eq("membre_id", user.supabaseId).order("created_at", { ascending: false }).limit(1),
     ]);
+    // Mettre à jour user avec les données fraîches depuis Supabase
+    if (membreFrais) {
+      setUser(prev => ({ ...prev, ...membreFrais, supabaseId: membreFrais.id }));
+      setLiberteBalance(membreFrais.liberte_balance || 0);
+      setLiberteTotal(membreFrais.liberte_total || 0);
+    }
     setEnfants(enf || []);
     setFacture(fac?.[0] || null);
-    setLiberteBalance(membre?.liberte_balance || 0);
-    setLiberteTotal(membre?.liberte_total || 0);
     setLoading(false);
   };
 
@@ -9810,4 +9813,4 @@ export default function App() {
     </div>
   );
 }
-// fetch by id Mon Apr  6 12:20:27 CEST 2026
+// sync membre profil Mon Apr  6 12:26:12 CEST 2026
