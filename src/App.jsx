@@ -4590,8 +4590,9 @@ const ALL_PAYMENTS = [
 function PaiementsTab({ onValidate }) {
   const [resas, setResas]     = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter]     = useState("tous");
-  const [dateFilter, setDateFilter] = useState(""); // YYYY-WXX or YYYY-MM
+  const [filter, setFilter]   = useState("tous");
+  const [dateFilter, setDateFilter] = useState("");
+  const [subTab, setSubTab]   = useState("liste"); // "liste" | "suivi"
 
   const loadAll = async () => {
     const [{ data: nat }, { data: club }] = await Promise.all([
@@ -4774,6 +4775,115 @@ function PaiementsTab({ onValidate }) {
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
 
+      {/* Onglets Liste / Cahier de suivi */}
+      <div style={{ display:"flex", gap:0, background:"#fff", borderRadius:14, padding:4, boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
+        {[["liste","📋 Liste"],["suivi","📓 Cahier de suivi"]].map(([k,l]) => (
+          <button key={k} onClick={() => setSubTab(k)} style={{ flex:1, background: subTab===k ? `linear-gradient(135deg,${C.ocean},${C.sea})` : "transparent", color: subTab===k?"#fff":"#888", border:"none", borderRadius:10, padding:"9px 4px", cursor:"pointer", fontWeight:900, fontSize:12, fontFamily:"inherit" }}>{l}</button>
+        ))}
+      </div>
+
+      {/* ── CAHIER DE SUIVI ── */}
+      {subTab === "suivi" && (() => {
+        // Grouper les résas confirmées par jour de validation
+        const confirmedAll = allGroups.filter(g => g.statut === "confirmed");
+        const parJour = {};
+        confirmedAll.forEach(g => {
+          const dateVal = (g.resas[0]?.validated_at || g.resas[0]?.created_at || "").slice(0,10);
+          if (!dateVal) return;
+          if (!parJour[dateVal]) parJour[dateVal] = [];
+          parJour[dateVal].push(g);
+        });
+        const jours = Object.keys(parJour).sort((a,b) => b.localeCompare(a));
+
+        if (jours.length === 0) return (
+          <div style={{ textAlign:"center", padding:"32px 0", color:"#bbb", fontSize:14 }}>Aucun encaissement enregistré</div>
+        );
+
+        return (
+          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+            {jours.map(jour => {
+              const groupes = parJour[jour];
+              const totalJour = groupes.reduce((s,g) => {
+                const m = getMontant(g).replace(" €","").replace("—","0");
+                return s + (Number(m)||0);
+              }, 0);
+              const dateLabel = new Date(jour+"T12:00:00").toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+              // Répartition par mode
+              const modesJour = {};
+              groupes.forEach(g => {
+                const mode = g.resas.find(r=>r.mode_paiement)?.mode_paiement || "non_renseigne";
+                if (!modesJour[mode]) modesJour[mode] = 0;
+                const m = getMontant(g).replace(" €","").replace("—","0");
+                modesJour[mode] += Number(m)||0;
+              });
+
+              return (
+                <div key={jour} style={{ background:"#fff", borderRadius:16, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,0.05)", borderLeft:`4px solid ${C.green}` }}>
+                  {/* Header jour */}
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10 }}>
+                    <div>
+                      <div style={{ fontWeight:900, color:C.dark, fontSize:14, textTransform:"capitalize" }}>{dateLabel}</div>
+                      <div style={{ fontSize:11, color:"#aaa", marginTop:2 }}>{groupes.length} transaction{groupes.length>1?"s":""}</div>
+                    </div>
+                    <div style={{ textAlign:"right" }}>
+                      <div style={{ fontWeight:900, fontSize:20, color:C.green }}>{totalJour} €</div>
+                      <div style={{ fontSize:10, color:"#aaa" }}>total du jour</div>
+                    </div>
+                  </div>
+
+                  {/* Barre modes paiement */}
+                  {totalJour > 0 && (
+                    <div style={{ display:"flex", borderRadius:6, overflow:"hidden", height:8, marginBottom:8 }}>
+                      {MODES_PAIEMENT.map(m => {
+                        const montantMode = modesJour[m.id] || 0;
+                        const pct = totalJour > 0 ? (montantMode/totalJour)*100 : 0;
+                        return pct > 0 ? <div key={m.id} style={{ width:`${pct}%`, background:m.color }} title={`${m.label} : ${montantMode}€`} /> : null;
+                      })}
+                      {(modesJour["non_renseigne"]||0) > 0 && (
+                        <div style={{ flex:1, background:"#e0e0e0" }} />
+                      )}
+                    </div>
+                  )}
+
+                  {/* Détail des transactions */}
+                  <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
+                    {groupes.map((g, gi) => {
+                      const mp = MODES_PAIEMENT.find(m => m.id === g.resas.find(r=>r.mode_paiement)?.mode_paiement);
+                      const montant = getMontant(g);
+                      const membre = g.membre ? `${g.membre.prenom} ${(g.membre.nom||"").toUpperCase()}` : "—";
+                      const label = g.type === "natation" ? getForfaitLabel(g) : isLiberte(g) ? "🎟️ Carte Liberté" : getForfaitLabel(g);
+                      return (
+                        <div key={gi} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"6px 8px", background:"#f8fbff", borderRadius:8 }}>
+                          <div style={{ flex:1 }}>
+                            <span style={{ fontWeight:700, fontSize:12, color:C.dark }}>{membre}</span>
+                            <span style={{ fontSize:11, color:"#aaa", marginLeft:8 }}>{label}</span>
+                          </div>
+                          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                            {mp && <span style={{ background:`${mp.color}20`, color:mp.color, borderRadius:50, padding:"2px 8px", fontSize:10, fontWeight:800 }}>{mp.label.split(" ").slice(1).join(" ")}</span>}
+                            <span style={{ fontWeight:800, color:C.dark, fontSize:13 }}>{montant}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Sous-total par mode */}
+                  <div style={{ marginTop:8, paddingTop:8, borderTop:"1px solid #f0f0f0", display:"flex", gap:8, flexWrap:"wrap" }}>
+                    {MODES_PAIEMENT.map(m => {
+                      const v = modesJour[m.id];
+                      return v ? <span key={m.id} style={{ fontSize:11, color:m.color, fontWeight:800 }}>{m.label.split(" ")[0]} {v} €</span> : null;
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
+
+      {/* ── LISTE ── */}
+      {subTab === "liste" && <>
+
       {/* KPIs */}
       <div style={{ display:"flex", gap:8 }}>
         {[
@@ -4949,6 +5059,7 @@ function PaiementsTab({ onValidate }) {
           })}
         </div>
       )}
+      </>}
     </div>
   );
 }
@@ -9654,4 +9765,4 @@ export default function App() {
     </div>
   );
 }
-// paiements graphique Mon Apr  6 11:48:16 CEST 2026
+// cahier suivi Mon Apr  6 11:53:33 CEST 2026
