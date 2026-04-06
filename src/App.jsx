@@ -8029,7 +8029,7 @@ ${mpHtml}
 
       const resp = await fetch("https://rnaosrftcntomehaepjh.supabase.co/functions/v1/send-email", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer sb_publishable_n9m3QjIKt9OnyN_d8n9cAQ_VQpUpnOu" },
         body: JSON.stringify({
           type: "facture",
           to: membre.email,
@@ -9070,7 +9070,7 @@ tr:nth-child(even) td{background:#f8fbff}
         try {
           await fetch("https://rnaosrftcntomehaepjh.supabase.co/functions/v1/send-email", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json", "Authorization": "Bearer sb_publishable_n9m3QjIKt9OnyN_d8n9cAQ_VQpUpnOu" },
             body: JSON.stringify({
               type: "confirmation",
               to: emailDest,
@@ -9839,4 +9839,4 @@ export default function App() {
     </div>
   );
 }
-// force deploy Mon Apr  6 14:55:39 CEST 2026
+// brevo auth fix Mon Apr  6 15:17:59 CEST 2026
