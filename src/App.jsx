@@ -8738,9 +8738,8 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
         <div style="margin-bottom:14px;padding:14px 16px;background:#EEF8FF;border-left:4px solid #1A8FE3;border-radius:8px">
           <div style="font-weight:700;color:#1A8FE3;font-size:13px;margin-bottom:6px">🏊 École de Natation</div>
           <div style="font-size:13px;color:#555;line-height:1.7">
-            Le règlement s'effectue avant la première séance, par virement ou sur place.<br/>
             Vos séances seront confirmées dès réception du paiement.<br/>
-            <strong>Rappel :</strong> Arriver 5 minutes avant le créneau. Prévoir maillot de bain, serviette et bonnet.
+            <strong>Rappel :</strong> Arriver 5 minutes avant le créneau. Prévoir maillot de bain, serviette et lunettes si besoin.
           </div>
         </div>`);
       if (hasClub) reglementSections.push(`
@@ -9566,4 +9565,4 @@ export default function App() {
     </div>
   );
 }
-// email pre-enregistree Mon Apr  6 11:21:32 CEST 2026
+// email natation fixes Mon Apr  6 11:28:32 CEST 2026
