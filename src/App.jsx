@@ -3551,14 +3551,18 @@ function SeancesTab({ sessions, setSessions }) {
   const spotColor   = n => n === 0 ? C.sunset : n === 1 ? C.coral : C.green;
   const spotDot     = n => n === 0 ? "#FF6B6B" : n === 1 ? "#FF8E53" : "#6BCB77";
 
-  const doCancel = async (id) => {
+  const doCancel = (id) => {
     const slot = sessions.find(s => s.id === id);
     if (!slot) return;
-    // Supprimer de Supabase
+    // Sauvegarder la suppression en Supabase
     const dayObj = ALL_SEASON_DAYS.find(d => d.id === slot.day);
     if (dayObj?.date) {
-      const dateISO = `${dayObj.date.getFullYear()}-${String(dayObj.date.getMonth()+1).padStart(2,"0")}-${String(dayObj.date.getDate()).padStart(2,"0")}`;
-      await sb.from("seances_natation").delete().eq("date", dateISO).eq("heure", slot.time).catch(() => {});
+      const d = dayObj.date;
+      const dateISO = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+      sb.from("seances_natation").upsert(
+        { date: dateISO, heure: slot.time, spots: -1 }, // spots = -1 = supprimé
+        { onConflict: "date,heure" }
+      ).catch(err => console.warn("Supabase seances:", err));
     }
     setSessions(prev => prev.filter(x => x.id !== id));
     setConfirmCancel(null);
@@ -3573,7 +3577,7 @@ function SeancesTab({ sessions, setSessions }) {
     "13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00","18:30","19:00"
   ];
 
-  const handleAddCreneau = async () => {
+  const handleAddCreneau = () => {
     setAddError("");
     const exists = daySessions.some(s => s.time === newHeure);
     if (exists) { setAddError(`Un créneau à ${newHeure} existe déjà ce jour.`); return; }
@@ -3583,11 +3587,15 @@ function SeancesTab({ sessions, setSessions }) {
       time: newHeure,
       spots: 2,
     };
-    // Sauvegarder en Supabase
+    // Sauvegarder en Supabase (spots = 2 = actif)
     const dayObj = ALL_SEASON_DAYS.find(d => d.id === selectedDayId);
     if (dayObj?.date) {
-      const dateISO = `${dayObj.date.getFullYear()}-${String(dayObj.date.getMonth()+1).padStart(2,"0")}-${String(dayObj.date.getDate()).padStart(2,"0")}`;
-      await sb.from("seances_natation").upsert({ date: dateISO, heure: newHeure, spots: 2 }, { onConflict: "date,heure" }).catch(() => {});
+      const d = dayObj.date;
+      const dateISO = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+      sb.from("seances_natation").upsert(
+        { date: dateISO, heure: newHeure, spots: 2 },
+        { onConflict: "date,heure" }
+      ).catch(err => console.warn("Supabase seances:", err));
     }
     setSessions(prev => [...prev, newSlot].sort((a, b) => {
       if (a.day !== b.day) return 0;
@@ -9799,20 +9807,37 @@ export default function App() {
   const [sessions, setSessions] = useState(INIT_SESSIONS);
   const [allSeasonSessions, setAllSeasonSessions] = useState(ALL_SEASON_SLOTS_INIT);
 
-  // Synchroniser les créneaux natation avec Supabase (suppressions admin)
+  // Synchroniser les créneaux natation avec Supabase (suppressions/ajouts admin)
   useEffect(() => {
-    sb.from("seances_natation").select("date, heure").then(({ data }) => {
+    sb.from("seances_natation").select("date, heure, spots").then(({ data }) => {
       if (!data || data.length === 0) return;
-      // Supprimer les créneaux supprimés par l'admin
-      setAllSeasonSessions(prev => prev.filter(slot => {
-        const dayObj = ALL_SEASON_DAYS.find(d => d.id === slot.day);
-        if (!dayObj?.date) return true;
-        const dateISO = `${dayObj.date.getFullYear()}-${String(dayObj.date.getMonth()+1).padStart(2,"0")}-${String(dayObj.date.getDate()).padStart(2,"0")}`;
-        // Si des créneaux existent en base pour ce jour, garder seulement ceux qui y sont
-        const seancesJour = data.filter(s => s.date === dateISO);
-        if (seancesJour.length === 0) return true; // pas de données pour ce jour → garder tout
-        return seancesJour.some(s => s.heure === slot.time);
-      }));
+      setAllSeasonSessions(prev => {
+        let updated = [...prev];
+        data.forEach(({ date, heure, spots }) => {
+          if (spots === -1) {
+            // Supprimé par l'admin → retirer du client
+            updated = updated.filter(slot => {
+              const dayObj = ALL_SEASON_DAYS.find(d => d.id === slot.day);
+              if (!dayObj?.date) return true;
+              const d = dayObj.date;
+              const dateISO = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+              return !(dateISO === date && slot.time === heure);
+            });
+          } else if (spots >= 0) {
+            // Ajouté par l'admin → vérifier qu'il est présent
+            const dayObj = ALL_SEASON_DAYS.find(d => {
+              const dd = d.date;
+              if (!dd) return false;
+              const dateISO = `${dd.getFullYear()}-${String(dd.getMonth()+1).padStart(2,"0")}-${String(dd.getDate()).padStart(2,"0")}`;
+              return dateISO === date;
+            });
+            if (dayObj && !updated.some(s => s.day === dayObj.id && s.time === heure)) {
+              updated.push({ id: `sb-${date}-${heure}`, day: dayObj.id, time: heure, spots });
+            }
+          }
+        });
+        return updated;
+      });
     }).catch(() => {});
   }, []);
   const [reservations, setReservations] = useState([]);
@@ -9997,4 +10022,4 @@ export default function App() {
     </div>
   );
 }
-// seances sync supabase Mon Apr  6 22:30:13 CEST 2026
+// seances sync fix Mon Apr  6 22:36:42 CEST 2026
