@@ -8012,31 +8012,42 @@ ${mpHtml}
       const dateEmission = fac
         ? (() => { const p=fac.date_emission.slice(0,10).split("-"); return `${p[2]}/${p[1]}/${p[0]}`; })()
         : new Date().toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"});
-      const html = buildFactureHtml(membre, numFac, dateEmission, modePaiement, 0, enfantsSelectionnes[membre.id]);
+      const factureHtml = buildFactureHtml(membre, numFac, dateEmission, modePaiement, 0, enfantsSelectionnes[membre.id]);
+      const mpLabel = modePaiement ? (MODES_PAIEMENT.find(m=>m.id===modePaiement)?.label||modePaiement) : "";
 
-      // Ouvrir la facture dans un nouvel onglet (pour impression/sauvegarde PDF)
-      // + ouvrir le client mail avec les infos
-      const win = window.open("","_blank");
-      if (win) { win.document.write(html); win.document.close(); }
+      const emailHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="font-family:Arial,sans-serif;color:#2C3E50;padding:30px;max-width:600px;margin:0 auto">
+        <div style="background:linear-gradient(135deg,#1A8FE3,#4ECDC4);padding:20px 24px;border-radius:12px;margin-bottom:24px">
+          <h1 style="color:#fff;margin:0;font-size:20px">🏖️ Eole Beach Club</h1>
+          <p style="color:rgba(255,255,255,0.85);margin:4px 0 0;font-size:12px">Club de Plage · École de Natation · Piriac-sur-Mer</p>
+        </div>
+        <p>Bonjour <strong>${membre.prenom}</strong>,</p>
+        <p>Veuillez trouver ci-joint votre facture <strong>${numFac}</strong> pour la saison 2026.</p>
+        ${mpLabel ? `<p>Mode de règlement : <strong>${mpLabel}</strong></p>` : ""}
+        <p>Pour toute question :<br/>📞 07 67 78 69 22<br/>✉️ clubdeplage.piriacsurmer@hotmail.com</p>
+        <p style="color:#888;font-size:12px">Eole Beach Club · Plage Saint-Michel · 44420 Piriac-sur-Mer · SIRET 839 887 072 00024</p>
+      </body></html>`;
 
-      const subject = encodeURIComponent(`Facture ${numFac} — Eole Beach Club Saison 2026`);
-      const body = encodeURIComponent(
-`Bonjour ${membre.prenom},
-
-Votre facture ${numFac} a été générée pour la saison 2026.
-
-Veuillez trouver votre facture dans l'onglet qui vient de s'ouvrir dans votre navigateur. Vous pouvez l'imprimer ou la sauvegarder en PDF depuis cet onglet.
-
-Montant : ${fac?.total||"—"} € ${modePaiement ? "— Réglé par " + (MODES_PAIEMENT.find(m=>m.id===modePaiement)?.label||modePaiement) : ""}
-
-Cordialement,
-L'équipe Eole Beach Club
-Plage Saint-Michel · 44420 Piriac-sur-Mer
-📞 07 67 78 69 22 · clubdeplage.piriacsurmer@hotmail.com`
-      );
-      setTimeout(() => {
-        window.location.href = `mailto:${membre.email}?subject=${subject}&body=${body}`;
-      }, 500);
+      const resp = await fetch("https://rnaosrftcntomehaepjh.supabase.co/functions/v1/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "facture",
+          to: membre.email,
+          toName: `${membre.prenom} ${membre.nom || ""}`.trim(),
+          subject: `Facture ${numFac} — Eole Beach Club Saison 2026`,
+          htmlContent: emailHtml,
+          attachments: {
+            factureHtml,
+            factureNom: `${numFac}-Eole-Beach-Club.html`,
+          },
+        }),
+      });
+      const result = await resp.json();
+      if (result.success) {
+        alert(`✅ Facture envoyée à ${membre.email}`);
+      } else {
+        throw new Error(result.error || "Erreur d'envoi");
+      }
     } catch(e) { alert("Erreur : " + e.message); }
     setSendingMail(null);
   };
@@ -9053,9 +9064,25 @@ tr:nth-child(even) td{background:#f8fbff}
   </div>
 </div></body></html>`;
 
-      // Ouvrir l'email dans une nouvelle fenêtre pour impression/copie
-      const win = window.open("", "_blank");
-      if (win) { win.document.write(emailHtml); win.document.close(); }
+      // Envoyer l'email via Brevo (Edge Function Supabase)
+      const emailDest = user.email || "";
+      if (emailDest) {
+        try {
+          await fetch("https://rnaosrftcntomehaepjh.supabase.co/functions/v1/send-email", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              type: "confirmation",
+              to: emailDest,
+              toName: `${user.prenom} ${user.nom || ""}`.trim(),
+              subject: "🏖️ Eole Beach Club — Confirmation de votre demande",
+              htmlContent: emailHtml,
+            }),
+          });
+        } catch(mailErr) {
+          console.warn("Email non envoyé :", mailErr);
+        }
+      }
 
       setDone(true);
     } catch(e) { setError("Erreur : " + e.message); }
@@ -9812,4 +9839,4 @@ export default function App() {
     </div>
   );
 }
-// admin home not inscription Mon Apr  6 12:40:45 CEST 2026
+// brevo email Mon Apr  6 14:47:28 CEST 2026
