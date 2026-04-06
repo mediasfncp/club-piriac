@@ -8806,6 +8806,11 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
   const [done, setDone]         = useState(false);
   const [error, setError]       = useState("");
 
+  // Si panier vide et pas en mode "done", retourner aux formules
+  useEffect(() => {
+    if (panier.length === 0 && !done) onNav("formules");
+  }, [panier.length, done]);
+
   const removeItem = (id) => setPanier(prev => prev.filter(item => item.id !== id));
 
   // Grille tarifaire natation
@@ -9037,18 +9042,19 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
         <td style="background:#FFF9F0;border:2px solid #FFD93D;border-radius:12px;padding:18px 20px">
           <p style="margin:0 0 10px;color:#b45309;font-size:14px;font-weight:700">💳 Comment régler votre inscription ?</p>
           <p style="margin:0 0 12px;font-size:13px;color:#555;line-height:1.7">Vous pouvez régler votre inscription selon les modes de paiement suivants :</p>
-          <table cellpadding="0" cellspacing="4" border="0">
+          <table cellpadding="0" cellspacing="3" border="0" style="width:100%">
             <tr>
-              <td style="background:#fff;border:1.5px solid #e0e0e0;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;color:#555">🏦 Virement bancaire</td>
-              <td width="4"></td>
-              <td style="background:#fff;border:1.5px solid #e0e0e0;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;color:#555">✉️ Chèque</td>
-              <td width="4"></td>
-              <td style="background:#fff;border:1.5px solid #e0e0e0;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;color:#555">💶 Espèces</td>
-              <td width="4"></td>
-              <td style="background:#fff;border:1.5px solid #e0e0e0;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;color:#555">🎫 Chèques vacances</td>
+              <td style="background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:4px 8px;font-size:10px;font-weight:700;color:#555;text-align:center;white-space:nowrap">🏦 Virement</td>
+              <td width="3"></td>
+              <td style="background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:4px 8px;font-size:10px;font-weight:700;color:#555;text-align:center;white-space:nowrap">✉️ Chèque</td>
+              <td width="3"></td>
+              <td style="background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:4px 8px;font-size:10px;font-weight:700;color:#555;text-align:center;white-space:nowrap">💶 Espèces</td>
+              <td width="3"></td>
+              <td style="background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:4px 8px;font-size:10px;font-weight:700;color:#555;text-align:center;white-space:nowrap">🎫 Chèques vacances</td>
             </tr>
           </table>
-          <p style="margin:12px 0 0;font-size:12px;color:#888;line-height:1.8">
+          <p style="margin:10px 0 4px;font-size:11px;color:#e67e22;font-weight:700;font-style:italic">⚠️ Virement bancaire accepté jusqu'au 15 juin.</p>
+          <p style="margin:4px 0 0;font-size:12px;color:#888;line-height:1.8">
             Pour le virement ou chèque, merci de préciser le nom de votre enfant en référence.<br/>
             <span style="display:block;text-align:center;margin-top:8px">Le chèque est à libeller à l'ordre de : <strong>SAUZEAU Charlène</strong></span>
             <span style="display:block;text-align:center;margin-top:8px">En avant saison, celui-ci est à envoyer à :<br/>
@@ -9139,10 +9145,7 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
         Toutes vos prestations ont été enregistrées.<br/>
         L'équipe Eole Beach Club vous contactera pour le paiement.
       </p>
-      <div style={{ background:`${C.green}10`, borderRadius:14, padding:"12px 20px", margin:"12px 0", fontSize:13, color:C.green, fontWeight:700 }}>
-        📄 Un récapitulatif s'est ouvert dans un nouvel onglet
-      </div>
-      <div style={{ background:`${C.ocean}10`, borderRadius:14, padding:"12px 20px", margin:"0 0 24px", fontSize:13, color:C.ocean, fontWeight:700 }}>
+      <div style={{ background:`${C.ocean}10`, borderRadius:14, padding:"12px 20px", margin:"12px 0 24px", fontSize:13, color:C.ocean, fontWeight:700 }}>
         ⏳ Vos accès seront activés à réception du paiement
       </div>
       <SunBtn color={C.ocean} onClick={() => { setDone(false); onNav("home"); }}>Retour à l'accueil</SunBtn>
@@ -9881,4 +9884,4 @@ export default function App() {
     </div>
   );
 }
-// email no gradient Mon Apr  6 15:56:43 CEST 2026
+// email + panier fixes Mon Apr  6 16:06:22 CEST 2026
