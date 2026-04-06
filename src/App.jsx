@@ -9964,4 +9964,4 @@ export default function App() {
     </div>
   );
 }
-// panier vide + eveil enfant Mon Apr  6 22:22:28 CEST 2026
+// seances sync supabase Mon Apr  6 22:27:43 CEST 2026
