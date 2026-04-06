@@ -8957,30 +8957,36 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
 
       const reglementSections = [];
       if (hasNat) reglementSections.push(`
-        <div style="margin-bottom:14px;padding:14px 16px;background:#EEF8FF;border-left:4px solid #1A8FE3;border-radius:8px">
-          <div style="font-weight:700;color:#1A8FE3;font-size:13px;margin-bottom:6px">🏊 École de Natation</div>
-          <div style="font-size:13px;color:#555;line-height:1.7">
-            Vos séances seront confirmées dès réception du paiement.<br/>
-            <strong>Rappel :</strong> Arriver 5 minutes avant le créneau. Prévoir maillot de bain, serviette et lunettes si besoin.
-          </div>
-        </div>`);
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:14px">
+          <tr><td style="background:#EEF8FF;border-left:4px solid #1A8FE3;border-radius:8px;padding:14px 16px">
+            <p style="margin:0 0 6px;font-weight:700;color:#1A8FE3;font-size:13px">🏊 École de Natation</p>
+            <p style="margin:0;font-size:13px;color:#555;line-height:1.7">
+              Vos séances seront confirmées dès réception du paiement.<br/>
+              <strong>Rappel :</strong> Arriver 5 minutes avant le créneau. Prévoir maillot de bain, serviette et lunettes si besoin.
+            </p>
+          </td></tr>
+        </table>`);
       if (hasClub) reglementSections.push(`
-        <div style="margin-bottom:14px;padding:14px 16px;background:#FFF0EC;border-left:4px solid #FF8E53;border-radius:8px">
-          <div style="font-weight:700;color:#FF8E53;font-size:13px;margin-bottom:6px">🏖️ Club de Plage</div>
-          <div style="font-size:13px;color:#555;line-height:1.7">
-            L'accès au club sera activé dès réception du paiement.<br/>
-            <strong>Rappel :</strong> Prévoir casquette, gourde, serviette de bain et crème solaire.
-          </div>
-        </div>`);
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:14px">
+          <tr><td style="background:#EEF8FF;border-left:4px solid #1A8FE3;border-radius:8px;padding:14px 16px">
+            <p style="margin:0 0 6px;font-weight:700;color:#1A8FE3;font-size:13px">🏖️ Club de Plage</p>
+            <p style="margin:0;font-size:13px;color:#555;line-height:1.7">
+              L'accès au club sera activé dès réception du paiement.<br/>
+              <strong>Rappel :</strong> Prévoir casquette, gourde, serviette de bain et crème solaire.
+            </p>
+          </td></tr>
+        </table>`);
       if (hasLiberte) reglementSections.push(`
-        <div style="margin-bottom:14px;padding:14px 16px;background:#FFF9E6;border-left:4px solid #FFD93D;border-radius:8px">
-          <div style="font-weight:700;color:#b45309;font-size:13px;margin-bottom:6px">🎟️ Carte Liberté</div>
-          <div style="font-size:13px;color:#555;line-height:1.7">
-            La carte Liberté est valable toute la saison 2026.<br/>
-            Elle sera créditée sur votre compte dès réception du paiement.<br/>
-            Vous pourrez ensuite réserver vos demi-journées librement depuis l'application.
-          </div>
-        </div>`);
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:14px">
+          <tr><td style="background:#EEF8FF;border-left:4px solid #1A8FE3;border-radius:8px;padding:14px 16px">
+            <p style="margin:0 0 6px;font-weight:700;color:#1A8FE3;font-size:13px">🎟️ Carte Liberté</p>
+            <p style="margin:0;font-size:13px;color:#555;line-height:1.7">
+              La carte Liberté est valable toute la saison 2026.<br/>
+              Elle sera créditée sur votre compte dès réception du paiement.<br/>
+              Vous pourrez ensuite réserver vos demi-journées librement depuis l'application.
+            </p>
+          </td></tr>
+        </table>`);
 
       const emailHtml = `<!DOCTYPE html>
 <html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Confirmation Eole Beach Club</title></head>
@@ -9048,6 +9054,18 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
             <span style="display:block;text-align:center;margin-top:8px">En avant saison, celui-ci est à envoyer à :<br/>
             <strong>Mme SAUZEAU Charlène<br/>4 allée des Roitelets<br/>44500 LA BAULE</strong></span>
           </p>
+          <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:14px">
+            <tr>
+              <td style="background:#EFF6FF;border:1.5px solid #1A8FE3;border-radius:10px;padding:14px 16px">
+                <p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#1A8FE3">🏦 Coordonnées bancaires pour virement</p>
+                <table cellpadding="0" cellspacing="0" border="0" style="font-size:12px;color:#2C3E50;line-height:2">
+                  <tr><td style="font-weight:700;padding-right:12px">Titulaire</td><td>SAUZEAU CHARLENE</td></tr>
+                  <tr><td style="font-weight:700;padding-right:12px">IBAN</td><td>FR76 1027 8360 6600 0130 5200 228</td></tr>
+                  <tr><td style="font-weight:700;padding-right:12px">BIC</td><td>CMCIFR2A</td></tr>
+                </table>
+              </td>
+            </tr>
+          </table>
         </td>
       </tr>
     </table>
@@ -9863,4 +9881,4 @@ export default function App() {
     </div>
   );
 }
-// email table layout Mon Apr  6 15:42:04 CEST 2026
+// email rib + bleu Mon Apr  6 15:51:52 CEST 2026
