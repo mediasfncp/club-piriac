@@ -4788,6 +4788,58 @@ function PaiementsTab({ onValidate }) {
         ))}
       </div>
 
+      {/* Graphique dynamique modes de paiement */}
+      {confirmed > 0 && (() => {
+        const modeCounts = MODES_PAIEMENT.map(m => ({
+          ...m,
+          count: allGroups.filter(g => g.statut==="confirmed" && g.resas.some(r => r.mode_paiement===m.id)).length,
+          montant: allGroups.filter(g => g.statut==="confirmed" && g.resas.some(r => r.mode_paiement===m.id)).reduce((s,g) => {
+            const montantStr = getMontant(g).replace(" €","").replace("—","0");
+            return s + (Number(montantStr)||0);
+          }, 0),
+        })).filter(m => m.count > 0);
+        const totalMontant = modeCounts.reduce((s,m) => s+m.montant, 0);
+        const nonRenseigne = allGroups.filter(g => g.statut==="confirmed" && !g.resas.some(r => r.mode_paiement)).length;
+        return (
+          <div style={{ background:"#fff", borderRadius:16, padding:"16px 18px", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
+            <div style={{ fontWeight:800, color:C.dark, fontSize:13, marginBottom:12 }}>💳 Répartition des paiements</div>
+            {/* Barre proportionnelle */}
+            <div style={{ display:"flex", borderRadius:10, overflow:"hidden", height:28, marginBottom:12 }}>
+              {modeCounts.map((m, i) => {
+                const pct = totalMontant > 0 ? Math.round((m.montant/totalMontant)*100) : Math.round((m.count/confirmed)*100);
+                return (
+                  <div key={m.id} title={`${m.label} : ${pct}%`}
+                    style={{ width:`${pct}%`, background:m.color, display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, color:"#fff", fontWeight:800, transition:"width .4s", minWidth: pct>5?0:0 }}>
+                    {pct > 8 ? `${pct}%` : ""}
+                  </div>
+                );
+              })}
+              {nonRenseigne > 0 && (
+                <div style={{ flex:1, background:"#e0e0e0", display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, color:"#aaa", fontWeight:700 }}>
+                  {nonRenseigne > 0 ? "?" : ""}
+                </div>
+              )}
+            </div>
+            {/* Légende */}
+            <div style={{ display:"flex", flexWrap:"wrap", gap:10 }}>
+              {modeCounts.map(m => (
+                <div key={m.id} style={{ display:"flex", alignItems:"center", gap:6 }}>
+                  <div style={{ width:12, height:12, borderRadius:3, background:m.color, flexShrink:0 }} />
+                  <span style={{ fontSize:12, color:"#555", fontWeight:700 }}>{m.label}</span>
+                  <span style={{ fontSize:11, color:"#aaa" }}>{m.count} · {m.montant} €</span>
+                </div>
+              ))}
+              {nonRenseigne > 0 && (
+                <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                  <div style={{ width:12, height:12, borderRadius:3, background:"#e0e0e0", flexShrink:0 }} />
+                  <span style={{ fontSize:12, color:"#aaa" }}>Non renseigné · {nonRenseigne}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Filtres statut */}
       <div style={{ display:"flex", gap:6, background:"#fff", borderRadius:14, padding:5, boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
         {[["tous","Toutes"],["pending","⏳ Attente"],["confirmed","✓ Payées"]].map(([k,l]) => (
@@ -9602,4 +9654,4 @@ export default function App() {
     </div>
   );
 }
-// comptes club groupes Mon Apr  6 11:43:14 CEST 2026
+// paiements graphique Mon Apr  6 11:48:16 CEST 2026
