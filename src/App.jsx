@@ -8813,11 +8813,12 @@ tr:nth-child(even) td{background:#f8fbff}
     </div>
     <div style="margin-top:12px;font-size:12px;color:#888;font-style:italic">
       Pour le virement ou chèque, merci de préciser le nom de votre enfant et la prestation en référence.<br/>
-      Le chèque est à libeller à l'ordre de : <strong>SAUZEAU Charlène</strong><br/>
-      En avant saison, le chèque est à envoyer à :<br/>
+      <div style="text-align:center;margin-top:6px">Le chèque est à libeller à l'ordre de : <strong>SAUZEAU Charlène</strong></div>
+      <br/>
+      <div style="text-align:center">En avant saison, celui-ci est à envoyer à :<br/>
       <strong>Mme SAUZEAU Charlène<br/>
       4 allée des Roitelets<br/>
-      44500 LA BAULE</strong>
+      44500 LA BAULE</strong></div>
     </div>
   </div>
 
@@ -9565,4 +9566,4 @@ export default function App() {
     </div>
   );
 }
-// email reglement Mon Apr  6 00:25:10 CEST 2026
+// email cheque format Mon Apr  6 11:11:04 CEST 2026
