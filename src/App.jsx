@@ -8996,7 +8996,7 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
 <table width="620" cellpadding="0" cellspacing="0" border="0" style="max-width:620px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.1)">
 
   <!-- HEADER -->
-  <tr><td style="background:linear-gradient(135deg,#1A8FE3,#4ECDC4);padding:24px 28px">
+  <tr><td style="background-color:#1A8FE3;padding:24px 28px">
     <p style="margin:0 0 4px;font-size:22px;font-weight:900;color:#ffffff">🏖️ Eole Beach Club</p>
     <p style="margin:0;font-size:13px;color:rgba(255,255,255,0.85)">Club de Plage · École de Natation · Piriac-sur-Mer · Saison 2026</p>
   </td></tr>
@@ -9020,7 +9020,7 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
     <!-- TOTAL -->
     <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:20px">
       <tr>
-        <td style="background:#1A8FE3;padding:16px 20px;border-radius:12px">
+        <td style="background-color:#1A8FE3;padding:16px 20px;border-radius:12px">
           <table width="100%" cellpadding="0" cellspacing="0" border="0">
             <tr>
               <td style="color:#ffffff;font-size:15px;font-weight:700">Total à régler</td>
@@ -9881,4 +9881,4 @@ export default function App() {
     </div>
   );
 }
-// email rib + bleu Mon Apr  6 15:51:52 CEST 2026
+// email no gradient Mon Apr  6 15:56:43 CEST 2026
