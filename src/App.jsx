@@ -3553,16 +3553,18 @@ function SeancesTab({ sessions, setSessions }) {
 
   const doCancel = (id) => {
     const slot = sessions.find(s => s.id === id);
-    if (!slot) return;
-    // Sauvegarder la suppression en Supabase
+    console.log("doCancel id:", id, "slot:", slot, "sessions count:", sessions.length);
+    if (!slot) { console.warn("Slot not found!"); return; }
     const dayObj = ALL_SEASON_DAYS.find(d => d.id === slot.day);
+    console.log("dayObj:", dayObj);
     if (dayObj?.date) {
       const d = dayObj.date;
       const dateISO = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+      console.log("Upserting to Supabase:", dateISO, slot.time);
       sb.from("seances_natation").upsert(
-        { date: dateISO, heure: slot.time, spots: -1 }, // spots = -1 = supprimé
+        { date: dateISO, heure: slot.time, spots: -1 },
         { onConflict: "date,heure" }
-      ).catch(err => console.warn("Supabase seances:", err));
+      ).then(r => console.log("Supabase result:", r)).catch(err => console.warn("Supabase error:", err));
     }
     setSessions(prev => prev.filter(x => x.id !== id));
     setConfirmCancel(null);
@@ -10022,4 +10024,4 @@ export default function App() {
     </div>
   );
 }
-// seances sync fix Mon Apr  6 22:36:42 CEST 2026
+// debug cancel Mon Apr  6 22:41:13 CEST 2026
