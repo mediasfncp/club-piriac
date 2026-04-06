@@ -3545,12 +3545,39 @@ function SeancesTab({ sessions, setSessions }) {
   const [addError, setAddError]           = useState("");
   const [dbResasNat, setDbResasNat]       = useState([]);
 
-  // Charger résas natation depuis Supabase
+  // Charger résas + appliquer suppressions/ajouts admin depuis Supabase
   useEffect(() => {
     sb.from("reservations_natation").select("date_seance, heure, statut")
       .eq("statut", "confirmed")
       .then(({ data }) => setDbResasNat(data || []))
       .catch(() => {});
+
+    // Appliquer les suppressions/ajouts enregistrés en base
+    sb.from("seances_natation").select("date, heure, spots").then(({ data }) => {
+      if (!data || data.length === 0) return;
+      setSessions(prev => {
+        let updated = [...prev];
+        data.forEach(({ date, heure, spots }) => {
+          const dayObj = ALL_SEASON_DAYS.find(d => {
+            const dd = d.date;
+            if (!dd) return false;
+            const iso = `${dd.getFullYear()}-${String(dd.getMonth()+1).padStart(2,"0")}-${String(dd.getDate()).padStart(2,"0")}`;
+            return iso === date;
+          });
+          if (!dayObj) return;
+          if (spots === -1) {
+            // Supprimé → retirer
+            updated = updated.filter(s => !(s.day === dayObj.id && s.time === heure));
+          } else {
+            // Ajouté → ajouter si absent
+            if (!updated.some(s => s.day === dayObj.id && s.time === heure)) {
+              updated.push({ id: `sb-${date}-${heure}`, day: dayObj.id, time: heure, spots });
+            }
+          }
+        });
+        return updated;
+      });
+    }).catch(() => {});
   }, []);
 
   // Calculer places réelles par créneau selon Supabase
@@ -10053,4 +10080,4 @@ export default function App() {
     </div>
   );
 }
-// seances sync client Mon Apr  6 22:49:47 CEST 2026
+// seances load supabase Mon Apr  6 22:55:20 CEST 2026
