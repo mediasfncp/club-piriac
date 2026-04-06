@@ -8015,17 +8015,33 @@ ${mpHtml}
       const factureHtml = buildFactureHtml(membre, numFac, dateEmission, modePaiement, 0, enfantsSelectionnes[membre.id]);
       const mpLabel = modePaiement ? (MODES_PAIEMENT.find(m=>m.id===modePaiement)?.label||modePaiement) : "";
 
-      const emailHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="font-family:Arial,sans-serif;color:#2C3E50;padding:30px;max-width:600px;margin:0 auto">
-        <div style="background:linear-gradient(135deg,#1A8FE3,#4ECDC4);padding:20px 24px;border-radius:12px;margin-bottom:24px">
-          <h1 style="color:#fff;margin:0;font-size:20px">🏖️ Eole Beach Club</h1>
-          <p style="color:rgba(255,255,255,0.85);margin:4px 0 0;font-size:12px">Club de Plage · École de Natation · Piriac-sur-Mer</p>
-        </div>
-        <p>Bonjour <strong>${membre.prenom}</strong>,</p>
-        <p>Veuillez trouver ci-joint votre facture <strong>${numFac}</strong> pour la saison 2026.</p>
-        ${mpLabel ? `<p>Mode de règlement : <strong>${mpLabel}</strong></p>` : ""}
-        <p>Pour toute question :<br/>📞 07 67 78 69 22<br/>✉️ clubdeplage.piriacsurmer@hotmail.com</p>
-        <p style="color:#888;font-size:12px">Eole Beach Club · Plage Saint-Michel · 44420 Piriac-sur-Mer · SIRET 839 887 072 00024</p>
-      </body></html>`;
+      const emailHtml = `<!DOCTYPE html>
+<html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f0f4f8;font-family:Arial,Helvetica,sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f0f4f8;padding:20px 0">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.1)">
+  <tr><td style="background-color:#1A8FE3;padding:24px 28px">
+    <p style="margin:0 0 4px;font-size:22px;font-weight:900;color:#ffffff">🏖️ Eole Beach Club</p>
+    <p style="margin:0;font-size:13px;color:rgba(255,255,255,0.85)">Club de Plage · École de Natation · Piriac-sur-Mer · Saison 2026 · SIRET 839 887 072 00024</p>
+  </td></tr>
+  <tr><td style="padding:24px 28px">
+    <p style="font-size:14px;color:#2C3E50;line-height:1.7;margin:0 0 16px">Bonjour <strong>${membre.prenom}</strong>,</p>
+    <p style="font-size:14px;color:#2C3E50;line-height:1.7;margin:0 0 16px">Veuillez trouver ci-joint votre facture <strong>${numFac}</strong> pour la saison 2026.</p>
+    ${mpLabel ? `<p style="font-size:14px;color:#2C3E50;margin:0 0 16px">Mode de règlement : <strong>${mpLabel}</strong></p>` : ""}
+    <p style="font-size:13px;color:#555;line-height:1.8;margin:0 0 20px">Pour toute question :<br/>📞 07 67 78 69 22<br/>✉️ clubdeplage.piriacsurmer@hotmail.com</p>
+    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+      <tr><td style="background:#F0F4F8;border-radius:10px;padding:14px;text-align:center;font-size:11px;color:#888;line-height:1.8">
+        <strong>Eole Beach Club · Club de Plage / École de Natation</strong><br/>
+        Plage Saint-Michel · Rue des Caps Horniers · 44420 Piriac-sur-Mer<br/>
+        SIRET 839 887 072 00024
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>`;
 
       const resp = await fetch("https://rnaosrftcntomehaepjh.supabase.co/functions/v1/send-email", {
         method: "POST",
@@ -9884,4 +9900,4 @@ export default function App() {
     </div>
   );
 }
-// done before panier clear Mon Apr  6 16:10:21 CEST 2026
+// facture email header Mon Apr  6 16:19:24 CEST 2026
