@@ -1805,7 +1805,7 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser, pa
       <h2 style={{ color:C.coral }}>Demande envoyée ! 🎉</h2>
       <div style={{ background:"#fff", borderRadius:20, padding:20, margin:"16px 0", boxShadow:"0 4px 16px rgba(0,0,0,0.06)" }}>
         <div style={{ fontSize:14, color:"#555", lineHeight:1.8 }}>
-          Votre demande de réservation a bien été enregistrée.<br/>
+          Votre demande de réservation a bien été pré-enregistrée.<br/>
           <strong>L'équipe Eole Beach Club va vous contacter</strong> pour finaliser le paiement par :<br/>
           🏦 Virement · ✉️ Chèque · 💶 Espèces · 🎫 Chèques vacances
         </div>
@@ -8812,7 +8812,7 @@ tr:nth-child(even) td{background:#f8fbff}
       <span class="payment-method">🎫 Chèques vacances</span>
     </div>
     <div style="margin-top:12px;font-size:12px;color:#888;font-style:italic">
-      Pour le virement ou chèque, merci de préciser le nom de votre enfant et la prestation en référence.<br/>
+      Pour le virement ou chèque, merci de préciser le nom de votre enfant en référence.<br/>
       <div style="text-align:center;margin-top:6px">Le chèque est à libeller à l'ordre de : <strong>SAUZEAU Charlène</strong></div>
       <br/>
       <div style="text-align:center">En avant saison, celui-ci est à envoyer à :<br/>
@@ -8828,7 +8828,7 @@ tr:nth-child(even) td{background:#f8fbff}
     <div style="font-size:13px;color:#2e7d32;font-weight:700">✅ Prochaines étapes</div>
     <ol style="font-size:13px;color:#555;line-height:1.9;margin:8px 0 0;padding-left:18px">
       <li>Effectuez le règlement selon l'un des modes ci-dessus</li>
-      <li>L'équipe Eole Beach Club valide votre réservation</li>
+      <li>L'équipe Eole Beach Club valide votre pré-réservation</li>
       <li>Votre accès est activé dans l'application</li>
       <li>À vous la plage ! 🏖️</li>
     </ol>
@@ -9566,4 +9566,4 @@ export default function App() {
     </div>
   );
 }
-// email cheque format Mon Apr  6 11:11:04 CEST 2026
+// email text fixes Mon Apr  6 11:16:55 CEST 2026
