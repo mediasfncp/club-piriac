@@ -1518,7 +1518,7 @@ function ReservationClubScreen({ onNav, user, setUser, clubPlaces, setClubPlaces
     if (user?.supabaseId) {
       sb.from("enfants").select("*").eq("membre_id", user.supabaseId)
         .then(({ data }) => setEnfantsDB(data || [])).catch(() => {});
-      sb.from("membres").select("liberte_balance, liberte_total").eq("id", user.supabaseId).single()
+      sb.from("membres").select("liberte_balance, liberte_total").eq("id", user.supabaseId).maybeSingle()
         .then(({ data }) => {
           setBalance(data?.liberte_balance || 0);
           setLiberteTotal(data?.liberte_total || 0);
@@ -2739,7 +2739,7 @@ function MesReservationsScreen({ onNav, user }) {
     const [{ data: nat }, { data: club }, { data: membre }] = await Promise.all([
       sb.from("reservations_natation").select("*").eq("membre_id", user.supabaseId).order("date_seance"),
       sb.from("reservations_club").select("*").eq("membre_id", user.supabaseId).order("date_reservation"),
-      sb.from("membres").select("liberte_balance, liberte_total").eq("id", user.supabaseId).single(),
+      sb.from("membres").select("liberte_balance, liberte_total").eq("id", user.supabaseId).maybeSingle(),
     ]);
     setResasNat(nat || []);
     setResasClub(club || []);
@@ -4747,7 +4747,7 @@ function PaiementsTab({ onValidate }) {
       const r = groupe.resas[0];
       const credit = Number(r.enfants?.[0]) || 0;
       if (credit > 0 && r.membre_id) {
-        const { data: m } = await sb.from("membres").select("liberte_balance, liberte_total").eq("id", r.membre_id).single();
+        const { data: m } = await sb.from("membres").select("liberte_balance, liberte_total").eq("id", r.membre_id).maybeSingle();
         if (m) {
           const delta = newStatut === "confirmed" ? credit : -credit;
           await sb.from("membres").update({
@@ -4763,7 +4763,7 @@ function PaiementsTab({ onValidate }) {
       const membreId = groupe.resas[0]?.membre_id;
       const nbUtil = groupe.resas.filter(r => (r.label_jour||"").startsWith("[LIBERTE]")).length;
       if (membreId && nbUtil > 0) {
-        const { data: m } = await sb.from("membres").select("liberte_balance").eq("id", membreId).single();
+        const { data: m } = await sb.from("membres").select("liberte_balance").eq("id", membreId).maybeSingle();
         if (m) {
           const delta = newStatut === "confirmed" ? -nbUtil : nbUtil; // confirmer = décrémenter
           await sb.from("membres").update({ liberte_balance: Math.max(0, (m.liberte_balance||0) + delta) }).eq("id", membreId);
@@ -8521,7 +8521,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
               const r0 = g.resas[0];
               const credit = Number(r0.enfants?.[0])||0;
               if (credit > 0 && r0.membre_id) {
-                const { data: m } = await sb.from("membres").select("liberte_balance, liberte_total").eq("id", r0.membre_id).single();
+                const { data: m } = await sb.from("membres").select("liberte_balance, liberte_total").eq("id", r0.membre_id).maybeSingle();
                 if (m) await sb.from("membres").update({ liberte_balance:(m.liberte_balance||0)+credit, liberte_total:(m.liberte_total||0)+credit }).eq("id", r0.membre_id);
               }
             }
@@ -8530,7 +8530,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
               const membreId = g.resas[0]?.membre_id;
               const nbUtil = g.resas.filter(r => (r.label_jour||"").startsWith("[LIBERTE]")).length;
               if (membreId && nbUtil > 0) {
-                const { data: m } = await sb.from("membres").select("liberte_balance").eq("id", membreId).single();
+                const { data: m } = await sb.from("membres").select("liberte_balance").eq("id", membreId).maybeSingle();
                 if (m) await sb.from("membres").update({ liberte_balance:Math.max(0,(m.liberte_balance||0)-nbUtil) }).eq("id", membreId);
               }
             }
@@ -9497,7 +9497,7 @@ function ProfilConnecte({ user, setUser, setScreen, reservations }) {
   const loadData = async () => {
     if (!user?.supabaseId) { setLoading(false); return; }
     const [{ data: membreFrais }, { data: enf }, { data: fac }] = await Promise.all([
-      sb.from("membres").select("*").eq("id", user.supabaseId).single(),
+      sb.from("membres").select("*").eq("id", user.supabaseId).maybeSingle(),
       sb.from("enfants").select("*").eq("membre_id", user.supabaseId),
       sb.from("factures_numeros").select("*").eq("membre_id", user.supabaseId).order("created_at", { ascending: false }).limit(1),
     ]);
@@ -9723,7 +9723,7 @@ function AdminCodeAccess({ onUnlock, user }) {
       }
       setChecking(true);
       try {
-        const { data } = await sb.from("membres").select("is_admin, email").eq("id", user.supabaseId).single();
+        const { data } = await sb.from("membres").select("is_admin, email").eq("id", user.supabaseId).maybeSingle();
         const emailOk = ADMIN_EMAILS.includes((data?.email || "").toLowerCase());
         const dbOk    = data?.is_admin === true;
         if (emailOk || dbOk) {
@@ -9935,7 +9935,7 @@ export default function App() {
       try {
         const { data: { session } } = await sb.auth.getSession();
         if (!session?.user) return;
-        const { data } = await sb.from("membres").select("*, enfants(*)").eq("id", session.user.id).single();
+        const { data } = await sb.from("membres").select("*, enfants(*)").eq("id", session.user.id).maybeSingle();
         if (data) setUser(prev => prev ? { ...prev, ...data, enfants: data.enfants, supabaseId: data.id } : null);
       } catch {}
     };
@@ -9949,12 +9949,12 @@ export default function App() {
       sb.auth.getSession().then(({ data: { session } }) => {
         if (session?.user) {
           // Chercher par id Supabase Auth pour avoir les données fraîches (même si admin a modifié l'email)
-          sb.from("membres").select("*, enfants(*)").eq("id", session.user.id).single()
+          sb.from("membres").select("*, enfants(*)").eq("id", session.user.id).maybeSingle()
             .then(({ data }) => {
               if (data) setUser({ ...data, supabaseId: data.id });
               else {
                 // Fallback par email
-                sb.from("membres").select("*, enfants(*)").eq("email", session.user.email).single()
+                sb.from("membres").select("*, enfants(*)").eq("email", session.user.email).maybeSingle()
                   .then(({ data: d }) => {
                     if (d) setUser({ ...d, supabaseId: d.id });
                     else {
@@ -9979,7 +9979,7 @@ export default function App() {
       // Écouter les connexions (magic link cliqué)
       const { data: { subscription } } = sb.auth.onAuthStateChange((event, session) => {
         if (event === "SIGNED_IN" && session?.user) {
-          sb.from("membres").select("*, enfants(*)").eq("id", session.user.id).single()
+          sb.from("membres").select("*, enfants(*)").eq("id", session.user.id).maybeSingle()
             .then(({ data }) => {
               const membre = data || null;
               if (membre) {
@@ -10005,7 +10005,7 @@ export default function App() {
           setScreen("home");
         }
         if (event === "TOKEN_REFRESHED" && session?.user) {
-          sb.from("membres").select("*, enfants(*)").eq("id", session.user.id).single()
+          sb.from("membres").select("*, enfants(*)").eq("id", session.user.id).maybeSingle()
             .then(({ data }) => {
               if (data) setUser(prev => prev ? { ...prev, ...data, supabaseId: data.id } : null);
             }).catch(() => {});
@@ -10099,4 +10099,4 @@ export default function App() {
     </div>
   );
 }
-// seances from supabase reservation Mon Apr  6 23:05:11 CEST 2026
+// maybeSingle fix Mon Apr  6 23:08:04 CEST 2026
