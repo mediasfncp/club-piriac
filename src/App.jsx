@@ -8236,20 +8236,13 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
     getAllMembres().then(d => setDbMembres(d)).catch(() => {});
   }, []);
 
-  const MOCK_RESAS = [
-    { id: 1, parent: "Martin Dupont",  email: "martin@gmail.com",  phone: "06 00 00 00 00", enfants: ["Emma","Lucas"], session: "09:00 - Lun 7",  status: "confirmed" },
-    { id: 2, parent: "Sophie Bernard", email: "sophie@gmail.com",  phone: "06 12 34 56 78", enfants: ["Léo","Chloé"],  session: "13:30 - Lun 7",  status: "confirmed" },
-    { id: 3, parent: "Pierre Martin",  email: "pierre@gmail.com",  phone: "06 55 44 33 22", enfants: ["Noah"],          session: "10:00 - Mar 8",  status: "pending"   },
-    { id: 4, parent: "Julie Leroy",    email: "julie@gmail.com",   phone: "06 77 88 99 11", enfants: ["Manon","Tom"],   session: "11:30 - Mer 9",  status: "confirmed" },
-  ];
-
-  // Fusionner données mock + vraies données Supabase
+  // Uniquement les vraies données Supabase
   const supabaseResas = dbResas.map((r, i) => ({
     id: `sb-${i}`, parent: `${r.membres?.prenom || ''} ${r.membres?.nom || ''}`.trim() || '—',
     email: r.membres?.email || '—', phone: r.membres?.tel || '—',
     enfants: r.enfants || [], session: `${r.heure} - ${r.jour}`, status: r.statut || 'confirmed'
   }));
-  const allResas = [...MOCK_RESAS, ...supabaseResas, ...reservations.map((r,i) => ({
+  const allResas = [...supabaseResas, ...reservations.map((r,i) => ({
     id: 1000+i, parent: r.parent, email: "—", phone: "—", enfants: r.enfants || [],
     session: `${r.time} - ${DAYS.find(d=>d.id===r.day)?.label} ${DAYS.find(d=>d.id===r.day)?.num}`, status: "confirmed"
   }))];
@@ -9813,4 +9806,4 @@ export default function App() {
     </div>
   );
 }
-// sync membre profil Mon Apr  6 12:26:12 CEST 2026
+// remove mock data Mon Apr  6 12:29:46 CEST 2026
