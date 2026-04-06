@@ -4804,14 +4804,17 @@ function PaiementsTab({ onValidate }) {
             {jours.map(jour => {
               const groupes = parJour[jour];
               const totalJour = groupes.reduce((s,g) => {
+                if (g.resas.find(r=>r.mode_paiement)?.mode_paiement === "offert") return s; // Offerts exclus
                 const m = getMontant(g).replace(" €","").replace("—","0");
                 return s + (Number(m)||0);
               }, 0);
               const dateLabel = new Date(jour+"T12:00:00").toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
               // Répartition par mode
               const modesJour = {};
+              let nbOfferts = 0;
               groupes.forEach(g => {
                 const mode = g.resas.find(r=>r.mode_paiement)?.mode_paiement || "non_renseigne";
+                if (mode === "offert") { nbOfferts++; return; } // Offerts : compter mais pas additionner
                 if (!modesJour[mode]) modesJour[mode] = 0;
                 const m = getMontant(g).replace(" €","").replace("—","0");
                 modesJour[mode] += Number(m)||0;
@@ -4849,18 +4852,19 @@ function PaiementsTab({ onValidate }) {
                   <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
                     {groupes.map((g, gi) => {
                       const mp = MODES_PAIEMENT.find(m => m.id === g.resas.find(r=>r.mode_paiement)?.mode_paiement);
+                      const isOffert = mp?.id === "offert";
                       const montant = getMontant(g);
                       const membre = g.membre ? `${g.membre.prenom} ${(g.membre.nom||"").toUpperCase()}` : "—";
                       const label = g.type === "natation" ? getForfaitLabel(g) : isLiberte(g) ? "🎟️ Carte Liberté" : getForfaitLabel(g);
                       return (
-                        <div key={gi} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"6px 8px", background:"#f8fbff", borderRadius:8 }}>
+                        <div key={gi} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"6px 8px", background: isOffert ? "#FDF2F8" : "#f8fbff", borderRadius:8, opacity: isOffert ? 0.85 : 1 }}>
                           <div style={{ flex:1 }}>
                             <span style={{ fontWeight:700, fontSize:12, color:C.dark }}>{membre}</span>
                             <span style={{ fontSize:11, color:"#aaa", marginLeft:8 }}>{label}</span>
                           </div>
                           <div style={{ display:"flex", alignItems:"center", gap:8 }}>
                             {mp && <span style={{ background:`${mp.color}20`, color:mp.color, borderRadius:50, padding:"2px 8px", fontSize:10, fontWeight:800 }}>{mp.label.split(" ").slice(1).join(" ")}</span>}
-                            <span style={{ fontWeight:800, color:C.dark, fontSize:13 }}>{montant}</span>
+                            <span style={{ fontWeight:800, color: isOffert ? "#EC4899" : C.dark, fontSize:13, textDecoration: isOffert ? "line-through" : "none" }}>{montant}</span>
                           </div>
                         </div>
                       );
@@ -4868,11 +4872,14 @@ function PaiementsTab({ onValidate }) {
                   </div>
 
                   {/* Sous-total par mode */}
-                  <div style={{ marginTop:8, paddingTop:8, borderTop:"1px solid #f0f0f0", display:"flex", gap:8, flexWrap:"wrap" }}>
-                    {MODES_PAIEMENT.map(m => {
+                  <div style={{ marginTop:8, paddingTop:8, borderTop:"1px solid #f0f0f0", display:"flex", gap:8, flexWrap:"wrap", alignItems:"center" }}>
+                    {MODES_PAIEMENT.filter(m => m.id !== "offert").map(m => {
                       const v = modesJour[m.id];
                       return v ? <span key={m.id} style={{ fontSize:11, color:m.color, fontWeight:800 }}>{m.label.split(" ")[0]} {v} €</span> : null;
                     })}
+                    {nbOfferts > 0 && (
+                      <span style={{ fontSize:11, color:"#EC4899", fontWeight:800 }}>🎁 {nbOfferts} offert{nbOfferts>1?"s":""} <span style={{ fontWeight:400, color:"#aaa" }}>(non comptabilisé{nbOfferts>1?"s":""})</span></span>
+                    )}
                   </div>
                 </div>
               );
@@ -8267,6 +8274,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
     });
     const PRIX_NAT = { 1:20, 2:40, 3:60, 4:80, 5:95, 6:113, 7:131, 8:147, 9:162, 10:170 };
     return Object.values(groups).reduce((total, g) => {
+      if (g[0].mode_paiement === "offert") return total; // Offerts → exclus
       const n = g.length;
       const prix = n <= 10 ? (PRIX_NAT[n] || n*20) : 170 + (n-10)*17;
       return total + prix;
@@ -8286,12 +8294,14 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
     });
     return Object.values(groups).reduce((total, g) => {
       const r0 = g[0];
+      // Offerts → exclus du total
+      if (r0.mode_paiement === "offert") return total;
       // Carte liberté : prix fixe unique
       const nb = Number(Array.isArray(r0.enfants) ? r0.enfants[0] : 0);
       if (nb >= 6 && LIBERTE_PRIX[nb]) return total + LIBERTE_PRIX[nb];
-      // Montant stocké sur la première résa = total du groupe (78€ pour la semaine)
+      // Montant stocké sur la première résa = total du groupe
       if (r0.montant) return total + Number(r0.montant);
-      // Fallback : lire [MONTANT:XX] × nb résas (ancien comportement)
+      // Fallback : lire [MONTANT:XX] × nb résas
       const parLabelJour = g.reduce((s, r) => {
         const match = (r.label_jour||"").match(/\[MONTANT:(\d+)\]/);
         return s + (match ? Number(match[1]) : 0);
@@ -8870,8 +8880,26 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
           if (e) throw e;
         } else if (item.type === "club") {
           const sessions = item.session === "journee" ? ["matin","apmidi"] : [item.session || "matin"];
+          // Charger les résas existantes pour éviter les doublons
+          const { data: existingClub } = await sb.from("reservations_club")
+            .select("date_reservation, session, enfants")
+            .eq("membre_id", user.supabaseId)
+            .in("statut", ["pending","confirmed"]);
+          const existingSet = new Set((existingClub||[]).map(r =>
+            (r.enfants||[]).map(enf => `${r.date_reservation?.slice(0,10)}-${r.session}-${enf}`).join("|")
+          ).join("|").split("|").filter(Boolean));
+
+          const doublons = [];
           for (const iso of (item.dates || [])) {
             for (const sess of sessions) {
+              // Vérifier si un des enfants est déjà inscrit ce jour/session
+              const enfantsDeja = (item.enfants||[]).filter(enf =>
+                existingSet.has(`${iso}-${sess}-${enf}`)
+              );
+              if (enfantsDeja.length > 0) {
+                doublons.push(`${new Date(iso).toLocaleDateString("fr-FR",{day:"numeric",month:"short"})} ${sess==="matin"?"matin":"après-midi"} (${enfantsDeja.join(", ")})`);
+                continue;
+              }
               const { error: e } = await sb.from("reservations_club").insert([{
                 membre_id:        user.supabaseId,
                 date_reservation: iso,
@@ -8882,6 +8910,9 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
               }]);
               if (e) throw e;
             }
+          }
+          if (doublons.length > 0) {
+            alert(`⚠️ Inscription(s) ignorée(s) car déjà existante(s) :\n${doublons.join("\n")}`);
           }
         } else if (item.type === "liberte") {
           const { error: e } = await sb.from("reservations_club").insert([{
@@ -9772,4 +9803,4 @@ export default function App() {
     </div>
   );
 }
-// admin persist signin Mon Apr  6 11:59:15 CEST 2026
+// offerts + doublons Mon Apr  6 12:10:42 CEST 2026
