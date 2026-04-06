@@ -9738,7 +9738,7 @@ export default function App() {
       case "reservation-club": return <ReservationClubScreen {...props} />;
       case "mes-reservations": return <MesReservationsScreen {...props} />;
       case "panier":            return <PanierScreen {...props} />;
-      case "inscription":      return user?.supabaseId ? (
+      case "inscription":      return (user?.supabaseId && !ADMIN_EMAILS.includes((user?.email||"").toLowerCase())) ? (
         <div style={{ padding:24, background:C.shell, minHeight:"100%", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center" }}>
           <div style={{ fontSize:60, marginBottom:16 }}>👋</div>
           <h3 style={{ color:C.dark, margin:"0 0 8px", textAlign:"center" }}>Vous êtes déjà inscrit !</h3>
@@ -9806,4 +9806,4 @@ export default function App() {
     </div>
   );
 }
-// remove mock data Mon Apr  6 12:29:46 CEST 2026
+// skip inscrit admin Mon Apr  6 12:37:18 CEST 2026
