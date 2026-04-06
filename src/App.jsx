@@ -1077,9 +1077,9 @@ function FormulesEveilScreen({ onNav, user, panier, setPanier }) {
 }
 
 // ── FORMULES NATATION ─────────────────────────────────────
-function FormulesNatationScreen({ onNav, user, allSeasonSessions, panier, setPanier }) {
+function FormulesNatationScreen({ onNav, user, allSeasonSessions, setAllSeasonSessions, panier, setPanier }) {
   const [selected, setSelected]             = useState(null);
-  const [selectedEnfants, setSelectedEnfants] = useState([]); // enfants sélectionnés (partagés entre créneaux)
+  const [selectedEnfants, setSelectedEnfants] = useState([]);
   const [done, setDone]                     = useState(false);
   const [enfantsDB, setEnfantsDB]           = useState([]);
   const [step, setStep]                     = useState("formule");
@@ -1095,6 +1095,39 @@ function FormulesNatationScreen({ onNav, user, allSeasonSessions, panier, setPan
     sb.from("reservations_natation").select("date_seance, heure, statut")
       .eq("statut", "confirmed")
       .then(({ data }) => setDbResasNat(data || [])).catch(() => {});
+
+    // Recharger les créneaux supprimés/ajoutés par l'admin
+    sb.from("seances_natation").select("date, heure, spots").then(({ data }) => {
+      if (!data || data.length === 0) return;
+      if (!setAllSeasonSessions) return;
+      setAllSeasonSessions(prev => {
+        let updated = [...prev];
+        data.forEach(({ date, heure, spots }) => {
+          if (spots === -1) {
+            // Supprimé par l'admin
+            updated = updated.filter(slot => {
+              const dayObj = ALL_SEASON_DAYS.find(d => d.id === slot.day);
+              if (!dayObj?.date) return true;
+              const dd = dayObj.date;
+              const dateISO = `${dd.getFullYear()}-${String(dd.getMonth()+1).padStart(2,"0")}-${String(dd.getDate()).padStart(2,"0")}`;
+              return !(dateISO === date && slot.time === heure);
+            });
+          } else if (spots >= 0) {
+            // Ajouté par l'admin
+            const dayObj = ALL_SEASON_DAYS.find(d => {
+              const dd = d.date;
+              if (!dd) return false;
+              const dateISO = `${dd.getFullYear()}-${String(dd.getMonth()+1).padStart(2,"0")}-${String(dd.getDate()).padStart(2,"0")}`;
+              return dateISO === date;
+            });
+            if (dayObj && !updated.some(s => s.day === dayObj.id && s.time === heure)) {
+              updated.push({ id: `sb-${date}-${heure}`, day: dayObj.id, time: heure, spots });
+            }
+          }
+        });
+        return updated;
+      });
+    }).catch(() => {});
   }, [user?.supabaseId]);
 
   const enfantsNat = enfantsDB.length > 0
@@ -10020,4 +10053,4 @@ export default function App() {
     </div>
   );
 }
-// seances delete insert Mon Apr  6 22:44:11 CEST 2026
+// seances sync client Mon Apr  6 22:49:47 CEST 2026
