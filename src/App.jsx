@@ -1093,7 +1093,7 @@ function FormulesNatationScreen({ onNav, user, allSeasonSessions, setAllSeasonSe
         .then(({ data }) => setEnfantsDB(data || [])).catch(() => {});
     }
     sb.from("reservations_natation").select("date_seance, heure, statut")
-      .eq("statut", "confirmed")
+      .in("statut", ["confirmed", "pending"])
       .then(({ data }) => setDbResasNat(data || [])).catch(() => {});
 
     // Recharger les créneaux supprimés/ajoutés par l'admin
@@ -1140,6 +1140,16 @@ function FormulesNatationScreen({ onNav, user, allSeasonSessions, setAllSeasonSe
   const getTodayISO = () => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}-${String(t.getDate()).padStart(2,"0")}`; };
   const getSpots = (dayISO, time) => {
     if (dayISO === getTodayISO()) return 0;
+    // Vérifier si le créneau existe encore (non supprimé par admin)
+    const dayObj = ALL_SEASON_DAYS.find(d => {
+      const dd = d.date;
+      if (!dd) return false;
+      const iso = `${dd.getFullYear()}-${String(dd.getMonth()+1).padStart(2,"0")}-${String(dd.getDate()).padStart(2,"0")}`;
+      return iso === dayISO;
+    });
+    if (dayObj && allSeasonSessions && !allSeasonSessions.some(s => s.day === dayObj.id && s.time === time)) {
+      return 0; // Supprimé par l'admin
+    }
     const taken = dbResasNat.filter(r => r.date_seance?.slice(0,10) === dayISO && r.heure === time).length;
     return Math.max(0, 2 - taken);
   };
@@ -1310,7 +1320,7 @@ function FormulesNatationScreen({ onNav, user, allSeasonSessions, setAllSeasonSe
             {/* Créneaux par jour */}
             {currentWeek.map(d => {
               const dayISO = `${d.date.getFullYear()}-${String(d.date.getMonth()+1).padStart(2,"0")}-${String(d.date.getDate()).padStart(2,"0")}`;
-              const daySlots = ALL_SEASON_SLOTS_INIT.filter(s => s.day === d.id);
+              const daySlots = (allSeasonSessions || ALL_SEASON_SLOTS_INIT).filter(s => s.day === d.id);
               if (!daySlots.length) return null;
               return (
                 <div key={d.id} style={{ marginBottom:12 }}>
@@ -10099,3 +10109,4 @@ export default function App() {
     </div>
   );
 }
+// spots dispo nat Tue Apr  7 03:56:56 CEST 2026
