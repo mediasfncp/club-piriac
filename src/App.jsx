@@ -4854,17 +4854,12 @@ function PaiementsTab({ onValidate }) {
     const nbApmidi = resas.filter(r => r.session === "apmidi").length;
     const isJournee = nbMatin > 0 && nbApmidi > 0 && Math.abs(nbMatin - nbApmidi) <= 1;
 
-    // Pour journée : additionner matin + apmidi depuis r.montant ou label_jour
+    // Pour journée : prendre r.montant une seule fois (pas matin+apmidi)
     if (isJournee) {
-      const r0matin  = resas.find(r => r.session === "matin");
-      const r0apmidi = resas.find(r => r.session === "apmidi");
-      const getMontantResa = (r) => {
-        if (r?.montant) return Number(r.montant);
-        const m = (r?.label_jour||"").match(/\[MONTANT:(\d+)\]/);
-        return m ? Number(m[1]) : 0;
-      };
-      const total = getMontantResa(r0matin) + getMontantResa(r0apmidi);
-      if (total > 0) return `${total} €`;
+      const r0 = resas.find(r => r.session === "matin") || resas[0];
+      if (r0?.montant) return `${r0.montant} €`;
+      const m = (r0?.label_jour||"").match(/\[MONTANT:(\d+)\]/);
+      if (m) return `${m[1]} €`;
     }
 
     // Pour matin ou apmidi seul : r.montant de la première résa (= total du groupe)
@@ -10121,7 +10116,4 @@ export default function App() {
     </div>
   );
 }
-// journee groupe Thu Apr  9 22:13:00 CEST 2026
-// redeploy mediasfncp jeu.  9 avr. 2026 22:35:13 CEST
-// deploy piriac jeu.  9 avr. 2026 23:04:26 CEST
-// deploy piriac jeu.  9 avr. 2026 23:31:02 CEST
+// journee montant fix Thu Apr  9 23:36:00 CEST 2026
