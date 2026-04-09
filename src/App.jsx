@@ -7219,6 +7219,10 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
               else { const m2=(resa.label_jour||"").match(/\[MONTANT:(\d+)\]/); montant=m2?Number(m2[1]):0; }
               await sb.from("reservations_club").update({ statut:"confirmed", validated_at:new Date().toISOString(), montant, mode_paiement:mode }).eq("id", resa.id);
             }
+            // Compte fin de saison → activer sur le membre
+            if (mode === "compte_fin_saison" && resa.membre_id) {
+              await sb.from("membres").update({ compte_fin_saison: true }).eq("id", resa.membre_id);
+            }
             setModePaiementConfirm(null);
             refreshResas();
           }}
@@ -7349,11 +7353,12 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
 // ── ONGLET COMPTES FIN DE SAISON ─────────────────────────
 // ── MODAL MODE DE PAIEMENT ───────────────────────────────
 const MODES_PAIEMENT = [
-  { id:"especes",          label:"💶 Espèces",           color:"#F59E0B" },
-  { id:"cheque",           label:"✉️ Chèque",            color:"#3B82F6" },
-  { id:"cheques_vacances", label:"🎫 Chèques vacances",  color:"#8B5CF6" },
-  { id:"virement",         label:"🏦 Virement",          color:"#10B981" },
-  { id:"offert",           label:"🎁 Offert",            color:"#EC4899" },
+  { id:"especes",            label:"💶 Espèces",             color:"#F59E0B" },
+  { id:"cheque",             label:"✉️ Chèque",              color:"#3B82F6" },
+  { id:"cheques_vacances",   label:"🎫 Chèques vacances",    color:"#8B5CF6" },
+  { id:"virement",           label:"🏦 Virement",            color:"#10B981" },
+  { id:"offert",             label:"🎁 Offert",              color:"#EC4899" },
+  { id:"compte_fin_saison",  label:"📒 Compte fin de saison", color:"#6366F1" },
 ];
 
 function ModePaiementModal({ onConfirm, onClose, titre }) {
@@ -8521,6 +8526,32 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
           onConfirm={async (mode) => {
             const g = pendingModalConfirm;
             const table = g.type === "natation" ? "reservations_natation" : "reservations_club";
+
+            // Si compte fin de saison → confirmer mais activer compte_fin_saison sur le membre
+            if (mode === "compte_fin_saison") {
+              if (g.type === "club") {
+                const LIBERTE_PRIX_V = {6:96,12:180,18:252,24:288,30:330};
+                for (const r of g.resas) {
+                  let montant = 0;
+                  const isLib = !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6;
+                  if (isLib) { montant = LIBERTE_PRIX_V[Number(r.enfants[0])]||0; }
+                  else { const m2=(r.label_jour||"").match(/\[MONTANT:(\d+)\]/); montant=m2?Number(m2[1]):0; }
+                  await sb.from(table).update({ statut:"confirmed", validated_at:new Date().toISOString(), montant, mode_paiement:mode }).eq("id", r.id);
+                }
+              } else {
+                await Promise.all(g.resas.map(r => sb.from(table).update({ statut:"confirmed", validated_at:new Date().toISOString(), mode_paiement:mode }).eq("id", r.id)));
+              }
+              // Activer compte_fin_saison sur le membre
+              const membreId = g.resas[0]?.membre_id;
+              if (membreId) {
+                await sb.from("membres").update({ compte_fin_saison: true }).eq("id", membreId);
+              }
+              setPendingModalConfirm(null);
+              refreshResas();
+              onRefresh && onRefresh();
+              return;
+            }
+
             if (g.type === "club") {
               const LIBERTE_PRIX_V = {6:96,12:180,18:252,24:288,30:330};
               for (const r of g.resas) {
@@ -10116,4 +10147,4 @@ export default function App() {
     </div>
   );
 }
-// journee montant fix Thu Apr  9 23:36:00 CEST 2026
+// compte fin saison mode Thu Apr  9 23:43:53 CEST 2026
