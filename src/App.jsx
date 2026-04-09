@@ -4951,7 +4951,8 @@ function PaiementsTab({ onValidate }) {
             {jours.map(jour => {
               const groupes = parJour[jour];
               const totalJour = groupes.reduce((s,g) => {
-                if (g.resas.find(r=>r.mode_paiement)?.mode_paiement === "offert") return s; // Offerts exclus
+                const mode = g.resas.find(r=>r.mode_paiement)?.mode_paiement;
+                if (mode === "offert" || mode === "compte_fin_saison") return s; // exclus
                 const m = getMontant(g).replace(" €","").replace("—","0");
                 return s + (Number(m)||0);
               }, 0);
@@ -4959,9 +4960,11 @@ function PaiementsTab({ onValidate }) {
               // Répartition par mode
               const modesJour = {};
               let nbOfferts = 0;
+              let nbComptesSaison = 0;
               groupes.forEach(g => {
                 const mode = g.resas.find(r=>r.mode_paiement)?.mode_paiement || "non_renseigne";
-                if (mode === "offert") { nbOfferts++; return; } // Offerts : compter mais pas additionner
+                if (mode === "offert") { nbOfferts++; return; }
+                if (mode === "compte_fin_saison") { nbComptesSaison++; return; }
                 if (!modesJour[mode]) modesJour[mode] = 0;
                 const m = getMontant(g).replace(" €","").replace("—","0");
                 modesJour[mode] += Number(m)||0;
@@ -5000,18 +5003,22 @@ function PaiementsTab({ onValidate }) {
                     {groupes.map((g, gi) => {
                       const mp = MODES_PAIEMENT.find(m => m.id === g.resas.find(r=>r.mode_paiement)?.mode_paiement);
                       const isOffert = mp?.id === "offert";
+                      const isCompte = mp?.id === "compte_fin_saison";
                       const montant = getMontant(g);
                       const membre = g.membre ? `${g.membre.prenom} ${(g.membre.nom||"").toUpperCase()}` : "—";
                       const label = g.type === "natation" ? getForfaitLabel(g) : isLiberte(g) ? "🎟️ Carte Liberté" : getForfaitLabel(g);
+                      // Enfants
+                      const enfantsNoms = [...new Set(g.resas.flatMap(r => Array.isArray(r.enfants) ? r.enfants.filter(e => isNaN(Number(e))) : []))].join(", ");
                       return (
-                        <div key={gi} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"6px 8px", background: isOffert ? "#FDF2F8" : "#f8fbff", borderRadius:8, opacity: isOffert ? 0.85 : 1 }}>
+                        <div key={gi} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"6px 8px", background: isOffert ? "#FDF2F8" : isCompte ? "#EEF2FF" : "#f8fbff", borderRadius:8, opacity: isOffert||isCompte ? 0.85 : 1 }}>
                           <div style={{ flex:1 }}>
                             <span style={{ fontWeight:700, fontSize:12, color:C.dark }}>{membre}</span>
                             <span style={{ fontSize:11, color:"#aaa", marginLeft:8 }}>{label}</span>
+                            {enfantsNoms && <span style={{ fontSize:11, color:C.ocean, marginLeft:8, fontWeight:700 }}>· {enfantsNoms}</span>}
                           </div>
                           <div style={{ display:"flex", alignItems:"center", gap:8 }}>
                             {mp && <span style={{ background:`${mp.color}20`, color:mp.color, borderRadius:50, padding:"2px 8px", fontSize:10, fontWeight:800 }}>{mp.label.split(" ").slice(1).join(" ")}</span>}
-                            <span style={{ fontWeight:800, color: isOffert ? "#EC4899" : C.dark, fontSize:13, textDecoration: isOffert ? "line-through" : "none" }}>{montant}</span>
+                            <span style={{ fontWeight:800, color: isOffert||isCompte ? mp?.color : C.dark, fontSize:13, textDecoration: isOffert||isCompte ? "line-through" : "none" }}>{montant}</span>
                           </div>
                         </div>
                       );
@@ -5020,12 +5027,15 @@ function PaiementsTab({ onValidate }) {
 
                   {/* Sous-total par mode */}
                   <div style={{ marginTop:8, paddingTop:8, borderTop:"1px solid #f0f0f0", display:"flex", gap:8, flexWrap:"wrap", alignItems:"center" }}>
-                    {MODES_PAIEMENT.filter(m => m.id !== "offert").map(m => {
+                    {MODES_PAIEMENT.filter(m => m.id !== "offert" && m.id !== "compte_fin_saison").map(m => {
                       const v = modesJour[m.id];
                       return v ? <span key={m.id} style={{ fontSize:11, color:m.color, fontWeight:800 }}>{m.label.split(" ")[0]} {v} €</span> : null;
                     })}
                     {nbOfferts > 0 && (
                       <span style={{ fontSize:11, color:"#EC4899", fontWeight:800 }}>🎁 {nbOfferts} offert{nbOfferts>1?"s":""} <span style={{ fontWeight:400, color:"#aaa" }}>(non comptabilisé{nbOfferts>1?"s":""})</span></span>
+                    )}
+                    {nbComptesSaison > 0 && (
+                      <span style={{ fontSize:11, color:"#6366F1", fontWeight:800 }}>📒 {nbComptesSaison} compte{nbComptesSaison>1?"s":""} fin de saison <span style={{ fontWeight:400, color:"#aaa" }}>(non comptabilisé{nbComptesSaison>1?"s":""})</span></span>
                     )}
                   </div>
                 </div>
@@ -8446,7 +8456,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
     });
     const PRIX_NAT = { 1:20, 2:40, 3:60, 4:80, 5:95, 6:113, 7:131, 8:147, 9:162, 10:170 };
     return Object.values(groups).reduce((total, g) => {
-      if (g[0].mode_paiement === "offert") return total; // Offerts → exclus
+      if (g[0].mode_paiement === "offert" || g[0].mode_paiement === "compte_fin_saison") return total; // Offerts et comptes fin saison → exclus
       const n = g.length;
       const prix = n <= 10 ? (PRIX_NAT[n] || n*20) : 170 + (n-10)*17;
       return total + prix;
@@ -8467,7 +8477,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
     return Object.values(groups).reduce((total, g) => {
       const r0 = g[0];
       // Offerts → exclus du total
-      if (r0.mode_paiement === "offert") return total;
+      if (r0.mode_paiement === "offert" || r0.mode_paiement === "compte_fin_saison") return total;
       // Carte liberté : prix fixe unique
       const nb = Number(Array.isArray(r0.enfants) ? r0.enfants[0] : 0);
       if (nb >= 6 && LIBERTE_PRIX[nb]) return total + LIBERTE_PRIX[nb];
@@ -10147,4 +10157,4 @@ export default function App() {
     </div>
   );
 }
-// compte fin saison mode Thu Apr  9 23:43:53 CEST 2026
+// compte fin saison exclus + enfants cahier Thu Apr  9 23:53:32 CEST 2026
