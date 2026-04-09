@@ -8016,7 +8016,6 @@ function FacturesTab({ dbMembres, dbResas, dbResasClub }) {
     Object.values(parEnfantsMontant).forEach(({ enfantsStr, montantR, resas }) => {
       const prenom = enfantsStr || "—";
       const r0 = resas[0];
-      const r0 = resas[0];
       const nbMatin = resas.filter(r=>r.session==="matin").length;
       const nbApmidi = resas.filter(r=>r.session==="apmidi").length;
       const isJournee = nbMatin > 0 && nbApmidi > 0;
@@ -10227,4 +10226,4 @@ export default function App() {
     </div>
   );
 }
-// fix montant enfants montant Fri Apr 10 00:30:16 CEST 2026
+// fix r0 duplicate Fri Apr 10 00:32:28 CEST 2026
