@@ -4794,7 +4794,7 @@ function PaiementsTab({ onValidate }) {
       // Club: grouper par session + enfants (trié) + minute → chaque combinaison enfant/session = 1 groupe
       const enfantsKey = Array.isArray(r.enfants) ? [...r.enfants].sort().join(",") : "";
       const keyClub = r._type === "club"
-        ? `${r.membre_id}-club-${r.session}-${enfantsKey}-${minuteCreation}`
+        ? `${r.membre_id}-club-${enfantsKey}-${minuteCreation}` // matin+apmidi même groupe si même minute+enfants
         : null;
       const key = keyClub || `${r.membre_id}-${r._type}-${enfantsKey}-${minuteCreation}`;
       if (!groups[key]) groups[key] = {
@@ -4846,20 +4846,32 @@ function PaiementsTab({ onValidate }) {
       const nb = Number(g.resas[0]?.enfants?.[0]) || 0;
       return LIBERTE_PRIX[nb] ? `${LIBERTE_PRIX[nb]} €` : "—";
     }
-    // Lire montant stocké dans label_jour [MONTANT:xx]
-    const label = g.resas[0]?.label_jour || "";
-    const montantMatch = label.match(/\[MONTANT:(\d+)\]/);
-    if (montantMatch) return `${montantMatch[1]} €`;
 
-    // Calculer automatiquement depuis les tarifs
     const resas = g.resas.filter(r => !(Array.isArray(r.enfants) && Number(r.enfants[0]) >= 6));
     if (resas.length === 0) return "—";
 
-    // Détecter session dominante
     const nbMatin  = resas.filter(r => r.session === "matin").length;
     const nbApmidi = resas.filter(r => r.session === "apmidi").length;
     const isJournee = nbMatin > 0 && nbApmidi > 0 && Math.abs(nbMatin - nbApmidi) <= 1;
-    const session = isJournee ? "journee" : nbMatin >= nbApmidi ? "matin" : "apmidi";
+
+    // Pour journée : additionner matin + apmidi depuis r.montant ou label_jour
+    if (isJournee) {
+      const r0matin  = resas.find(r => r.session === "matin");
+      const r0apmidi = resas.find(r => r.session === "apmidi");
+      const getMontantResa = (r) => {
+        if (r?.montant) return Number(r.montant);
+        const m = (r?.label_jour||"").match(/\[MONTANT:(\d+)\]/);
+        return m ? Number(m[1]) : 0;
+      };
+      const total = getMontantResa(r0matin) + getMontantResa(r0apmidi);
+      if (total > 0) return `${total} €`;
+    }
+
+    // Pour matin ou apmidi seul : r.montant de la première résa (= total du groupe)
+    const r0 = resas[0];
+    if (r0?.montant) return `${r0.montant} €`;
+    const montantMatch = (r0?.label_jour||"").match(/\[MONTANT:(\d+)\]/);
+    if (montantMatch) return `${montantMatch[1]} €`;
 
     // Nb de jours réels (journée = 1 jour = 2 résas)
     const nbJours = isJournee ? Math.round(resas.length / 2) : resas.length;
@@ -8598,7 +8610,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
               const minuteCreation = (r.created_at||"").slice(0,16);
               const enfantsKey = Array.isArray(r.enfants) ? [...r.enfants].sort().join(",") : "";
               const keyClub = r._type === "club"
-                ? `${r.membre_id}-club-${r.session}-${enfantsKey}-${minuteCreation}`
+                ? `${r.membre_id}-club-${enfantsKey}-${minuteCreation}`
                 : null;
               const key = keyClub || `${r.membre_id}-${r._type}-${enfantsKey}-${minuteCreation}`;
               if (!groups[key]) groups[key] = { membre: r.membres, type: r._type, resas: [] };
@@ -8845,7 +8857,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                       const minuteCreation = (r.created_at||"").slice(0,16);
                       const enfantsKey = Array.isArray(r.enfants) ? [...r.enfants].sort().join(",") : "";
                       const keyClub = r._type === "club"
-                        ? `${r.membre_id}-club-${r.session}-${enfantsKey}-${minuteCreation}`
+                        ? `${r.membre_id}-club-${enfantsKey}-${minuteCreation}`
                         : null;
                       const key = keyClub || `${r.membre_id}-${r._type}-${enfantsKey}-${minuteCreation}`;
                       if (!groups[key]) groups[key] = { membre: r.membres, type: r._type, resas: [] };
@@ -10109,4 +10121,4 @@ export default function App() {
     </div>
   );
 }
-// spots dispo nat Tue Apr  7 03:56:56 CEST 2026
+// journee groupe Thu Apr  9 22:13:00 CEST 2026
