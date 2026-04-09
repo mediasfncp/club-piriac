@@ -5239,7 +5239,7 @@ function PaiementsTab({ onValidate }) {
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:6 }}>
                   <div>
                     <div style={{ fontWeight:900, color:C.dark, fontSize:14 }}>
-                      {g.membre ? `${g.membre.prenom} ${NOM(g.membre.nom)}` : "—"}
+                      {g.membre ? `${PRENOM(g.membre.prenom)} ${NOM(g.membre.nom)}` : "—"}
                     </div>
                     {enfants.length > 0 && (
                       <div style={{ fontSize:12, color:"#888", marginTop:1 }}>{enfants.join(", ")}</div>
@@ -6139,7 +6139,7 @@ function AgeGroupCard({ dbMembres = [] }) {
       const key = `${e.prenom}-${e.nom}-${e.naissance}`;
       if (!seenEnfants.has(key)) {
         seenEnfants.add(key);
-        allEnfants.push({ ...e, age: calcAge(e.naissance), parent: `${m.prenom} ${NOM(m.nom)}`, parentColor: C.ocean, phone: m.tel,
+        allEnfants.push({ ...e, age: calcAge(e.naissance), parent: `${PRENOM(m.prenom)} ${NOM(m.nom)}`, parentColor: C.ocean, phone: m.tel,
           adresse: m.adresse, ville: m.ville, cp: m.cp,
           adresse_vac: m.adresse_vac, ville_vac: m.ville_vac, cp_vac: m.cp_vac,
         });
@@ -6520,7 +6520,7 @@ function ModifierResaModal({ resa, type, onClose, onSaved, dbMembres }) {
             <select value={membreId} onChange={e => { setMembreId(e.target.value); setEnfants([]); }}
               style={{ width:"100%", border:"2px solid #e0e8f0", borderRadius:12, padding:"11px 12px", fontSize:14, fontFamily:"inherit", outline:"none", background:"#fff" }}>
               <option value="">— Sélectionner —</option>
-              {dbMembres.map(m => <option key={m.id} value={m.id}>{m.prenom} {NOM(m.nom)}</option>)}
+              {dbMembres.map(m => <option key={m.id} value={m.id}>{PRENOM(m.prenom)} {NOM(m.nom)}</option>)}
             </select>
           </Field>
 
@@ -6764,7 +6764,7 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
             <select value={membreId} onChange={e => handleMembreChange(e.target.value)}
               style={{ width:"100%", border:"2px solid #e0e8f0", borderRadius:12, padding:"10px 12px", fontSize:14, fontFamily:"inherit", outline:"none", background:"#fff" }}>
               <option value="">— Sélectionner —</option>
-              {dbMembres.map(m => <option key={m.id} value={m.id}>{m.prenom} {NOM(m.nom)}</option>)}
+              {dbMembres.map(m => <option key={m.id} value={m.id}>{PRENOM(m.prenom)} {NOM(m.nom)}</option>)}
             </select>
           </div>
 
@@ -7339,7 +7339,7 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
         const isOpen = openMembreIds[mid];
         const allR = [...g.nat, ...g.club];
         const hasPending = allR.some(r => r.statut === "pending");
-        const nomMembre = g.membre ? `${g.membre.prenom} ${NOM(g.membre.nom)}` : "—";
+        const nomMembre = g.membre ? `${PRENOM(g.membre.prenom)} ${NOM(g.membre.nom)}` : "—";
         return (
           <div key={mid} style={{ background:"#fff", borderRadius:18, boxShadow:"0 3px 12px rgba(0,0,0,0.07)", overflow:"hidden", border: hasPending ? `2px solid ${C.sun}60` : "2px solid transparent" }}>
             <div onClick={() => toggleMembre(mid)} style={{ padding:"14px 16px", display:"flex", alignItems:"center", gap:12, cursor:"pointer" }}>
@@ -7536,12 +7536,12 @@ function ComptesTab({ dbMembres, dbResas, dbResasClub, onRefresh }) {
       return s + (n <= 10 ? (PRIX_NAT[n] || n*20) : 170+(n-10)*17);
     }, 0);
 
-    // Club : r.montant une seule fois par groupe session+enfants+minute
+    // Club : r.montant une seule fois par groupe enfants+minute (matin+apmidi = même groupe pour journée)
     const clubGroups = {};
     resasClub.forEach(r => {
       const enfantsKey = Array.isArray(r.enfants) ? [...r.enfants].sort().join(",") : "";
       const minute = (r.created_at||"").slice(0,16);
-      const k = `${r.session}-${enfantsKey}-${minute}`;
+      const k = `${enfantsKey}-${minute}`; // sans session pour grouper journée
       if (!clubGroups[k]) clubGroups[k] = [];
       clubGroups[k].push(r);
     });
@@ -7550,6 +7550,7 @@ function ComptesTab({ dbMembres, dbResas, dbResasClub, onRefresh }) {
       const r0 = g[0];
       const nb = Number(r0.enfants?.[0]);
       if (nb >= 6 && LP[nb]) return s + LP[nb];
+      // Pour une journée (matin+apmidi), prendre r.montant une seule fois
       if (r0.montant) return s + Number(r0.montant);
       const match = (r0.label_jour||"").match(/\[MONTANT:(\d+)\]/);
       return s + (match ? Number(match[1]) : 0);
@@ -7600,7 +7601,7 @@ function ComptesTab({ dbMembres, dbResas, dbResasClub, onRefresh }) {
 
   const genererFacture = (membre, compte) => {
     const remise = compte.remise || 0;
-    const nomMembre = `${membre.prenom} ${(membre.nom||"").toUpperCase()}`;
+    const nomMembre = `${PRENOM(membre.prenom)} ${NOM(membre.nom)}`;
     const lignesNat = compte.resasNat.map(r => `<tr><td>🏊 Natation · ${r.heure}</td><td>${r.date_seance ? parseLocalDate(r.date_seance).toLocaleDateString("fr-FR",{day:"numeric",month:"short"}) : "—"}</td><td style="text-align:right;font-weight:700">${getMontantResa(r,"natation")} €</td></tr>`).join("");
     const lignesClub = compte.resasClub.map(r => {
       const isLib = (r.label_jour||"").startsWith("[LIBERTE]");
@@ -7664,7 +7665,7 @@ Document généré le ${new Date().toLocaleDateString("fr-FR")}
               <div style={{ width:18, height:18, borderRadius:4, background: m.compte_fin_saison ? C.ocean : "#ddd", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
                 {m.compte_fin_saison && <span style={{ color:"#fff", fontSize:12, fontWeight:900 }}>✓</span>}
               </div>
-              <span style={{ fontSize:12, fontWeight:700, color: m.compte_fin_saison ? C.ocean : "#555" }}>{m.prenom} {NOM(m.nom)}</span>
+              <span style={{ fontSize:12, fontWeight:700, color: m.compte_fin_saison ? C.ocean : "#555" }}>{PRENOM(m.prenom)} {NOM(m.nom)}</span>
             </div>
           ))}
         </div>
@@ -7685,7 +7686,7 @@ Document généré le ${new Date().toLocaleDateString("fr-FR")}
               <div style={{ display:"flex", alignItems:"center", gap:12 }}>
                 <div style={{ width:46, height:46, borderRadius:14, background:`linear-gradient(135deg,${C.ocean},${C.sea})`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22 }}>👤</div>
                 <div>
-                  <div style={{ fontWeight:900, color:C.dark, fontSize:15 }}>{m.prenom} {NOM(m.nom)}</div>
+                  <div style={{ fontWeight:900, color:C.dark, fontSize:15 }}>{PRENOM(m.prenom)} {NOM(m.nom)}</div>
                   <div style={{ fontSize:11, color:"#aaa" }}>{m.email}</div>
                   <div style={{ display:"flex", gap:8, marginTop:4 }}>
                     <span style={{ background:`${C.ocean}15`, color:C.ocean, borderRadius:50, padding:"2px 10px", fontSize:11, fontWeight:800 }}>{compte.resasNat.length + compte.resasClub.length} préstation{compte.resasNat.length+compte.resasClub.length>1?"s":""}</span>
@@ -7732,12 +7733,12 @@ Document généré le ${new Date().toLocaleDateString("fr-FR")}
                   <div style={{ marginBottom:16 }}>
                     <div style={{ fontWeight:800, color:C.coral, fontSize:12, textTransform:"uppercase", marginBottom:8 }}>🏖️ Club de Plage</div>
                     {(() => {
-                      // Grouper par session+enfants+minute pour montant correct
+                      // Grouper par enfants+minute (sans session pour merger journée)
                       const groups = {};
                       compte.resasClub.forEach(r => {
                         const enfantsKey = Array.isArray(r.enfants) ? [...r.enfants].sort().join(",") : "";
                         const minute = (r.created_at||"").slice(0,16);
-                        const k = `${r.session}-${enfantsKey}-${minute}`;
+                        const k = `${enfantsKey}-${minute}`;
                         if (!groups[k]) groups[k] = [];
                         groups[k].push(r);
                       });
@@ -7745,18 +7746,19 @@ Document généré le ${new Date().toLocaleDateString("fr-FR")}
                       return Object.values(groups).map((g, gi) => {
                         const r0 = g[0];
                         const isLib = (r0.label_jour||"").startsWith("[LIBERTE]");
-                        const label = isLib ? "🎟️ Liberté" : r0.session==="matin" ? "☀️ Matin" : "🌊 Après-midi";
-                        // Montant du groupe
+                        const nbMatin = g.filter(r=>r.session==="matin").length;
+                        const nbApmidi = g.filter(r=>r.session==="apmidi").length;
+                        const isJournee = nbMatin > 0 && nbApmidi > 0;
+                        const label = isLib ? "🎟️ Liberté" : isJournee ? "☀️🌊 Journée" : r0.session==="matin" ? "☀️ Matin" : "🌊 Après-midi";
+                        const nbJours = isJournee ? Math.round(g.length/2) : g.length;
+                        // Montant : une seule fois (r0.montant = total du groupe)
                         const nb = Number(r0.enfants?.[0]);
                         let montant = 0;
                         if (nb >= 6 && LP[nb]) montant = LP[nb];
                         else if (r0.montant) montant = Number(r0.montant);
                         else { const m2=(r0.label_jour||"").match(/\[MONTANT:(\d+)\]/); montant=m2?Number(m2[1]):0; }
                         const allExcluded = g.every(r => exclusions[r.id]);
-                        const someExcluded = g.some(r => exclusions[r.id]);
-                        const dateLabel = g.length > 1
-                          ? `${g.length} jour${g.length>1?"s":""}`
-                          : (r0.date_reservation ? new Date(r0.date_reservation).toLocaleDateString("fr-FR",{day:"numeric",month:"short"}) : "—");
+                        const dateLabel = `${nbJours} jour${nbJours>1?"s":""}`;
                         return (
                           <div key={gi} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"7px 10px", background: allExcluded ? "#f8f8f8" : `${C.coral}06`, borderRadius:10, marginBottom:4, opacity: allExcluded ? 0.5 : 1 }}>
                             <div>
@@ -8000,36 +8002,40 @@ function FacturesTab({ dbMembres, dbResas, dbResasClub }) {
   const grouperClub = (resasClub, enfantsFilter = null) => {
     if (resasClub.length === 0) return [];
 
-    // Grouper par enfant + session
-    const parEnfantSession = {};
+    // Grouper par enfant + minute (sans session pour merger matin+apmidi en journée)
+    const parEnfantMinute = {};
     resasClub.forEach(r => {
       const enfs = Array.isArray(r.enfants) && r.enfants.length > 0 ? r.enfants : ["—"];
-      const session = r.session || "matin";
+      const minute = (r.created_at||"").slice(0,16);
       enfs.forEach(prenom => {
-        const k = `${prenom}__${session}`;
-        if (!parEnfantSession[k]) parEnfantSession[k] = { prenom, session, resas: [] };
-        parEnfantSession[k].resas.push(r);
+        const k = `${prenom}__${minute}`;
+        if (!parEnfantMinute[k]) parEnfantMinute[k] = { prenom, minute, resas: [] };
+        parEnfantMinute[k].resas.push(r);
       });
     });
 
     const groupes = [];
-    Object.values(parEnfantSession).forEach(({ prenom, session, resas }) => {
-      // Prendre r.montant de la première résa (= total du groupe stocké à la validation)
-      // Si pas de montant stocké, lire [MONTANT:XX] sur la première résa seulement
-      let montant = 0;
+    Object.values(parEnfantMinute).forEach(({ prenom, resas }) => {
       const r0 = resas[0];
+      const nbMatin = resas.filter(r=>r.session==="matin").length;
+      const nbApmidi = resas.filter(r=>r.session==="apmidi").length;
+      const isJournee = nbMatin > 0 && nbApmidi > 0;
+      const nbJours = isJournee ? Math.round(resas.length/2) : resas.length;
+
+      let montant = 0;
       if (r0.montant) {
         montant = Number(r0.montant);
       } else {
         const match = (r0.label_jour||"").match(/\[MONTANT:(\d+)\]/);
         montant = match ? Number(match[1]) : 0;
       }
-      const sessionLabel = session === "matin" ? "☀️ Club de Plage — Matin" : "🌊 Club de Plage — Après-midi";
+
+      const sessionLabel = isJournee ? "☀️🌊 Club de Plage — Journée" : nbMatin > 0 ? "☀️ Club de Plage — Matin" : "🌊 Club de Plage — Après-midi";
       const enfantLabel = prenom !== "—" ? ` (${prenom})` : "";
       groupes.push({
         label: `${sessionLabel}${enfantLabel}`,
         montant,
-        detail: `${resas.length} jour${resas.length>1?"s":""}${prenom!=="—"?" · "+prenom:""}`
+        detail: `${nbJours} jour${nbJours>1?"s":""}${prenom!=="—"?" · "+prenom:""}`
       });
     });
     return groupes;
@@ -8369,7 +8375,7 @@ ${mpHtml}
                     <div style={{ width:22, height:22, borderRadius:6, background:sel?C.ocean:"#e0e0e0", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
                       {sel && <span style={{ color:"#fff", fontSize:13, fontWeight:900 }}>✓</span>}
                     </div>
-                    <div style={{ fontWeight:900, color:C.dark, fontSize:14 }}>{m.prenom} {(m.nom||"").toUpperCase()}</div>
+                    <div style={{ fontWeight:900, color:C.dark, fontSize:14 }}>{PRENOM(m.prenom)} {NOM(m.nom)}</div>
                   </div>
                   <div style={{ fontSize:11, color:"#aaa", marginBottom:4 }}>{m.email}</div>
                   {enfantsListe.length > 0 && (
@@ -8820,7 +8826,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                   <div key={m.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"9px 0", borderBottom:i<Math.min(dbMembres.length,5)-1?"1px solid #F0F4F8":"none" }}>
                     <div style={{ width:36, height:36, borderRadius:12, background:`linear-gradient(135deg,${C.ocean},${C.sea})`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, flexShrink:0 }}>👤</div>
                     <div style={{ flex:1 }}>
-                      <div style={{ fontWeight:800, color:"#2C3E50", fontSize:13 }}>{m.prenom} {NOM(m.nom)}</div>
+                      <div style={{ fontWeight:800, color:"#2C3E50", fontSize:13 }}>{PRENOM(m.prenom)} {NOM(m.nom)}</div>
                       <div style={{ fontSize:11, color:"#aaa" }}>{m.email}</div>
                     </div>
                     <Pill color={C.green}>✓</Pill>
@@ -8849,7 +8855,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:6 }}>
                             <div>
                               <div style={{ fontWeight:900, color:"#2C3E50", fontSize:13 }}>
-                                {g.membre ? `${g.membre.prenom} ${NOM(g.membre.nom)}` : "—"}
+                                {g.membre ? `${PRENOM(g.membre.prenom)} ${NOM(g.membre.nom)}` : "—"}
                               </div>
                               <div style={{ fontSize:11, color, fontWeight:700 }}>
                                 {g.type==="natation" ? `🏊 Natation · ${g.resas.length} séance${g.resas.length>1?"s":""}` : g.resas.some(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6) ? `🎟️ Carte Liberté · ${Number(g.resas[0]?.enfants?.[0])} demi-journées` : `🏖️ Club · ${g.resas.length} séance${g.resas.length>1?"s":""}`}
@@ -8977,7 +8983,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
                             <div>
                               <div style={{ fontWeight:900, color:"#2C3E50", fontSize:13 }}>
-                                {g.membre ? `${g.membre.prenom} ${NOM(g.membre.nom)}` : "—"}
+                                {g.membre ? `${PRENOM(g.membre.prenom)} ${NOM(g.membre.nom)}` : "—"}
                               </div>
                               <div style={{ fontSize:11, color, fontWeight:700, marginTop:2 }}>
                                 {g.type === "natation" ? `🏊 Natation · ${g.resas.length} séance${g.resas.length>1?"s":""}` : g.resas.some(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6) ? `🎟️ Carte Liberté · ${Number(g.resas[0]?.enfants?.[0])} demi-journées` : `🏖️ Club · ${g.resas.length} séance${g.resas.length>1?"s":""}`}
@@ -9744,7 +9750,7 @@ function ProfilConnecte({ user, setUser, setScreen, reservations }) {
       <Card style={{ marginTop:14 }}>
         <div style={{ textAlign:"center", marginBottom:16 }}>
           <div style={{ width:72, height:72, borderRadius:24, background:`linear-gradient(135deg,${C.ocean},${C.sea})`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:36, margin:"0 auto 12px" }}>👤</div>
-          <h2 style={{ color:C.dark, margin:"0 0 4px" }}>{user.prenom} {NOM(user.nom)}</h2>
+          <h2 style={{ color:C.dark, margin:"0 0 4px" }}>{PRENOM(user.prenom)} {NOM(user.nom)}</h2>
           <p style={{ color:"#888", fontSize:13, margin:"0 0 2px" }}>{user.email}</p>
           <p style={{ margin:0 }}><a href={`tel:${user.tel}`} style={{ color:C.ocean, fontWeight:700, textDecoration:"none", fontSize:13 }}>📞 {user.tel}</a></p>
         </div>
@@ -10228,4 +10234,4 @@ export default function App() {
     </div>
   );
 }
-// membres alpha + chart semaines + noms Fri Apr 10 00:09:47 CEST 2026
+// montants journee + noms Fri Apr 10 00:18:57 CEST 2026
