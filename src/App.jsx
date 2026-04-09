@@ -7536,14 +7536,12 @@ function ComptesTab({ dbMembres, dbResas, dbResasClub, onRefresh }) {
       return s + (n <= 10 ? (PRIX_NAT[n] || n*20) : 170+(n-10)*17);
     }, 0);
 
-    // Club : grouper par enfants + semaine (pour merger matin+apmidi journée)
+    // Club : grouper par enfants + montant (1 ligne par formule achetée)
     const clubGroups = {};
     resasClub.forEach(r => {
       const enfantsKey = Array.isArray(r.enfants) ? [...r.enfants].sort().join(",") : "";
-      const d = new Date((r.date_reservation||r.created_at||"").slice(0,10)+"T12:00:00");
-      const lundi = new Date(d); lundi.setDate(d.getDate() - ((d.getDay()+6)%7));
-      const semaineKey = lundi.toISOString().slice(0,10);
-      const k = `${enfantsKey}-${semaineKey}`;
+      const montantR = r.montant || ((r.label_jour||"").match(/\[MONTANT:(\d+)\]/)||[])[1] || "0";
+      const k = `${enfantsKey}-${montantR}`;
       if (!clubGroups[k]) clubGroups[k] = [];
       clubGroups[k].push(r);
     });
@@ -7735,13 +7733,12 @@ Document généré le ${new Date().toLocaleDateString("fr-FR")}
                   <div style={{ marginBottom:16 }}>
                     <div style={{ fontWeight:800, color:C.coral, fontSize:12, textTransform:"uppercase", marginBottom:8 }}>🏖️ Club de Plage</div>
                     {(() => {
-                      // Grouper par enfants+semaine pour merger matin+apmidi journée
+                      // Grouper par enfants+montant pour merger matin+apmidi journée
                       const groups = {};
                       compte.resasClub.forEach(r => {
                         const enfantsKey = Array.isArray(r.enfants) ? [...r.enfants].sort().join(",") : "";
-                        const d = new Date((r.date_reservation||r.created_at||"").slice(0,10)+"T12:00:00");
-                        const lundi = new Date(d); lundi.setDate(d.getDate() - ((d.getDay()+6)%7));
-                        const k = `${enfantsKey}-${lundi.toISOString().slice(0,10)}`;
+                        const montantR = r.montant || ((r.label_jour||"").match(/\[MONTANT:(\d+)\]/)||[])[1] || "0";
+                        const k = `${enfantsKey}-${montantR}`;
                         if (!groups[k]) groups[k] = [];
                         groups[k].push(r);
                       });
@@ -8005,45 +8002,33 @@ function FacturesTab({ dbMembres, dbResas, dbResasClub }) {
   const grouperClub = (resasClub, enfantsFilter = null) => {
     if (resasClub.length === 0) return [];
 
-    // Grouper par enfant + semaine (lundi de la semaine) pour merger matin+apmidi en journée
-    // car matin et apmidi peuvent avoir des created_at différentes
-    const parEnfantSemaine = {};
+    // Grouper par enfants + montant stocké → 1 ligne par formule achetée
+    const parEnfantsMontant = {};
     resasClub.forEach(r => {
-      const enfs = Array.isArray(r.enfants) && r.enfants.length > 0 ? r.enfants : ["—"];
-      // Clé = enfants + date tronquée à la semaine (lundi)
-      const d = new Date((r.date_reservation||r.created_at||"").slice(0,10)+"T12:00:00");
-      const lundi = new Date(d); lundi.setDate(d.getDate() - ((d.getDay()+6)%7));
-      const semaineKey = lundi.toISOString().slice(0,10);
       const enfantsStr = Array.isArray(r.enfants) ? [...r.enfants].sort().join(",") : "";
-      enfs.forEach(prenom => {
-        const k = `${prenom}__${semaineKey}__${enfantsStr}`;
-        if (!parEnfantSemaine[k]) parEnfantSemaine[k] = { prenom, semaineKey, resas: [] };
-        parEnfantSemaine[k].resas.push(r);
-      });
+      const montantR = r.montant || ((r.label_jour||"").match(/\[MONTANT:(\d+)\]/)||[])[1] || "0";
+      const k = `${enfantsStr}__${montantR}`;
+      if (!parEnfantsMontant[k]) parEnfantsMontant[k] = { enfantsStr, montantR, resas: [] };
+      parEnfantsMontant[k].resas.push(r);
     });
 
     const groupes = [];
-    Object.values(parEnfantSemaine).forEach(({ prenom, resas }) => {
+    Object.values(parEnfantsMontant).forEach(({ enfantsStr, montantR, resas }) => {
+      const prenom = enfantsStr || "—";
+      const r0 = resas[0];
       const r0 = resas[0];
       const nbMatin = resas.filter(r=>r.session==="matin").length;
       const nbApmidi = resas.filter(r=>r.session==="apmidi").length;
       const isJournee = nbMatin > 0 && nbApmidi > 0;
-      const nbJours = isJournee ? Math.round(resas.length/2) : resas.length;
-
-      let montant = 0;
-      if (r0.montant) {
-        montant = Number(r0.montant);
-      } else {
-        const match = (r0.label_jour||"").match(/\[MONTANT:(\d+)\]/);
-        montant = match ? Number(match[1]) : 0;
-      }
-
+      const nbJours = isJournee ? Math.max(nbMatin, nbApmidi) : resas.length;
+      const montant = Number(montantR) || 0;
+      const enfants = enfantsStr ? enfantsStr.split(",") : [];
       const sessionLabel = isJournee ? "☀️🌊 Club de Plage — Journée" : nbMatin > 0 ? "☀️ Club de Plage — Matin" : "🌊 Club de Plage — Après-midi";
-      const enfantLabel = prenom !== "—" ? ` (${prenom})` : "";
+      const enfantLabel = enfants.length > 0 ? ` (${enfants.join(", ")})` : "";
       groupes.push({
         label: `${sessionLabel}${enfantLabel}`,
         montant,
-        detail: `${nbJours} jour${nbJours>1?"s":""}${prenom!=="—"?" · "+prenom:""}`
+        detail: `${nbJours} jour${nbJours>1?"s":""}${enfants.length>0?" · "+enfants.join(", "):""}`
       });
     });
     return groupes;
@@ -10242,4 +10227,4 @@ export default function App() {
     </div>
   );
 }
-// facture montant semaine Fri Apr 10 00:25:25 CEST 2026
+// fix montant enfants montant Fri Apr 10 00:30:16 CEST 2026
