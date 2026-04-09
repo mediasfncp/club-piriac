@@ -2902,6 +2902,53 @@ function MesReservationsScreen({ onNav, user }) {
             </div>
           );
         })()}
+
+        {/* Bouton renvoyer le mail de confirmation */}
+        {(resasNat.length > 0 || resasClub.length > 0) && (
+          <div style={{ margin:"8px 0 16px", padding:"0 4px" }}>
+            <button onClick={async () => {
+              if (!user?.email) { alert("Aucun email associé à votre compte."); return; }
+              try {
+                const resp = await fetch("https://rnaosrftcntomehaepjh.supabase.co/functions/v1/send-email", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", "Authorization": "Bearer sb_publishable_n9m3QjIKt9OnyN_d8n9cAQ_VQpUpnOu" },
+                  body: JSON.stringify({
+                    type: "confirmation",
+                    to: user.email,
+                    toName: `${user.prenom} ${user.nom || ""}`.trim(),
+                    subject: "🏖️ Eole Beach Club — Rappel de votre demande de réservation",
+                    htmlContent: `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="font-family:Arial,sans-serif;color:#2C3E50;padding:30px;max-width:600px;margin:0 auto">
+                      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f0f4f8;padding:20px 0"><tr><td align="center">
+                      <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden">
+                      <tr><td style="background-color:#1A8FE3;padding:24px 28px">
+                        <p style="margin:0 0 4px;font-size:22px;font-weight:900;color:#ffffff">🏖️ Eole Beach Club</p>
+                        <p style="margin:0;font-size:13px;color:rgba(255,255,255,0.85)">Club de Plage · École de Natation · Piriac-sur-Mer · Saison 2026</p>
+                      </td></tr>
+                      <tr><td style="padding:24px 28px">
+                        <p style="font-size:14px;color:#2C3E50;line-height:1.7;margin:0 0 16px">Bonjour <strong>${user.prenom}</strong>,</p>
+                        <p style="font-size:14px;color:#2C3E50;line-height:1.7;margin:0 0 16px">Voici un rappel de votre demande de réservation pour la saison 2026 à l'Eole Beach Club.</p>
+                        <p style="font-size:14px;color:#2C3E50;line-height:1.7;margin:0 0 16px">Vous avez <strong>${resasNat.filter(r=>r.statut==="pending").length + resasClub.filter(r=>r.statut==="pending").length}</strong> réservation(s) en attente de validation.</p>
+                        <p style="font-size:13px;color:#555;line-height:1.8;margin:0 0 20px">Pour toute question :<br/>📞 07 67 78 69 22<br/>✉️ clubdeplage.piriacsurmer@hotmail.com</p>
+                        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                          <tr><td style="background:#F0F4F8;border-radius:10px;padding:14px;text-align:center;font-size:11px;color:#888;line-height:1.8">
+                            <strong>Eole Beach Club · Club de Plage / École de Natation</strong><br/>
+                            Plage Saint-Michel · 44420 Piriac-sur-Mer
+                          </td></tr>
+                        </table>
+                      </td></tr>
+                      </table></td></tr></table>
+                    </body></html>`,
+                  }),
+                });
+                const result = await resp.json();
+                if (result.success) alert(`✅ Mail de rappel envoyé à ${user.email}`);
+                else throw new Error(result.error);
+              } catch(e) { alert("Erreur : " + e.message); }
+            }} style={{ width:"100%", background:`${C.ocean}10`, border:`1.5px solid ${C.ocean}30`, color:C.ocean, borderRadius:14, padding:"12px", cursor:"pointer", fontWeight:800, fontSize:13, fontFamily:"inherit" }}>
+              📧 Renvoyer le mail de confirmation
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -8989,6 +9036,55 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                               cursor:"pointer", fontWeight:900, fontSize:12, fontFamily:"inherit",
                               boxShadow:`0 3px 10px ${C.green}44`, flexShrink:0, marginLeft:8,
                             }}>✅ Valider tout</button>
+                            {g.membre?.email && (
+                              <button onClick={async () => {
+                                const email = g.membre.email;
+                                const prenom = g.membre.prenom || "";
+                                const label = g.type === "natation"
+                                  ? `🏊 Natation · ${g.resas.length} séance${g.resas.length>1?"s":""}`
+                                  : `🏖️ Club · ${g.resas.length} séance${g.resas.length>1?"s":""}`;
+                                try {
+                                  const resp = await fetch("https://rnaosrftcntomehaepjh.supabase.co/functions/v1/send-email", {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json", "Authorization": "Bearer sb_publishable_n9m3QjIKt9OnyN_d8n9cAQ_VQpUpnOu" },
+                                    body: JSON.stringify({
+                                      type: "rappel",
+                                      to: email,
+                                      toName: `${prenom} ${NOM(g.membre.nom||"")}`.trim(),
+                                      subject: "🏖️ Eole Beach Club — Rappel pré-réservation en attente",
+                                      htmlContent: `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="font-family:Arial,sans-serif;color:#2C3E50;padding:0;margin:0;background:#f0f4f8">
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="padding:20px 0"><tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden">
+<tr><td style="background-color:#1A8FE3;padding:24px 28px">
+  <p style="margin:0 0 4px;font-size:22px;font-weight:900;color:#fff">🏖️ Eole Beach Club</p>
+  <p style="margin:0;font-size:13px;color:rgba(255,255,255,0.85)">Club de Plage · École de Natation · Piriac-sur-Mer · Saison 2026</p>
+</td></tr>
+<tr><td style="padding:24px 28px">
+  <p style="font-size:14px;color:#2C3E50;line-height:1.7;margin:0 0 16px">Bonjour <strong>${prenom}</strong>,</p>
+  <p style="font-size:14px;color:#2C3E50;line-height:1.7;margin:0 0 16px">Nous vous rappelons que votre pré-réservation suivante est en attente de paiement :</p>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:20px">
+    <tr><td style="background:#EEF8FF;border-left:4px solid #1A8FE3;border-radius:8px;padding:14px 16px">
+      <p style="margin:0;font-size:14px;font-weight:700;color:#1A8FE3">${label}</p>
+    </td></tr>
+  </table>
+  <p style="font-size:14px;color:#2C3E50;line-height:1.7;margin:0 0 16px">Pour finaliser votre inscription, merci de procéder au règlement selon l'un des modes suivants :<br/>🏦 Virement · ✉️ Chèque · 💶 Espèces · 🎫 Chèques vacances</p>
+  <p style="font-size:13px;color:#555;line-height:1.8;margin:0 0 20px">📞 07 67 78 69 22 · clubdeplage.piriacsurmer@hotmail.com</p>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr><td style="background:#F0F4F8;border-radius:10px;padding:14px;text-align:center;font-size:11px;color:#888;line-height:1.8">
+      <strong>Eole Beach Club · Club de Plage / École de Natation</strong><br/>
+      Plage Saint-Michel · Rue des Caps Horniers · 44420 Piriac-sur-Mer
+    </td></tr>
+  </table>
+</td></tr>
+</table></td></tr></table></body></html>`,
+                                    }),
+                                  });
+                                  const result = await resp.json();
+                                  if (result.success) alert(`✅ Mail envoyé à ${email}`);
+                                  else throw new Error(result.error);
+                                } catch(e) { alert("Erreur : " + e.message); }
+                              }} style={{ background:"#EEF8FF", border:"1.5px solid #1A8FE340", color:C.ocean, borderRadius:50, padding:"7px 12px", cursor:"pointer", fontWeight:900, fontSize:12, fontFamily:"inherit", flexShrink:0, marginLeft:4 }}>📧</button>
+                            )}
                             <button onClick={async () => {
                               if (!window.confirm(`Supprimer ${g.resas.length} réservation${g.resas.length>1?"s":""} ?`)) return;
                               const table = g.type === "natation" ? "reservations_natation" : "reservations_club";
@@ -10226,4 +10322,4 @@ export default function App() {
     </div>
   );
 }
-// fix r0 duplicate Fri Apr 10 00:32:28 CEST 2026
+// mail rappel par resa Fri Apr 10 00:42:22 CEST 2026
