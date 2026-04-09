@@ -15,6 +15,7 @@ import {
 
 // Helper — nom toujours en majuscules
 const NOM = (n) => (n || "").toUpperCase();
+const PRENOM = (p) => (p || "").charAt(0).toUpperCase() + (p || "").slice(1).toLowerCase();
 
 const C = {
   sun:    "#FFD93D",
@@ -4410,7 +4411,7 @@ function MembresTab({ allResas, dbMembres, onRefresh }) {
   };
 
   const membresSupabase = (dbMembres || []).map(m => ({
-    id: m.id, name: `${m.prenom} ${m.nom}`, prenom: m.prenom, nom: m.nom,
+    id: m.id, name: `${PRENOM(m.prenom)} ${NOM(m.nom)}`, prenom: PRENOM(m.prenom), nom: NOM(m.nom),
     email: m.email, phone: m.tel, tel: m.tel, tel2: m.tel2,
     adresse: m.adresse, ville: m.ville, cp: m.cp,
     adresse_vac: m.adresse_vac, ville_vac: m.ville_vac, cp_vac: m.cp_vac,
@@ -4420,7 +4421,22 @@ function MembresTab({ allResas, dbMembres, onRefresh }) {
     compte_solde: m.compte_solde || false,
   }));
 
-  const tousLesMembres = membresSupabase.length > 0 ? membresSupabase : MEMBRES;
+  const tousLesMembres = (membresSupabase.length > 0 ? membresSupabase : MEMBRES)
+    .sort((a, b) => (a.nom||"").localeCompare(b.nom||"", "fr"));
+
+  const [searchLettre, setSearchLettre] = useState("");
+  const [searchText, setSearchText] = useState("");
+
+  const lettres = [...new Set(tousLesMembres.map(m => (m.nom||"").charAt(0).toUpperCase()))].sort();
+
+  const filteredMembres = tousLesMembres.filter(m => {
+    if (searchLettre && (m.nom||"").charAt(0).toUpperCase() !== searchLettre) return false;
+    if (searchText) {
+      const q = searchText.toLowerCase();
+      return (m.nom||"").toLowerCase().includes(q) || (m.prenom||"").toLowerCase().includes(q) || (m.email||"").toLowerCase().includes(q);
+    }
+    return true;
+  });
 
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
@@ -4429,15 +4445,28 @@ function MembresTab({ allResas, dbMembres, onRefresh }) {
       {modifierMembre && <ModifierMembreModal membre={modifierMembre} onClose={() => setModifierMembre(null)} onSaved={() => { setModifierMembre(null); onRefresh?.(); }} />}
       {showCreer && <CreerMembreModal onClose={() => setShowCreer(false)} onSaved={() => { setShowCreer(false); onRefresh?.(); }} />}
 
+      {/* Header + recherche */}
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
-        <div style={{ fontWeight:900, color:"#2C3E50", fontSize:14 }}>{tousLesMembres.length} membre{tousLesMembres.length>1?"s":""} inscrit{tousLesMembres.length>1?"s":""}</div>
+        <div style={{ fontWeight:900, color:"#2C3E50", fontSize:14 }}>{filteredMembres.length} / {tousLesMembres.length} membre{tousLesMembres.length>1?"s":""}</div>
         <button onClick={() => setShowCreer(true)} style={{ background:`linear-gradient(135deg,${C.green},#1E8449)`, color:"#fff", border:"none", borderRadius:50, padding:"6px 14px", cursor:"pointer", fontWeight:900, fontSize:12, fontFamily:"inherit" }}>
           ➕ Nouveau membre
         </button>
       </div>
 
+      {/* Recherche texte */}
+      <input value={searchText} onChange={e => setSearchText(e.target.value)} placeholder="🔍 Rechercher par nom, prénom, email..."
+        style={{ border:"1.5px solid #e0e0e0", borderRadius:10, padding:"8px 12px", fontSize:13, fontFamily:"inherit", outline:"none", width:"100%", boxSizing:"border-box" }} />
+
+      {/* Filtre alphabet */}
+      <div style={{ display:"flex", flexWrap:"wrap", gap:4 }}>
+        <button onClick={() => setSearchLettre("")} style={{ background:searchLettre===""?C.ocean:"#f0f0f0", color:searchLettre===""?"#fff":"#888", border:"none", borderRadius:8, padding:"4px 10px", cursor:"pointer", fontWeight:800, fontSize:12, fontFamily:"inherit" }}>Tous</button>
+        {lettres.map(l => (
+          <button key={l} onClick={() => setSearchLettre(searchLettre===l?"":l)} style={{ background:searchLettre===l?C.ocean:"#f0f0f0", color:searchLettre===l?"#fff":"#555", border:"none", borderRadius:8, padding:"4px 10px", cursor:"pointer", fontWeight:800, fontSize:12, fontFamily:"inherit" }}>{l}</button>
+        ))}
+      </div>
+
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(280px, 1fr))", gap:10 }}>
-      {tousLesMembres.map((u, i) => (
+      {filteredMembres.map((u, i) => (
         <div key={u.id || i} style={{ background:"#fff", borderRadius:20, padding:"14px 16px", boxShadow:"0 4px 16px rgba(0,0,0,0.06)" }}>
           <div style={{ display:"flex", alignItems:"center", gap:14, cursor:"pointer" }} onClick={() => setSelectedMembre(u)}>
             <div style={{ width:50, height:50, borderRadius:18, background:`linear-gradient(135deg,${u.color},${u.color}bb)`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:24, flexShrink:0 }}>{u.av}</div>
@@ -4931,7 +4960,6 @@ function PaiementsTab({ onValidate }) {
 
       {/* ── CAHIER DE SUIVI ── */}
       {subTab === "suivi" && (() => {
-        // Grouper les résas confirmées par jour de validation
         const confirmedAll = allGroups.filter(g => g.statut === "confirmed");
         const parJour = {};
         confirmedAll.forEach(g => {
@@ -4942,12 +4970,55 @@ function PaiementsTab({ onValidate }) {
         });
         const jours = Object.keys(parJour).sort((a,b) => b.localeCompare(a));
 
+        // Calcul totaux par semaine et total saison
+        const getTotal = (groupes) => groupes.reduce((s,g) => {
+          const mode = g.resas.find(r=>r.mode_paiement)?.mode_paiement;
+          if (mode === "offert" || mode === "compte_fin_saison") return s;
+          return s + (Number(getMontant(g).replace(" €","").replace("—","0"))||0);
+        }, 0);
+
+        const parSemaine = {};
+        Object.entries(parJour).forEach(([date, groupes]) => {
+          const d = new Date(date+"T12:00:00");
+          const lundi = new Date(d);
+          lundi.setDate(d.getDate() - ((d.getDay()+6)%7));
+          const key = lundi.toISOString().slice(0,10);
+          if (!parSemaine[key]) parSemaine[key] = [];
+          parSemaine[key].push(...groupes);
+        });
+        const semaines = Object.entries(parSemaine).sort(([a],[b]) => a.localeCompare(b));
+        const totalSaison = semaines.reduce((s,[,g]) => s + getTotal(g), 0);
+        const maxSemaine = Math.max(...semaines.map(([,g]) => getTotal(g)), 1);
+
         if (jours.length === 0) return (
           <div style={{ textAlign:"center", padding:"32px 0", color:"#bbb", fontSize:14 }}>Aucun encaissement enregistré</div>
         );
 
         return (
           <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+
+            {/* Graphique par semaine */}
+            <div style={{ background:"#fff", borderRadius:16, padding:"16px 18px", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
+                <div style={{ fontWeight:800, color:C.dark, fontSize:13 }}>📊 Encaissements par semaine</div>
+                <div style={{ fontWeight:900, color:C.green, fontSize:16 }}>Total : {totalSaison} €</div>
+              </div>
+              <div style={{ display:"flex", gap:6, alignItems:"flex-end", height:80 }}>
+                {semaines.map(([lundi, groupes]) => {
+                  const total = getTotal(groupes);
+                  const pct = Math.round((total / maxSemaine) * 100);
+                  const d = new Date(lundi+"T12:00:00");
+                  const label = `${d.getDate()}/${d.getMonth()+1}`;
+                  return (
+                    <div key={lundi} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:3 }}>
+                      <div style={{ fontSize:9, color:C.green, fontWeight:800 }}>{total > 0 ? total+"€" : ""}</div>
+                      <div style={{ width:"100%", background:`linear-gradient(180deg,${C.green},#27AE60)`, borderRadius:"4px 4px 0 0", height:`${Math.max(pct,2)}%`, minHeight:total>0?4:0, transition:"height .3s" }} />
+                      <div style={{ fontSize:8, color:"#aaa", fontWeight:700, whiteSpace:"nowrap" }}>{label}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
             {jours.map(jour => {
               const groupes = parJour[jour];
               const totalJour = groupes.reduce((s,g) => {
@@ -10157,4 +10228,4 @@ export default function App() {
     </div>
   );
 }
-// compte fin saison exclus + enfants cahier Thu Apr  9 23:53:32 CEST 2026
+// membres alpha + chart semaines + noms Fri Apr 10 00:09:47 CEST 2026
