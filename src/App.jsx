@@ -8891,7 +8891,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                       const color = g.type === "natation" ? C.ocean : C.coral;
                       return (
                         <div key={gi} style={{ background:`${C.sun}08`, borderRadius:14, padding:"12px 14px", borderLeft:`4px solid ${C.sun}` }}>
-                          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:6 }}>
+                          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
                             <div>
                               <div style={{ fontWeight:900, color:"#2C3E50", fontSize:13 }}>
                                 {g.membre ? `${PRENOM(g.membre.prenom)} ${NOM(g.membre.nom)}` : "—"}
@@ -9019,7 +9019,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                       const color = g.type === "natation" ? C.ocean : C.coral;
                       return (
                         <div key={key} style={{ background:`${C.sun}08`, borderRadius:12, padding:"12px 14px", borderLeft:`3px solid ${C.sun}` }}>
-                          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
+                          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
                             <div>
                               <div style={{ fontWeight:900, color:"#2C3E50", fontSize:13 }}>
                                 {g.membre ? `${PRENOM(g.membre.prenom)} ${NOM(g.membre.nom)}` : "—"}
@@ -9069,6 +9069,18 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
   </table>
   <p style="font-size:14px;color:#2C3E50;line-height:1.7;margin:0 0 16px">Pour finaliser votre inscription, merci de procéder au règlement selon l'un des modes suivants :<br/>🏦 Virement · ✉️ Chèque · 💶 Espèces · 🎫 Chèques vacances</p>
   <p style="font-size:13px;color:#555;line-height:1.8;margin:0 0 20px">📞 07 67 78 69 22 · clubdeplage.piriacsurmer@hotmail.com</p>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:16px">
+    <tr><td style="background:#EFF6FF;border:1.5px solid #1A8FE3;border-radius:10px;padding:14px 16px">
+      <p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#1A8FE3">🏦 Coordonnées bancaires pour virement</p>
+      <table cellpadding="0" cellspacing="0" border="0" style="font-size:12px;color:#2C3E50;line-height:2">
+        <tr><td style="font-weight:700;padding-right:12px">Titulaire</td><td>SAUZEAU CHARLENE</td></tr>
+        <tr><td style="font-weight:700;padding-right:12px">IBAN</td><td>FR76 1027 8360 6600 0130 5200 228</td></tr>
+        <tr><td style="font-weight:700;padding-right:12px">BIC</td><td>CMCIFR2A</td></tr>
+      </table>
+      <p style="margin:8px 0 0;font-size:11px;color:#888">Le chèque est à libeller à l'ordre de : <strong>SAUZEAU Charlène</strong><br/>
+      En avant saison : Mme SAUZEAU Charlène · 4 allée des Roitelets · 44500 LA BAULE</p>
+    </td></tr>
+  </table>
   <table width="100%" cellpadding="0" cellspacing="0" border="0">
     <tr><td style="background:#F0F4F8;border-radius:10px;padding:14px;text-align:center;font-size:11px;color:#888;line-height:1.8">
       <strong>Eole Beach Club · Club de Plage / École de Natation</strong><br/>
@@ -9083,7 +9095,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                                   if (result.success) alert(`✅ Mail envoyé à ${email}`);
                                   else throw new Error(result.error);
                                 } catch(e) { alert("Erreur : " + e.message); }
-                              }} style={{ background:"#EEF8FF", border:"1.5px solid #1A8FE340", color:C.ocean, borderRadius:50, padding:"7px 12px", cursor:"pointer", fontWeight:900, fontSize:12, fontFamily:"inherit", flexShrink:0, marginLeft:4 }}>📧</button>
+                              }} style={{ background:"#EEF8FF", border:"1.5px solid #1A8FE340", color:C.ocean, borderRadius:50, padding:"7px 12px", cursor:"pointer", fontWeight:900, fontSize:12, fontFamily:"inherit", flexShrink:0, marginLeft:4 }}>📧 Renvoyer le mail</button>
                             )}
                             <button onClick={async () => {
                               if (!window.confirm(`Supprimer ${g.resas.length} réservation${g.resas.length>1?"s":""} ?`)) return;
@@ -10322,4 +10334,4 @@ export default function App() {
     </div>
   );
 }
-// mail rappel par resa Fri Apr 10 00:42:22 CEST 2026
+// align + mail rib Fri Apr 10 00:48:53 CEST 2026
