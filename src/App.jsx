@@ -7536,12 +7536,14 @@ function ComptesTab({ dbMembres, dbResas, dbResasClub, onRefresh }) {
       return s + (n <= 10 ? (PRIX_NAT[n] || n*20) : 170+(n-10)*17);
     }, 0);
 
-    // Club : r.montant une seule fois par groupe enfants+minute (matin+apmidi = même groupe pour journée)
+    // Club : grouper par enfants + semaine (pour merger matin+apmidi journée)
     const clubGroups = {};
     resasClub.forEach(r => {
       const enfantsKey = Array.isArray(r.enfants) ? [...r.enfants].sort().join(",") : "";
-      const minute = (r.created_at||"").slice(0,16);
-      const k = `${enfantsKey}-${minute}`; // sans session pour grouper journée
+      const d = new Date((r.date_reservation||r.created_at||"").slice(0,10)+"T12:00:00");
+      const lundi = new Date(d); lundi.setDate(d.getDate() - ((d.getDay()+6)%7));
+      const semaineKey = lundi.toISOString().slice(0,10);
+      const k = `${enfantsKey}-${semaineKey}`;
       if (!clubGroups[k]) clubGroups[k] = [];
       clubGroups[k].push(r);
     });
@@ -7733,12 +7735,13 @@ Document généré le ${new Date().toLocaleDateString("fr-FR")}
                   <div style={{ marginBottom:16 }}>
                     <div style={{ fontWeight:800, color:C.coral, fontSize:12, textTransform:"uppercase", marginBottom:8 }}>🏖️ Club de Plage</div>
                     {(() => {
-                      // Grouper par enfants+minute (sans session pour merger journée)
+                      // Grouper par enfants+semaine pour merger matin+apmidi journée
                       const groups = {};
                       compte.resasClub.forEach(r => {
                         const enfantsKey = Array.isArray(r.enfants) ? [...r.enfants].sort().join(",") : "";
-                        const minute = (r.created_at||"").slice(0,16);
-                        const k = `${enfantsKey}-${minute}`;
+                        const d = new Date((r.date_reservation||r.created_at||"").slice(0,10)+"T12:00:00");
+                        const lundi = new Date(d); lundi.setDate(d.getDate() - ((d.getDay()+6)%7));
+                        const k = `${enfantsKey}-${lundi.toISOString().slice(0,10)}`;
                         if (!groups[k]) groups[k] = [];
                         groups[k].push(r);
                       });
@@ -8002,20 +8005,25 @@ function FacturesTab({ dbMembres, dbResas, dbResasClub }) {
   const grouperClub = (resasClub, enfantsFilter = null) => {
     if (resasClub.length === 0) return [];
 
-    // Grouper par enfant + minute (sans session pour merger matin+apmidi en journée)
-    const parEnfantMinute = {};
+    // Grouper par enfant + semaine (lundi de la semaine) pour merger matin+apmidi en journée
+    // car matin et apmidi peuvent avoir des created_at différentes
+    const parEnfantSemaine = {};
     resasClub.forEach(r => {
       const enfs = Array.isArray(r.enfants) && r.enfants.length > 0 ? r.enfants : ["—"];
-      const minute = (r.created_at||"").slice(0,16);
+      // Clé = enfants + date tronquée à la semaine (lundi)
+      const d = new Date((r.date_reservation||r.created_at||"").slice(0,10)+"T12:00:00");
+      const lundi = new Date(d); lundi.setDate(d.getDate() - ((d.getDay()+6)%7));
+      const semaineKey = lundi.toISOString().slice(0,10);
+      const enfantsStr = Array.isArray(r.enfants) ? [...r.enfants].sort().join(",") : "";
       enfs.forEach(prenom => {
-        const k = `${prenom}__${minute}`;
-        if (!parEnfantMinute[k]) parEnfantMinute[k] = { prenom, minute, resas: [] };
-        parEnfantMinute[k].resas.push(r);
+        const k = `${prenom}__${semaineKey}__${enfantsStr}`;
+        if (!parEnfantSemaine[k]) parEnfantSemaine[k] = { prenom, semaineKey, resas: [] };
+        parEnfantSemaine[k].resas.push(r);
       });
     });
 
     const groupes = [];
-    Object.values(parEnfantMinute).forEach(({ prenom, resas }) => {
+    Object.values(parEnfantSemaine).forEach(({ prenom, resas }) => {
       const r0 = resas[0];
       const nbMatin = resas.filter(r=>r.session==="matin").length;
       const nbApmidi = resas.filter(r=>r.session==="apmidi").length;
@@ -10234,4 +10242,4 @@ export default function App() {
     </div>
   );
 }
-// montants journee + noms Fri Apr 10 00:18:57 CEST 2026
+// facture montant semaine Fri Apr 10 00:25:25 CEST 2026
