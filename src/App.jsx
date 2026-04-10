@@ -7473,6 +7473,8 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
                         </div>
                       </div>
                     ))}
+                  </div>
+                )}
                 {g.club.length > 0 && (
                   <div>
                     <div style={{ fontSize:10, fontWeight:900, color:C.coral, textTransform:"uppercase", marginBottom:6 }}>🏖️ Club de Plage</div>
