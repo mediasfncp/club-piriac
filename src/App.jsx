@@ -7681,9 +7681,9 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
                               await fetch("https://api.resend.com/emails", { method:"POST", headers:{"Authorization":"Bearer re_fncp_placeholder","Content-Type":"application/json"}, body: JSON.stringify({ from:"FNCP Club de Plage <noreply@fncp-club.fr>", to:email, subject:"🔔 Rappel : votre séance de natation", html }) });
                               alert(`🔔 Relance envoyée à ${email}`);
                             } catch(e) { alert("Simulation : relance envoyée à " + email); }
-                          }} style={{ background:"#FFF8E0", border:"1.5px solid #FFD93D60", color:"#b45309", borderRadius:8, width:28, height:28, cursor:"pointer", fontSize:13, fontFamily:"inherit", flexShrink:0 }} title="Relance">🔔</button>
+                          }} style={{ flex:1, background:"#FFF8E0", border:"1.5px solid #FFD93D60", color:"#b45309", borderRadius:8, padding:"5px 0", cursor:"pointer", fontSize:12, fontFamily:"inherit", fontWeight:700 }}>🔔 Relance</button>
                           <button onClick={() => { if(window.confirm("Supprimer ?")) supprimerResaNatation(r.id); }}
-                            style={{ background:"#FFF0F0", border:"none", color:C.sunset, borderRadius:8, width:28, height:28, cursor:"pointer", fontSize:13, fontFamily:"inherit", flexShrink:0 }}>🗑</button>
+                            style={{ background:"#FFF0F0", border:"none", color:C.sunset, borderRadius:8, padding:"5px 8px", cursor:"pointer", fontSize:13, fontFamily:"inherit" }}>🗑</button>
                         </div>
                       </div>
                     ))}
