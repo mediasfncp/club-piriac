@@ -7408,24 +7408,153 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
                   <div>
                     <div style={{ fontSize:10, fontWeight:900, color:C.ocean, textTransform:"uppercase", marginBottom:6 }}>🏊 Natation</div>
                     {g.nat.map(r => (
-                      <div key={r.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", background:`${C.ocean}08`, borderRadius:10, padding:"7px 10px", marginBottom:4, borderLeft:`3px solid ${r.statut==="pending"?C.sun:C.ocean}` }}>
-                        <div>
-                          <span style={{ fontWeight:800, color:C.dark, fontSize:12 }}>{r.heure}</span>
-                          <span style={{ color:"#aaa", fontSize:11, marginLeft:6 }}>{r.date_seance ? parseLocalDate(r.date_seance).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}) : "—"}</span>
-                          {r.enfants?.length > 0 && <span style={{ color:C.ocean, fontSize:10, marginLeft:6, fontWeight:700 }}>{enrichEnfants(r.enfants, r.membres).join(", ")}</span>}
-                          {r.created_at && <div style={{ fontSize:9, color:"#bbb", marginTop:2 }}>Envoyé le {new Date(r.created_at).toLocaleDateString("fr-FR",{day:"numeric",month:"short",year:"numeric"})}</div>}
-                        </div>
-                        <div style={{ display:"flex", gap:4, alignItems:"center" }}>
+                      <div key={r.id} style={{ background:`${C.ocean}08`, borderRadius:10, padding:"8px 10px", marginBottom:4, borderLeft:`3px solid ${r.statut==="pending"?C.sun:C.ocean}` }}>
+                        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:6 }}>
+                          <div>
+                            <span style={{ fontWeight:800, color:C.dark, fontSize:12 }}>{r.heure}</span>
+                            <span style={{ color:"#aaa", fontSize:11, marginLeft:6 }}>{r.date_seance ? parseLocalDate(r.date_seance).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}) : "—"}</span>
+                            {r.enfants?.length > 0 && <span style={{ color:C.ocean, fontSize:10, marginLeft:6, fontWeight:700 }}>{enrichEnfants(r.enfants, r.membres).join(", ")}</span>}
+                          </div>
                           {r.statut === "pending" ? (
                             <button onClick={() => setModePaiementConfirm({ resa:r, type:"natation" })}
-                              style={{ background:C.green, border:"none", color:"#fff", borderRadius:8, padding:"3px 8px", cursor:"pointer", fontWeight:900, fontSize:10, fontFamily:"inherit" }}>✅</button>
+                              style={{ background:C.green, border:"none", color:"#fff", borderRadius:8, padding:"3px 8px", cursor:"pointer", fontWeight:900, fontSize:10, fontFamily:"inherit", flexShrink:0 }}>✅ Valider</button>
                           ) : (
-                            <span style={{ fontSize:10, color:C.green, fontWeight:800, display:"flex", alignItems:"center", gap:3 }}>
-                              ✓{r.mode_paiement && <span style={{ fontSize:9, color:"#aaa" }}>{MODES_PAIEMENT.find(m=>m.id===r.mode_paiement)?.label.split(" ")[0]}</span>}
-                            </span>
+                            <span style={{ fontSize:10, color:C.green, fontWeight:800 }}>✓ {MODES_PAIEMENT?.find(m=>m.id===r.mode_paiement)?.label.split(" ")[0] || "Payé"}</span>
                           )}
+                        </div>
+                        <div style={{ display:"flex", gap:6 }}>
                           <button onClick={() => setModifierResa({ resa: r, type:"natation" })}
-                            style={{ background:`${C.ocean}15`, border:"none", color:C.ocean, borderRadius:8, width:28, height:28, cursor:"pointer", fontSize:13, fontFamily:"inherit", flexShrink:0 }} title="Modifier">✏️</button>
+                            style={{ flex:1, background:`${C.ocean}15`, border:"none", color:C.ocean, borderRadius:8, padding:"5px 0", cursor:"pointer", fontSize:12, fontFamily:"inherit", fontWeight:700 }}>✏️ Modifier</button>
+                          <button onClick={async () => {
+                            const email = g.membre?.email; if (!email) return alert("Email introuvable");
+                            const prenom = g.membre?.prenom || "";
+                            const dateStr = r.date_seance ? new Date(r.date_seance).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"}) : "—";
+                            const html = `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#f5f7fa;padding:20px">
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#fff;border-radius:16px;overflow:hidden">
+<tr><td style="background:linear-gradient(135deg,#1A8FE3,#4ECDC4);padding:28px 28px 20px;text-align:center">
+  <h1 style="color:#fff;margin:0;font-size:22px">✅ Confirmation de réservation</h1>
+  <p style="color:rgba(255,255,255,0.85);margin:6px 0 0;font-size:13px">Eole Beach Club · Piriac-sur-Mer</p>
+</td></tr>
+<tr><td style="padding:24px 28px">
+  <p style="font-size:14px;color:#2C3E50;line-height:1.7;margin:0 0 16px">Bonjour <strong>${prenom}</strong>,<br/>
+  Votre réservation de natation est bien enregistrée :</p>
+  <table width="100%" style="background:#EFF6FF;border-radius:10px;padding:14px;margin-bottom:20px">
+    <tr><td style="font-size:15px;font-weight:700;color:#1A8FE3">🏊 ${r.heure}</td></tr>
+    <tr><td style="font-size:13px;color:#555;margin-top:4px">${dateStr}</td></tr>
+    ${r.enfants?.length > 0 ? `<tr><td style="font-size:12px;color:#888;margin-top:4px">Enfants : ${r.enfants.join(", ")}</td></tr>` : ""}
+  </table>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:20px">
+    <tr><td style="background:#FFF9F0;border:2px solid #FFD93D;border-radius:12px;padding:18px 20px">
+      <p style="margin:0 0 10px;color:#b45309;font-size:14px;font-weight:700">💳 Comment régler votre inscription ?</p>
+      <p style="margin:0 0 12px;font-size:13px;color:#555;line-height:1.7">Vous pouvez régler selon les modes suivants :</p>
+      <table cellpadding="0" cellspacing="3" border="0" style="width:100%;margin-bottom:10px">
+        <tr>
+          <td style="background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:4px 8px;font-size:10px;font-weight:700;color:#555;text-align:center">🏦 Virement</td>
+          <td width="3"></td>
+          <td style="background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:4px 8px;font-size:10px;font-weight:700;color:#555;text-align:center">✉️ Chèque</td>
+          <td width="3"></td>
+          <td style="background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:4px 8px;font-size:10px;font-weight:700;color:#555;text-align:center">💶 Espèces</td>
+          <td width="3"></td>
+          <td style="background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:4px 8px;font-size:10px;font-weight:700;color:#555;text-align:center">🎫 Chèques vacances</td>
+        </tr>
+      </table>
+      <p style="margin:4px 0;font-size:11px;color:#e67e22;font-weight:700;font-style:italic">⚠️ Virement bancaire accepté jusqu'au 15 juin.</p>
+      <p style="margin:4px 0;font-size:12px;color:#888;line-height:1.8">
+        Pour le virement ou chèque, merci de préciser le nom de votre enfant en référence.<br/>
+        Le chèque est à libeller à l'ordre de : <strong>SAUZEAU Charlène</strong><br/>
+        En avant saison, à envoyer à : <strong>Mme SAUZEAU Charlène · 4 allée des Roitelets · 44500 LA BAULE</strong>
+      </p>
+      <table width="100%" style="margin-top:14px"><tr>
+        <td style="background:#EFF6FF;border:1.5px solid #1A8FE3;border-radius:10px;padding:14px 16px">
+          <p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#1A8FE3">🏦 Coordonnées bancaires pour virement</p>
+          <table style="font-size:12px;color:#2C3E50;line-height:2">
+            <tr><td style="font-weight:700;padding-right:12px">Titulaire</td><td>SAUZEAU CHARLENE</td></tr>
+            <tr><td style="font-weight:700;padding-right:12px">IBAN</td><td>FR76 1027 8360 6600 0130 5200 228</td></tr>
+            <tr><td style="font-weight:700;padding-right:12px">BIC</td><td>CMCIFR2A</td></tr>
+          </table>
+        </td>
+      </tr></table>
+    </td></tr>
+  </table>
+  <p style="font-size:13px;color:#888;text-align:center">À bientôt sur la plage ! 🌊<br/><strong>L'équipe Eole Beach Club</strong></p>
+</td></tr>
+<tr><td style="background:#F0F4F8;padding:14px;text-align:center;font-size:11px;color:#888;line-height:1.8">
+  <strong>Eole Beach Club · Club de Plage / École de Natation</strong><br/>
+  Plage Saint-Michel · Rue des Caps Horniers · 44420 Piriac-sur-Mer<br/>
+  📞 07 67 78 69 22 · clubdeplage.piriacsurmer@hotmail.com
+</td></tr>
+</table></body></html>`;
+                            try {
+                              await fetch("https://api.resend.com/emails", { method:"POST", headers:{"Authorization":"Bearer re_fncp_placeholder","Content-Type":"application/json"}, body: JSON.stringify({ from:"FNCP Club de Plage <noreply@fncp-club.fr>", to:email, subject:"✅ Confirmation de votre réservation natation", html }) });
+                              alert(`📧 Mail de confirmation envoyé à ${email}`);
+                            } catch(e) { alert("Simulation : mail de confirmation envoyé à " + email); }
+                          }} style={{ flex:1, background:"#EEF8FF", border:"1.5px solid #1A8FE360", color:C.ocean, borderRadius:8, padding:"5px 0", cursor:"pointer", fontSize:12, fontFamily:"inherit", fontWeight:700 }}>📧 Confirmation</button>
+                          <button onClick={async () => {
+                            const email = g.membre?.email; if (!email) return alert("Email introuvable");
+                            const prenom = g.membre?.prenom || "";
+                            const dateStr = r.date_seance ? new Date(r.date_seance).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"}) : "—";
+                            const html = `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#f5f7fa;padding:20px">
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#fff;border-radius:16px;overflow:hidden">
+<tr><td style="background:linear-gradient(135deg,#FF6B6B,#FF8E53);padding:28px 28px 20px;text-align:center">
+  <h1 style="color:#fff;margin:0;font-size:22px">🔔 Rappel de séance</h1>
+  <p style="color:rgba(255,255,255,0.85);margin:6px 0 0;font-size:13px">Eole Beach Club · Piriac-sur-Mer</p>
+</td></tr>
+<tr><td style="padding:24px 28px">
+  <p style="font-size:14px;color:#2C3E50;line-height:1.7;margin:0 0 16px">Bonjour <strong>${prenom}</strong>,<br/>
+  Nous vous rappelons votre séance de natation :</p>
+  <table width="100%" style="background:#EFF6FF;border-radius:10px;padding:14px;margin-bottom:20px">
+    <tr><td style="font-size:15px;font-weight:700;color:#1A8FE3">🏊 ${r.heure}</td></tr>
+    <tr><td style="font-size:13px;color:#555">${dateStr}</td></tr>
+  </table>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:20px">
+    <tr><td style="background:#FFF9F0;border:2px solid #FFD93D;border-radius:12px;padding:18px 20px">
+      <p style="margin:0 0 10px;color:#b45309;font-size:14px;font-weight:700">💳 Comment régler votre inscription ?</p>
+      <p style="margin:0 0 12px;font-size:13px;color:#555;line-height:1.7">Si ce n'est pas encore fait, vous pouvez régler selon les modes suivants :</p>
+      <table cellpadding="0" cellspacing="3" border="0" style="width:100%;margin-bottom:10px">
+        <tr>
+          <td style="background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:4px 8px;font-size:10px;font-weight:700;color:#555;text-align:center">🏦 Virement</td>
+          <td width="3"></td>
+          <td style="background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:4px 8px;font-size:10px;font-weight:700;color:#555;text-align:center">✉️ Chèque</td>
+          <td width="3"></td>
+          <td style="background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:4px 8px;font-size:10px;font-weight:700;color:#555;text-align:center">💶 Espèces</td>
+          <td width="3"></td>
+          <td style="background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:4px 8px;font-size:10px;font-weight:700;color:#555;text-align:center">🎫 Chèques vacances</td>
+        </tr>
+      </table>
+      <p style="margin:4px 0;font-size:11px;color:#e67e22;font-weight:700;font-style:italic">⚠️ Virement bancaire accepté jusqu'au 15 juin.</p>
+      <p style="margin:4px 0;font-size:12px;color:#888;line-height:1.8">
+        Pour le virement ou chèque, merci de préciser le nom de votre enfant en référence.<br/>
+        Le chèque est à libeller à l'ordre de : <strong>SAUZEAU Charlène</strong><br/>
+        En avant saison, à envoyer à : <strong>Mme SAUZEAU Charlène · 4 allée des Roitelets · 44500 LA BAULE</strong>
+      </p>
+      <table width="100%" style="margin-top:14px"><tr>
+        <td style="background:#EFF6FF;border:1.5px solid #1A8FE3;border-radius:10px;padding:14px 16px">
+          <p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#1A8FE3">🏦 Coordonnées bancaires pour virement</p>
+          <table style="font-size:12px;color:#2C3E50;line-height:2">
+            <tr><td style="font-weight:700;padding-right:12px">Titulaire</td><td>SAUZEAU CHARLENE</td></tr>
+            <tr><td style="font-weight:700;padding-right:12px">IBAN</td><td>FR76 1027 8360 6600 0130 5200 228</td></tr>
+            <tr><td style="font-weight:700;padding-right:12px">BIC</td><td>CMCIFR2A</td></tr>
+          </table>
+        </td>
+      </tr></table>
+    </td></tr>
+  </table>
+  <p style="font-size:13px;color:#888;text-align:center">N'oubliez pas le matériel de bain ! 🏊<br/><strong>L'équipe Eole Beach Club</strong></p>
+</td></tr>
+<tr><td style="background:#F0F4F8;padding:14px;text-align:center;font-size:11px;color:#888;line-height:1.8">
+  <strong>Eole Beach Club</strong><br/>Plage Saint-Michel · 44420 Piriac-sur-Mer · 📞 07 67 78 69 22
+</td></tr>
+</table></body></html>`;
+                            try {
+                              await fetch("https://api.resend.com/emails", { method:"POST", headers:{"Authorization":"Bearer re_fncp_placeholder","Content-Type":"application/json"}, body: JSON.stringify({ from:"FNCP Club de Plage <noreply@fncp-club.fr>", to:email, subject:"🔔 Rappel : votre séance de natation", html }) });
+                              alert(`🔔 Relance envoyée à ${email}`);
+                            } catch(e) { alert("Simulation : relance envoyée à " + email); }
+                          }} style={{ flex:1, background:"#FFF8E0", border:"1.5px solid #FFD93D60", color:"#b45309", borderRadius:8, padding:"5px 0", cursor:"pointer", fontSize:12, fontFamily:"inherit", fontWeight:700 }}>🔔 Relance</button>
+                          <button onClick={() => { if(window.confirm("Supprimer ?")) supprimerResaNatation(r.id); }}
+                            style={{ background:"#FFF0F0", border:"none", color:C.sunset, borderRadius:8, padding:"5px 8px", cursor:"pointer", fontSize:13, fontFamily:"inherit" }}>🗑</button>
+                        </div>
+                      </div>
+                    ))}
                           <button onClick={async () => {
                             const email = g.membre?.email; if (!email) return alert("Email introuvable");
                             const prenom = g.membre?.prenom || "";
@@ -7567,26 +7696,25 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
                       const isLiberte = !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6;
                       const isLib = (r.label_jour||"").startsWith("[LIBERTE]");
                       return (
-                        <div key={r.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", background:`${C.coral}08`, borderRadius:10, padding:"7px 10px", marginBottom:4, borderLeft:`3px solid ${r.statut==="pending"?C.sun:C.coral}` }}>
-                          <div>
-                            <span style={{ fontWeight:800, color:C.dark, fontSize:12 }}>
-                              {isLiberte ? `🎟️ Carte ${r.enfants[0]} demi-j.` : isLib ? "🎟️ Liberté" : r.session==="matin"?"☀️ Matin":"🌊 Après-midi"}
-                            </span>
-                            <span style={{ color:"#aaa", fontSize:11, marginLeft:6 }}>{r.date_reservation ? new Date(r.date_reservation).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}) : "—"}</span>
-                            {r.enfants?.length > 0 && !isLiberte && <span style={{ color:C.coral, fontSize:10, marginLeft:6, fontWeight:700 }}>{enrichEnfants(r.enfants, r.membres).join(", ")}</span>}
-                            {r.created_at && <div style={{ fontSize:9, color:"#bbb", marginTop:2 }}>Envoyé le {new Date(r.created_at).toLocaleDateString("fr-FR",{day:"numeric",month:"short",year:"numeric"})}</div>}
-                          </div>
-                          <div style={{ display:"flex", gap:4, alignItems:"center" }}>
+                        <div key={r.id} style={{ background:`${C.coral}08`, borderRadius:10, padding:"8px 10px", marginBottom:4, borderLeft:`3px solid ${r.statut==="pending"?C.sun:C.coral}` }}>
+                          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:6 }}>
+                            <div>
+                              <span style={{ fontWeight:800, color:C.dark, fontSize:12 }}>
+                                {isLiberte ? `🎟️ Carte ${r.enfants[0]} demi-j.` : isLib ? "🎟️ Liberté" : r.session==="matin"?"☀️ Matin":"🌊 Après-midi"}
+                              </span>
+                              <span style={{ color:"#aaa", fontSize:11, marginLeft:6 }}>{r.date_reservation ? new Date(r.date_reservation).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}) : "—"}</span>
+                              {r.enfants?.length > 0 && !isLiberte && <span style={{ color:C.coral, fontSize:10, marginLeft:6, fontWeight:700 }}>{enrichEnfants(r.enfants, r.membres).join(", ")}</span>}
+                            </div>
                             {r.statut === "pending" ? (
                               <button onClick={() => setModePaiementConfirm({ resa:r, type:"club" })}
-                                style={{ background:C.green, border:"none", color:"#fff", borderRadius:8, padding:"3px 8px", cursor:"pointer", fontWeight:900, fontSize:10, fontFamily:"inherit" }}>✅</button>
+                                style={{ background:C.green, border:"none", color:"#fff", borderRadius:8, padding:"3px 8px", cursor:"pointer", fontWeight:900, fontSize:10, fontFamily:"inherit", flexShrink:0 }}>✅ Valider</button>
                             ) : (
-                              <span style={{ fontSize:10, color:C.green, fontWeight:800, display:"flex", alignItems:"center", gap:3 }}>
-                                ✓{r.mode_paiement && <span style={{ fontSize:9, color:"#aaa" }}>{MODES_PAIEMENT.find(m=>m.id===r.mode_paiement)?.label.split(" ")[0]}</span>}
-                              </span>
+                              <span style={{ fontSize:10, color:C.green, fontWeight:800 }}>✓ {MODES_PAIEMENT?.find(m=>m.id===r.mode_paiement)?.label.split(" ")[0] || "Payé"}</span>
                             )}
+                          </div>
+                          <div style={{ display:"flex", gap:6 }}>
                             <button onClick={() => setModifierResa({ resa: r, type:"club" })}
-                              style={{ background:`${C.coral}15`, border:"none", color:C.coral, borderRadius:8, width:28, height:28, cursor:"pointer", fontSize:13, fontFamily:"inherit", flexShrink:0 }} title="Modifier">✏️</button>
+                              style={{ flex:1, background:`${C.coral}15`, border:"none", color:C.coral, borderRadius:8, padding:"5px 0", cursor:"pointer", fontSize:12, fontFamily:"inherit", fontWeight:700 }}>✏️ Modifier</button>
                             <button onClick={async () => {
                               const email = g.membre?.email; if (!email) return alert("Email introuvable");
                               const prenom = g.membre?.prenom || "";
@@ -7632,7 +7760,7 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
                                 await fetch("https://api.resend.com/emails", { method:"POST", headers:{"Authorization":"Bearer re_fncp_placeholder","Content-Type":"application/json"}, body: JSON.stringify({ from:"FNCP Club de Plage <noreply@fncp-club.fr>", to:email, subject:"✅ Confirmation de votre réservation Club de Plage", html }) });
                                 alert(`📧 Mail de confirmation envoyé à ${email}`);
                               } catch(e) { alert("Simulation : mail de confirmation envoyé à " + email); }
-                            }} style={{ background:"#EEF8FF", border:"1.5px solid #1A8FE360", color:C.ocean, borderRadius:8, width:28, height:28, cursor:"pointer", fontSize:13, fontFamily:"inherit", flexShrink:0 }} title="Mail de confirmation">📧</button>
+                            }} style={{ flex:1, background:"#EEF8FF", border:"1.5px solid #1A8FE360", color:C.ocean, borderRadius:8, padding:"5px 0", cursor:"pointer", fontSize:12, fontFamily:"inherit", fontWeight:700 }}>📧 Confirmation</button>
                             <button onClick={async () => {
                               const email = g.membre?.email; if (!email) return alert("Email introuvable");
                               const prenom = g.membre?.prenom || "";
@@ -7678,9 +7806,9 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
                                 await fetch("https://api.resend.com/emails", { method:"POST", headers:{"Authorization":"Bearer re_fncp_placeholder","Content-Type":"application/json"}, body: JSON.stringify({ from:"FNCP Club de Plage <noreply@fncp-club.fr>", to:email, subject:"🔔 Rappel : votre journée au Club de Plage", html }) });
                                 alert(`🔔 Relance envoyée à ${email}`);
                               } catch(e) { alert("Simulation : relance envoyée à " + email); }
-                            }} style={{ background:"#FFF8E0", border:"1.5px solid #FFD93D60", color:"#b45309", borderRadius:8, width:28, height:28, cursor:"pointer", fontSize:13, fontFamily:"inherit", flexShrink:0 }} title="Relance">🔔</button>
+                            }} style={{ flex:1, background:"#FFF8E0", border:"1.5px solid #FFD93D60", color:"#b45309", borderRadius:8, padding:"5px 0", cursor:"pointer", fontSize:12, fontFamily:"inherit", fontWeight:700 }}>🔔 Relance</button>
                             <button onClick={() => { if(window.confirm("Supprimer ?")) supprimerResaClub(r.id); }}
-                              style={{ background:"#FFF0F0", border:"none", color:C.sunset, borderRadius:8, width:28, height:28, cursor:"pointer", fontSize:13, fontFamily:"inherit", flexShrink:0 }}>🗑</button>
+                              style={{ background:"#FFF0F0", border:"none", color:C.sunset, borderRadius:8, padding:"5px 8px", cursor:"pointer", fontSize:13, fontFamily:"inherit" }}>🗑</button>
                           </div>
                         </div>
                       );
