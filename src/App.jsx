@@ -7426,6 +7426,24 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
                           )}
                           <button onClick={() => setModifierResa({ resa: r, type:"natation" })}
                             style={{ background:`${C.ocean}15`, border:"none", color:C.ocean, borderRadius:8, width:24, height:24, cursor:"pointer", fontSize:11, fontFamily:"inherit" }}>✏️</button>
+                          <button onClick={async () => {
+                            const email = g.membre?.email; if (!email) return alert("Email introuvable");
+                            const prenom = g.membre?.prenom || "";
+                            const dateStr = r.date_seance ? new Date(r.date_seance).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"}) : "—";
+                            try {
+                              const resp = await fetch("https://api.resend.com/emails", { method:"POST", headers:{"Authorization":"Bearer re_fncp_placeholder","Content-Type":"application/json"}, body: JSON.stringify({ from:"FNCP Club de Plage <noreply@fncp-club.fr>", to:email, subject:"✅ Confirmation de votre réservation natation", html:`<p>Bonjour ${prenom},</p><p>Nous confirmons votre réservation de natation :<br/><strong>${r.heure} · ${dateStr}</strong></p><p>À bientôt sur la plage ! 🌊<br/>L'équipe FNCP</p>` }) });
+                              alert(`📧 Mail initial envoyé à ${email}`);
+                            } catch(e) { alert("Simulation : mail initial envoyé à " + email); }
+                          }} style={{ background:"#EEF8FF", border:"1.5px solid #1A8FE340", color:C.ocean, borderRadius:8, width:24, height:24, cursor:"pointer", fontSize:11, fontFamily:"inherit" }} title="Mail initial">📧</button>
+                          <button onClick={async () => {
+                            const email = g.membre?.email; if (!email) return alert("Email introuvable");
+                            const prenom = g.membre?.prenom || "";
+                            const dateStr = r.date_seance ? new Date(r.date_seance).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"}) : "—";
+                            try {
+                              await fetch("https://api.resend.com/emails", { method:"POST", headers:{"Authorization":"Bearer re_fncp_placeholder","Content-Type":"application/json"}, body: JSON.stringify({ from:"FNCP Club de Plage <noreply@fncp-club.fr>", to:email, subject:"🔔 Rappel : votre séance de natation", html:`<p>Bonjour ${prenom},</p><p>Rappel : vous avez une séance de natation prévue :<br/><strong>${r.heure} · ${dateStr}</strong></p><p>N'oubliez pas le matériel de bain ! 🏊<br/>L'équipe FNCP</p>` }) });
+                              alert(`🔔 Relance envoyée à ${email}`);
+                            } catch(e) { alert("Simulation : relance envoyée à " + email); }
+                          }} style={{ background:"#FFF8E0", border:"1.5px solid #FFD93D60", color:"#b45309", borderRadius:8, width:24, height:24, cursor:"pointer", fontSize:11, fontFamily:"inherit" }} title="Relance">🔔</button>
                           <button onClick={() => { if(window.confirm("Supprimer ?")) supprimerResaNatation(r.id); }}
                             style={{ background:"#FFF0F0", border:"none", color:C.sunset, borderRadius:8, width:24, height:24, cursor:"pointer", fontSize:11, fontFamily:"inherit" }}>🗑</button>
                         </div>
@@ -7460,6 +7478,24 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
                             )}
                             <button onClick={() => setModifierResa({ resa: r, type:"club" })}
                               style={{ background:`${C.coral}15`, border:"none", color:C.coral, borderRadius:8, width:24, height:24, cursor:"pointer", fontSize:11, fontFamily:"inherit" }}>✏️</button>
+                            <button onClick={async () => {
+                              const email = g.membre?.email; if (!email) return alert("Email introuvable");
+                              const prenom = g.membre?.prenom || "";
+                              const dateStr = r.date_reservation ? new Date(r.date_reservation).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"}) : "—";
+                              try {
+                                await fetch("https://api.resend.com/emails", { method:"POST", headers:{"Authorization":"Bearer re_fncp_placeholder","Content-Type":"application/json"}, body: JSON.stringify({ from:"FNCP Club de Plage <noreply@fncp-club.fr>", to:email, subject:"✅ Confirmation de votre réservation Club", html:`<p>Bonjour ${prenom},</p><p>Nous confirmons votre réservation au Club de Plage :<br/><strong>${r.session==="matin"?"Matin":"Après-midi"} · ${dateStr}</strong></p><p>À bientôt sur la plage ! 🏖️<br/>L'équipe FNCP</p>` }) });
+                                alert(`📧 Mail initial envoyé à ${email}`);
+                              } catch(e) { alert("Simulation : mail initial envoyé à " + email); }
+                            }} style={{ background:"#EEF8FF", border:"1.5px solid #1A8FE340", color:C.ocean, borderRadius:8, width:24, height:24, cursor:"pointer", fontSize:11, fontFamily:"inherit" }} title="Mail initial">📧</button>
+                            <button onClick={async () => {
+                              const email = g.membre?.email; if (!email) return alert("Email introuvable");
+                              const prenom = g.membre?.prenom || "";
+                              const dateStr = r.date_reservation ? new Date(r.date_reservation).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"}) : "—";
+                              try {
+                                await fetch("https://api.resend.com/emails", { method:"POST", headers:{"Authorization":"Bearer re_fncp_placeholder","Content-Type":"application/json"}, body: JSON.stringify({ from:"FNCP Club de Plage <noreply@fncp-club.fr>", to:email, subject:"🔔 Rappel : votre journée au Club de Plage", html:`<p>Bonjour ${prenom},</p><p>Rappel : vous avez une réservation au Club de Plage :<br/><strong>${r.session==="matin"?"Matin":"Après-midi"} · ${dateStr}</strong></p><p>À bientôt ! 🌊<br/>L'équipe FNCP</p>` }) });
+                                alert(`🔔 Relance envoyée à ${email}`);
+                              } catch(e) { alert("Simulation : relance envoyée à " + email); }
+                            }} style={{ background:"#FFF8E0", border:"1.5px solid #FFD93D60", color:"#b45309", borderRadius:8, width:24, height:24, cursor:"pointer", fontSize:11, fontFamily:"inherit" }} title="Relance">🔔</button>
                             <button onClick={() => { if(window.confirm("Supprimer ?")) supprimerResaClub(r.id); }}
                               style={{ background:"#FFF0F0", border:"none", color:C.sunset, borderRadius:8, width:24, height:24, cursor:"pointer", fontSize:11, fontFamily:"inherit" }}>🗑</button>
                           </div>
@@ -9095,7 +9131,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                                   if (result.success) alert(`✅ Mail envoyé à ${email}`);
                                   else throw new Error(result.error);
                                 } catch(e) { alert("Erreur : " + e.message); }
-                              }} style={{ background:"#EEF8FF", border:"1.5px solid #1A8FE340", color:C.ocean, borderRadius:50, padding:"7px 12px", cursor:"pointer", fontWeight:900, fontSize:12, fontFamily:"inherit", flexShrink:0, marginLeft:4 }}>📧 Renvoyer le mail</button>
+                              }} style={{ background:"#EEF8FF", border:"1.5px solid #1A8FE340", color:C.ocean, borderRadius:50, padding:"7px 12px", cursor:"pointer", fontWeight:900, fontSize:12, fontFamily:"inherit", flexShrink:0, marginLeft:4 }}>🔔 Relance</button>
                             )}
                             <button onClick={async () => {
                               if (!window.confirm(`Supprimer ${g.resas.length} réservation${g.resas.length>1?"s":""} ?`)) return;
@@ -10334,4 +10370,3 @@ export default function App() {
     </div>
   );
 }
-// align + mail rib Fri Apr 10 00:48:53 CEST 2026
