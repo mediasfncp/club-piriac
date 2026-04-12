@@ -8762,7 +8762,7 @@ function EquipeTab() {
   const [saving, setSaving]       = useState(false);
   const [error, setError]         = useState("");
 
-  const emptyForm = { prenom:"", nom:"", poste:"maitre_nageur", email:"", telephone:"", contrat:"Saisonnier", date_debut:"2026-07-06", date_fin:"2026-08-22", horaires_matin:false, horaires_apmidi:false, jours:[], statut:"actif", notes:"" };
+  const emptyForm = { prenom:"", nom:"", poste:"maitre_nageur", email:"", telephone:"", contrat:"Saisonnier", date_debut:"2026-07-06", date_fin:"2026-08-22", horaires_matin:false, horaires_apmidi:false, jours:[], notes:"", carte_pro:"", diplome:"", date_recyclage_pse1:"" };
   const [form, setForm]           = useState(emptyForm);
 
   const load = async () => {
@@ -8824,9 +8824,6 @@ function EquipeTab() {
               <div>
                 <div style={{ color:"#fff", fontWeight:900, fontSize:20 }}>{PRENOM(emp.prenom)} {NOM(emp.nom)}</div>
                 <div style={{ color:"rgba(255,255,255,0.85)", fontSize:13 }}>{poste.label} · {emp.contrat}</div>
-                <div style={{ marginTop:6, display:"flex", gap:6, alignItems:"center" }}>
-                  <span style={{ background:"rgba(255,255,255,0.2)", color:"#fff", borderRadius:50, padding:"3px 12px", fontSize:12, fontWeight:800 }}>{statut.dot} {statut.label}</span>
-                </div>
               </div>
             </div>
           </div>
@@ -8845,23 +8842,14 @@ function EquipeTab() {
               <div style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:"1px solid #f5f5f5", fontSize:13 }}><span style={{ color:"#aaa" }}>Début</span><span style={{ fontWeight:700 }}>{emp.date_debut ? new Date(emp.date_debut).toLocaleDateString("fr-FR") : "—"}</span></div>
               <div style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", fontSize:13 }}><span style={{ color:"#aaa" }}>Fin</span><span style={{ fontWeight:700 }}>{emp.date_fin ? new Date(emp.date_fin).toLocaleDateString("fr-FR") : "—"}</span></div>
             </div>
-            {/* Planning */}
+            {/* Qualifications */}
             <div style={{ background:"#fff", borderRadius:16, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
-              <div style={{ fontWeight:800, color:"#2C3E50", fontSize:13, marginBottom:10 }}>🗓️ Planning hebdomadaire</div>
-              <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginBottom:10 }}>
-                {JOURS_IDS.map((j, i) => {
-                  const actif = (emp.jours || []).includes(j);
-                  return (
-                    <div key={j} style={{ background: actif ? `${poste.color}18` : "#f5f5f5", border:`2px solid ${actif ? poste.color : "#eee"}`, borderRadius:10, padding:"5px 10px", fontSize:12, fontWeight:800, color: actif ? poste.color : "#bbb" }}>
-                      {JOURS_SEMAINE[i]}
-                    </div>
-                  );
-                })}
-              </div>
-              <div style={{ display:"flex", gap:8 }}>
-                {emp.horaires_matin  && <span style={{ background:"#FFF4E8", color:"#FF8E53", borderRadius:50, padding:"4px 12px", fontSize:12, fontWeight:800 }}>☀️ Matin</span>}
-                {emp.horaires_apmidi && <span style={{ background:"#E8F4FF", color:C.ocean,  borderRadius:50, padding:"4px 12px", fontSize:12, fontWeight:800 }}>🌊 Après-midi</span>}
-              </div>
+              <div style={{ fontWeight:800, color:"#2C3E50", fontSize:13, marginBottom:10 }}>🎓 Qualifications</div>
+              {emp.carte_pro && <div style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:"1px solid #f5f5f5", fontSize:13 }}><span style={{ color:"#aaa" }}>🪪 Carte pro</span><span style={{ fontWeight:700 }}>{emp.carte_pro}</span></div>}
+              {emp.diplome && <div style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:"1px solid #f5f5f5", fontSize:13 }}><span style={{ color:"#aaa" }}>📜 Diplôme</span><span style={{ fontWeight:700 }}>{emp.diplome}</span></div>}
+              {(emp.poste === "maitre_nageur" || emp.poste === "bsaan") && emp.date_recyclage_pse1 && (
+                <div style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", fontSize:13 }}><span style={{ color:"#aaa" }}>♻️ Recyclage PSE1</span><span style={{ fontWeight:700, color: new Date(emp.date_recyclage_pse1) < new Date() ? C.sunset : C.green }}>{new Date(emp.date_recyclage_pse1).toLocaleDateString("fr-FR")}</span></div>
+              )}
             </div>
             {emp.notes && (
               <div style={{ background:"#FFFBEA", borderRadius:16, padding:"12px 16px", border:"1.5px solid #FFD93D40" }}>
@@ -8901,59 +8889,71 @@ function EquipeTab() {
             <div style={{ background:"#fff", borderRadius:16, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
               <div style={{ fontWeight:800, color:"#2C3E50", fontSize:13, marginBottom:10 }}>👤 Identité</div>
               <div style={{ display:"flex", gap:10, marginBottom:10 }}>
-                <div style={{ flex:1 }}><div style={{ fontSize:11, color:"#aaa", marginBottom:4 }}>Prénom *</div><FInput value={form.prenom} onChange={v => setForm(f => ({...f, prenom:v}))} placeholder="Prénom" /></div>
-                <div style={{ flex:1 }}><div style={{ fontSize:11, color:"#aaa", marginBottom:4 }}>Nom *</div><FInput value={form.nom} onChange={v => setForm(f => ({...f, nom:v}))} placeholder="NOM" /></div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:11, color:"#aaa", marginBottom:4 }}>Prénom *</div>
+                  <input type="text" value={form.prenom} onChange={e => setForm(f => ({...f, prenom:e.target.value}))} placeholder="Prénom" style={{ width:"100%", border:"2px solid #ddd", borderRadius:10, padding:"9px 12px", fontSize:14, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+                </div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:11, color:"#aaa", marginBottom:4 }}>Nom *</div>
+                  <input type="text" value={form.nom} onChange={e => setForm(f => ({...f, nom:e.target.value}))} placeholder="Nom" style={{ width:"100%", border:"2px solid #ddd", borderRadius:10, padding:"9px 12px", fontSize:14, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+                </div>
               </div>
-              {/* Poste */}
               <div style={{ fontSize:11, color:"#aaa", marginBottom:6 }}>Poste</div>
-              <div style={{ display:"flex", gap:6, marginBottom:10 }}>
+              <div style={{ display:"flex", gap:6 }}>
                 {POSTES.map(p => (
                   <button key={p.id} onClick={() => setForm(f => ({...f, poste:p.id}))} style={{ flex:1, background: form.poste===p.id ? `${p.color}18` : "#f5f5f5", border:`2px solid ${form.poste===p.id ? p.color : "#eee"}`, color: form.poste===p.id ? p.color : "#aaa", borderRadius:12, padding:"8px 4px", cursor:"pointer", fontWeight:900, fontSize:11, fontFamily:"inherit" }}>{p.emoji} {p.label.split(" ")[0]}</button>
-                ))}
-              </div>
-              {/* Statut */}
-              <div style={{ fontSize:11, color:"#aaa", marginBottom:6 }}>Statut</div>
-              <div style={{ display:"flex", gap:6 }}>
-                {STATUTS.map(s => (
-                  <button key={s.id} onClick={() => setForm(f => ({...f, statut:s.id}))} style={{ flex:1, background: form.statut===s.id ? `${s.color}18` : "#f5f5f5", border:`2px solid ${form.statut===s.id ? s.color : "#eee"}`, color: form.statut===s.id ? s.color : "#aaa", borderRadius:12, padding:"8px 4px", cursor:"pointer", fontWeight:900, fontSize:11, fontFamily:"inherit" }}>{s.dot} {s.label}</button>
                 ))}
               </div>
             </div>
             {/* Contact */}
             <div style={{ background:"#fff", borderRadius:16, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
               <div style={{ fontWeight:800, color:"#2C3E50", fontSize:13, marginBottom:10 }}>📞 Contact</div>
-              <div style={{ marginBottom:10 }}><div style={{ fontSize:11, color:"#aaa", marginBottom:4 }}>Email</div><FInput value={form.email} onChange={v => setForm(f => ({...f, email:v}))} placeholder="email@exemple.fr" /></div>
-              <div><div style={{ fontSize:11, color:"#aaa", marginBottom:4 }}>Téléphone</div><FInput value={form.telephone} onChange={v => setForm(f => ({...f, telephone:v}))} placeholder="06 00 00 00 00" /></div>
+              <div style={{ marginBottom:10 }}>
+                <div style={{ fontSize:11, color:"#aaa", marginBottom:4 }}>Email</div>
+                <input type="email" value={form.email} onChange={e => setForm(f => ({...f, email:e.target.value}))} placeholder="email@exemple.fr" style={{ width:"100%", border:"2px solid #ddd", borderRadius:10, padding:"9px 12px", fontSize:14, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+              </div>
+              <div>
+                <div style={{ fontSize:11, color:"#aaa", marginBottom:4 }}>Téléphone</div>
+                <input type="tel" value={form.telephone} onChange={e => setForm(f => ({...f, telephone:e.target.value}))} placeholder="06 00 00 00 00" style={{ width:"100%", border:"2px solid #ddd", borderRadius:10, padding:"9px 12px", fontSize:14, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+              </div>
             </div>
             {/* Contrat */}
             <div style={{ background:"#fff", borderRadius:16, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
               <div style={{ fontWeight:800, color:"#2C3E50", fontSize:13, marginBottom:10 }}>📄 Contrat</div>
               <div style={{ fontSize:11, color:"#aaa", marginBottom:6 }}>Type de contrat</div>
-              <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:12 }}>
+              <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:14 }}>
                 {CONTRATS.map(c => (
                   <button key={c} onClick={() => setForm(f => ({...f, contrat:c}))} style={{ background: form.contrat===c ? `${poste.color}18` : "#f5f5f5", border:`2px solid ${form.contrat===c ? poste.color : "#eee"}`, color: form.contrat===c ? poste.color : "#aaa", borderRadius:12, padding:"6px 14px", cursor:"pointer", fontWeight:800, fontSize:12, fontFamily:"inherit" }}>{c}</button>
                 ))}
               </div>
               <div style={{ display:"flex", gap:10 }}>
-                <div style={{ flex:1 }}><div style={{ fontSize:11, color:"#aaa", marginBottom:4 }}>Date de début</div><FInput value={form.date_debut} onChange={v => setForm(f => ({...f, date_debut:v}))} placeholder="2026-07-06" /></div>
-                <div style={{ flex:1 }}><div style={{ fontSize:11, color:"#aaa", marginBottom:4 }}>Date de fin</div><FInput value={form.date_fin} onChange={v => setForm(f => ({...f, date_fin:v}))} placeholder="2026-08-22" /></div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:11, color:"#aaa", marginBottom:4 }}>📅 Date de début</div>
+                  <input type="date" value={form.date_debut} onChange={e => setForm(f => ({...f, date_debut:e.target.value}))} style={{ width:"100%", border:"2px solid #ddd", borderRadius:10, padding:"9px 12px", fontSize:14, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+                </div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:11, color:"#aaa", marginBottom:4 }}>📅 Date de fin</div>
+                  <input type="date" value={form.date_fin} onChange={e => setForm(f => ({...f, date_fin:e.target.value}))} style={{ width:"100%", border:"2px solid #ddd", borderRadius:10, padding:"9px 12px", fontSize:14, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+                </div>
               </div>
             </div>
-            {/* Planning */}
+            {/* Qualifications */}
             <div style={{ background:"#fff", borderRadius:16, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
-              <div style={{ fontWeight:800, color:"#2C3E50", fontSize:13, marginBottom:10 }}>🗓️ Planning</div>
-              <div style={{ fontSize:11, color:"#aaa", marginBottom:8 }}>Jours de travail</div>
-              <div style={{ display:"flex", gap:6, marginBottom:12 }}>
-                {JOURS_IDS.map((j, i) => (
-                  <button key={j} onClick={() => toggleJour(j)} style={{ flex:1, background: form.jours.includes(j) ? `${poste.color}18` : "#f5f5f5", border:`2px solid ${form.jours.includes(j) ? poste.color : "#eee"}`, color: form.jours.includes(j) ? poste.color : "#bbb", borderRadius:10, padding:"7px 0", cursor:"pointer", fontWeight:900, fontSize:11, fontFamily:"inherit" }}>{JOURS_SEMAINE[i]}</button>
-                ))}
+              <div style={{ fontWeight:800, color:"#2C3E50", fontSize:13, marginBottom:10 }}>🎓 Qualifications</div>
+              <div style={{ marginBottom:10 }}>
+                <div style={{ fontSize:11, color:"#aaa", marginBottom:4 }}>🪪 N° Carte professionnelle</div>
+                <input type="text" value={form.carte_pro} onChange={e => setForm(f => ({...f, carte_pro:e.target.value}))} placeholder="Ex : BEESAN 12345" style={{ width:"100%", border:"2px solid #ddd", borderRadius:10, padding:"9px 12px", fontSize:14, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
               </div>
-              <div style={{ fontSize:11, color:"#aaa", marginBottom:8 }}>Horaires</div>
-              <div style={{ display:"flex", gap:8 }}>
-                {[["horaires_matin","☀️ Matin","#FF8E53"],["horaires_apmidi","🌊 Après-midi",C.ocean]].map(([k,l,col]) => (
-                  <button key={k} onClick={() => setForm(f => ({...f, [k]:!f[k]}))} style={{ flex:1, background: form[k] ? `${col}18` : "#f5f5f5", border:`2px solid ${form[k] ? col : "#eee"}`, color: form[k] ? col : "#bbb", borderRadius:12, padding:"9px", cursor:"pointer", fontWeight:900, fontSize:12, fontFamily:"inherit" }}>{l}</button>
-                ))}
+              <div style={{ marginBottom:10 }}>
+                <div style={{ fontSize:11, color:"#aaa", marginBottom:4 }}>📜 Diplôme</div>
+                <input type="text" value={form.diplome} onChange={e => setForm(f => ({...f, diplome:e.target.value}))} placeholder="Ex : BEESAN, BPJEPS AAN…" style={{ width:"100%", border:"2px solid #ddd", borderRadius:10, padding:"9px 12px", fontSize:14, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
               </div>
+              {(form.poste === "maitre_nageur" || form.poste === "bsaan") && (
+                <div>
+                  <div style={{ fontSize:11, color:"#aaa", marginBottom:4 }}>♻️ Date recyclage PSE1 (MNS)</div>
+                  <input type="date" value={form.date_recyclage_pse1} onChange={e => setForm(f => ({...f, date_recyclage_pse1:e.target.value}))} style={{ width:"100%", border:"2px solid #ddd", borderRadius:10, padding:"9px 12px", fontSize:14, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+                </div>
+              )}
             </div>
             {/* Notes */}
             <div style={{ background:"#fff", borderRadius:16, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
@@ -9013,76 +9013,24 @@ function EquipeTab() {
           <div style={{ fontSize:12, color:"#ccc", marginTop:4 }}>Cliquez sur ➕ pour ajouter</div>
         </div>
       ) : (
-        <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10 }}>
           {filtered.map(emp => {
-            const poste  = POSTE_INFO[emp.poste]  || POSTES[0];
-            const statut = STATUT_INFO[emp.statut] || STATUTS[0];
-            const joursActifs = (emp.jours||[]);
+            const poste = POSTE_INFO[emp.poste] || POSTES[0];
             return (
-              <div key={emp.id} onClick={() => setSelected(emp)} style={{ background:"#fff", borderRadius:18, padding:"14px 16px", boxShadow:"0 2px 10px rgba(0,0,0,0.05)", cursor:"pointer", display:"flex", alignItems:"center", gap:12, transition:"transform .15s" }}
+              <div key={emp.id} onClick={() => setSelected(emp)} style={{ background:"#fff", borderRadius:18, padding:"12px 10px", boxShadow:"0 2px 10px rgba(0,0,0,0.05)", cursor:"pointer", textAlign:"center", transition:"transform .15s" }}
                 onMouseEnter={e => e.currentTarget.style.transform="translateY(-2px)"}
                 onMouseLeave={e => e.currentTarget.style.transform=""}>
-                {/* Avatar */}
-                <div style={{ width:52, height:52, borderRadius:16, background:`linear-gradient(135deg,${poste.color},${poste.color}aa)`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:24, flexShrink:0 }}>{poste.emoji}</div>
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontWeight:900, color:"#2C3E50", fontSize:15 }}>{PRENOM(emp.prenom)} <span style={{ fontWeight:700 }}>{NOM(emp.nom)}</span></div>
-                  <div style={{ fontSize:11, color:"#aaa" }}>{poste.label} · {emp.contrat}</div>
-                  {/* Jours */}
-                  <div style={{ display:"flex", gap:3, marginTop:5, flexWrap:"wrap" }}>
-                    {JOURS_IDS.map((j, i) => (
-                      <span key={j} style={{ background: joursActifs.includes(j) ? `${poste.color}18` : "#f5f5f5", color: joursActifs.includes(j) ? poste.color : "#ccc", borderRadius:6, padding:"2px 6px", fontSize:10, fontWeight:800 }}>{JOURS_SEMAINE[i]}</span>
-                    ))}
-                  </div>
-                </div>
-                <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:8 }}>
-                  <button onClick={ev => { ev.stopPropagation(); toggleStatut(emp); }} style={{ background:`${statut.color}18`, border:`1.5px solid ${statut.color}40`, color:statut.color, borderRadius:50, padding:"4px 10px", fontWeight:800, fontSize:11, cursor:"pointer", fontFamily:"inherit", whiteSpace:"nowrap" }}>{statut.dot} {statut.label}</button>
-                  {(emp.horaires_matin || emp.horaires_apmidi) && (
-                    <div style={{ fontSize:10, color:"#bbb" }}>
-                      {emp.horaires_matin  && "☀️"}
-                      {emp.horaires_apmidi && "🌊"}
-                    </div>
-                  )}
-                </div>
+                <div style={{ width:44, height:44, borderRadius:14, background:`linear-gradient(135deg,${poste.color},${poste.color}aa)`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, margin:"0 auto 8px" }}>{poste.emoji}</div>
+                <div style={{ fontWeight:900, color:"#2C3E50", fontSize:12, lineHeight:1.3 }}>{PRENOM(emp.prenom)}</div>
+                <div style={{ fontWeight:700, color:"#2C3E50", fontSize:12 }}>{NOM(emp.nom)}</div>
+                <div style={{ fontSize:10, color:"#aaa", marginTop:3 }}>{poste.label.split(" ")[0]}</div>
+                {emp.carte_pro && <div style={{ fontSize:9, color:poste.color, fontWeight:700, marginTop:2 }}>🪪 {emp.carte_pro}</div>}
               </div>
             );
           })}
         </div>
       )}
 
-      {/* Planning semaine résumé */}
-      {employes.length > 0 && !loading && (
-        <div style={{ background:"#fff", borderRadius:18, overflow:"hidden", boxShadow:"0 2px 10px rgba(0,0,0,0.05)" }}>
-          <div style={{ padding:"12px 16px", background:"#F0F4F8" }}>
-            <div style={{ fontWeight:900, color:C.dark, fontSize:14 }}>🗓️ Vue semaine — Présences</div>
-          </div>
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(6,1fr)", background:"#F8FBFF" }}>
-            {JOURS_SEMAINE.map(j => (
-              <div key={j} style={{ textAlign:"center", padding:"8px 4px", fontSize:11, fontWeight:900, color:"#aaa", borderRight:"1px solid #F0F4F8" }}>{j}</div>
-            ))}
-          </div>
-          {POSTES.map(p => {
-            const empPoste = employes.filter(e => e.poste === p.id && e.statut === "actif");
-            if (empPoste.length === 0) return null;
-            return (
-              <div key={p.id}>
-                <div style={{ padding:"6px 14px", background:`${p.color}10`, fontSize:10, fontWeight:900, color:p.color }}>{p.emoji} {p.label}</div>
-                <div style={{ display:"grid", gridTemplateColumns:"repeat(6,1fr)" }}>
-                  {JOURS_IDS.map((j, ji) => {
-                    const present = empPoste.filter(e => (e.jours||[]).includes(j));
-                    return (
-                      <div key={j} style={{ textAlign:"center", padding:"8px 4px", borderRight:"1px solid #F0F4F8", borderBottom:"1px solid #F0F4F8" }}>
-                        {present.length > 0
-                          ? <div style={{ background:`${p.color}18`, color:p.color, borderRadius:8, padding:"4px 2px", fontSize:12, fontWeight:900 }}>{present.length}</div>
-                          : <div style={{ color:"#e0e0e0", fontSize:14 }}>—</div>}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 }
