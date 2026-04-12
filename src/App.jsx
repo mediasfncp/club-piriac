@@ -8868,19 +8868,18 @@ function EquipeTab() {
     );
   };
 
-  // ── Formulaire ajout/édition
-  const FormModal = () => {
-    const poste = POSTE_INFO[form.poste] || POSTES[0];
-    const toggleJour = (j) => setForm(f => ({ ...f, jours: f.jours.includes(j) ? f.jours.filter(x => x !== j) : [...f.jours, j] }));
-    return (
+// ── Formulaire employé (composant externe pour éviter recréation à chaque frappe)
+function EmployeFormModal({ form, setForm, editEmp, saving, error, onClose, onSave }) {
+  const poste = POSTE_INFO[form.poste] || POSTES[0];
+  return (
       <div style={{ position:"fixed", inset:0, zIndex:1000, display:"flex", flexDirection:"column" }}>
-        <div onClick={() => setShowForm(false)} style={{ position:"absolute", inset:0, background:"rgba(0,20,50,0.65)", backdropFilter:"blur(5px)" }} />
+        <div onClick={onClose} style={{ position:"absolute", inset:0, background:"rgba(0,20,50,0.65)", backdropFilter:"blur(5px)" }} />
         <div style={{ position:"relative", marginTop:"auto", background:"#F0F4F8", borderRadius:"28px 28px 0 0", maxHeight:"92vh", display:"flex", flexDirection:"column", boxShadow:"0 -12px 48px rgba(0,0,0,0.3)" }}>
           <div style={{ display:"flex", justifyContent:"center", padding:"12px 0 4px" }}>
             <div style={{ width:40, height:5, borderRadius:10, background:"#ddd" }} />
           </div>
           <div style={{ background:`linear-gradient(135deg,${poste.color},${poste.color}cc)`, margin:"0 16px", borderRadius:20, padding:"14px 18px", position:"relative" }}>
-            <button onClick={() => setShowForm(false)} style={{ position:"absolute", top:10, right:12, background:"rgba(255,255,255,0.25)", border:"none", color:"#fff", borderRadius:"50%", width:30, height:30, cursor:"pointer", fontWeight:900, fontSize:16, fontFamily:"inherit" }}>✕</button>
+            <button onClick={onClose} style={{ position:"absolute", top:10, right:12, background:"rgba(255,255,255,0.25)", border:"none", color:"#fff", borderRadius:"50%", width:30, height:30, cursor:"pointer", fontWeight:900, fontSize:16, fontFamily:"inherit" }}>✕</button>
             <div style={{ color:"#fff", fontWeight:900, fontSize:18 }}>{editEmp ? "✏️ Modifier" : "➕ Nouvel employé"}</div>
           </div>
           <div style={{ overflowY:"auto", padding:"14px 18px 32px", display:"flex", flexDirection:"column", gap:12 }}>
@@ -8960,14 +8959,14 @@ function EquipeTab() {
               <div style={{ fontWeight:800, color:"#2C3E50", fontSize:13, marginBottom:8 }}>📝 Notes</div>
               <textarea value={form.notes} onChange={e => setForm(f => ({...f, notes:e.target.value}))} placeholder="Informations complémentaires…" style={{ width:"100%", minHeight:70, border:"2px solid #eee", borderRadius:12, padding:"10px 12px", fontSize:13, fontFamily:"inherit", resize:"vertical", outline:"none", boxSizing:"border-box" }} />
             </div>
-            <SunBtn color={poste.color} full onClick={saveEmploye} disabled={saving}>
+            <SunBtn color={poste.color} full onClick={onSave} disabled={saving}>
               {saving ? "Enregistrement…" : editEmp ? "✅ Mettre à jour" : "✅ Ajouter l'employé"}
             </SunBtn>
           </div>
         </div>
       </div>
     );
-  };
+}
 
   // ── Render principal
   const aujourd = new Date().toLocaleDateString("fr-FR",{weekday:"long"}).slice(0,3).toLowerCase();
@@ -8976,7 +8975,17 @@ function EquipeTab() {
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
       {selected && <FicheModal emp={selected} />}
-      {showForm && <FormModal />}
+      {showForm && (
+        <EmployeFormModal
+          form={form}
+          setForm={setForm}
+          editEmp={editEmp}
+          saving={saving}
+          error={error}
+          onClose={() => setShowForm(false)}
+          onSave={saveEmploye}
+        />
+      )}
 
       {/* KPIs */}
       <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10 }}>
