@@ -4926,18 +4926,22 @@ function PaiementsTab({ onValidate }) {
       const nb = Number(g.resas[0]?.enfants?.[0]) || 0;
       return LIBERTE_PRIX[nb] ? `${LIBERTE_PRIX[nb]} €` : "—";
     }
-    // Chercher la commande_club correspondante :
-    // même membre + au moins une date en commun avec les résas du groupe
-    const membreId = g.resas[0]?.membre_id;
-    const datesGroupe = new Set(g.resas.map(r => r.date_reservation?.slice(0,10)).filter(Boolean));
-    const commande = commandesClub.find(c =>
-      c.membre_id === membreId &&
-      Array.isArray(c.dates) &&
-      c.dates.some(d => datesGroupe.has(d))
-    );
-    if (commande?.montant_total) return `${commande.montant_total} €`;
 
-    // Fallback : lire depuis TARIFS selon session + nbJours + nbEnfants
+    const membreId = g.resas[0]?.membre_id;
+    const minuteGroupe = (g.created_at||"").slice(0,16);
+
+    // Sommer TOUTES les commandes du même membre créées à la même minute
+    // (une commande par formule achetée dans le même panier)
+    const commandesGroupe = commandesClub.filter(c =>
+      c.membre_id === membreId &&
+      (c.created_at||"").slice(0,16) === minuteGroupe
+    );
+    if (commandesGroupe.length > 0) {
+      const total = commandesGroupe.reduce((s, c) => s + Number(c.montant_total || 0), 0);
+      return `${total} €`;
+    }
+
+    // Fallback pour anciennes résas sans commandes_club : TARIFS
     const resas = g.resas.filter(r => !(Array.isArray(r.enfants) && Number(r.enfants[0]) >= 6));
     if (resas.length === 0) return "—";
     const nbMatin  = resas.filter(r => r.session === "matin").length;
