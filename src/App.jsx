@@ -7398,14 +7398,13 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
                             <span style={{ fontSize:10, color:C.green, fontWeight:800 }}>✓ {MODES_PAIEMENT?.find(m=>m.id===r.mode_paiement)?.label.split(" ")[0] || "Payé"}</span>
                           )}
                         </div>
+                        {r.statut === "pending" && (
                         <div style={{ display:"flex", gap:6 }}>
-
                           <button onClick={async () => {
                             const email = g.membre?.email; if (!email) return alert("Email introuvable");
                             const prenom = g.membre?.prenom || "";
                             const dateStr = r.date_seance ? new Date(r.date_seance).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"}) : "—";
                             const html = genMailConfirmNat(prenom, r.heure, dateStr, r.enfants);
-
                             try {
                               await fetch("https://api.resend.com/emails", { method:"POST", headers:{"Authorization":"Bearer re_fncp_placeholder","Content-Type":"application/json"}, body: JSON.stringify({ from:"FNCP Club de Plage <noreply@fncp-club.fr>", to:email, subject:"✅ Confirmation de votre réservation natation", html }) });
                               alert(`📧 Mail de confirmation envoyé à ${email}`);
@@ -7416,7 +7415,6 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
                             const prenom = g.membre?.prenom || "";
                             const dateStr = r.date_seance ? new Date(r.date_seance).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"}) : "—";
                             const html = genMailRelanceNat(prenom, r.heure, dateStr);
-
                             try {
                               await fetch("https://api.resend.com/emails", { method:"POST", headers:{"Authorization":"Bearer re_fncp_placeholder","Content-Type":"application/json"}, body: JSON.stringify({ from:"FNCP Club de Plage <noreply@fncp-club.fr>", to:email, subject:"🔔 Rappel : votre séance de natation", html }) });
                               alert(`🔔 Relance envoyée à ${email}`);
@@ -7425,6 +7423,7 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
                           <button onClick={() => { if(window.confirm("Supprimer ?")) supprimerResaNatation(r.id); }}
                             style={{ background:"#FFF0F0", border:"none", color:C.sunset, borderRadius:8, padding:"5px 8px", cursor:"pointer", fontSize:13, fontFamily:"inherit" }}>🗑</button>
                         </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -7452,6 +7451,7 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
                               <span style={{ fontSize:10, color:C.green, fontWeight:800 }}>✓ {MODES_PAIEMENT?.find(m=>m.id===r.mode_paiement)?.label.split(" ")[0] || "Payé"}</span>
                             )}
                           </div>
+                          {r.statut === "pending" && (
                           <div style={{ display:"flex", gap:6 }}>
                             <button onClick={() => setModifierResa({ resa: r, type:"club" })}
                               style={{ flex:1, background:`${C.coral}15`, border:"none", color:C.coral, borderRadius:8, padding:"5px 0", cursor:"pointer", fontSize:12, fontFamily:"inherit", fontWeight:700 }}>✏️ Modifier</button>
@@ -7461,7 +7461,6 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
                               const dateStr = r.date_reservation ? new Date(r.date_reservation).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"}) : "—";
                               const session = r.session==="matin" ? "☀️ Matin" : "🌊 Après-midi";
                               const html = genMailConfirmClub(prenom, session, dateStr);
-
                               try {
                                 await fetch("https://api.resend.com/emails", { method:"POST", headers:{"Authorization":"Bearer re_fncp_placeholder","Content-Type":"application/json"}, body: JSON.stringify({ from:"FNCP Club de Plage <noreply@fncp-club.fr>", to:email, subject:"✅ Confirmation de votre réservation Club de Plage", html }) });
                                 alert(`📧 Mail de confirmation envoyé à ${email}`);
@@ -7473,7 +7472,6 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
                               const dateStr = r.date_reservation ? new Date(r.date_reservation).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"}) : "—";
                               const session = r.session==="matin" ? "☀️ Matin" : "🌊 Après-midi";
                               const html = genMailRelanceClub(prenom, session, dateStr);
-
                               try {
                                 await fetch("https://api.resend.com/emails", { method:"POST", headers:{"Authorization":"Bearer re_fncp_placeholder","Content-Type":"application/json"}, body: JSON.stringify({ from:"FNCP Club de Plage <noreply@fncp-club.fr>", to:email, subject:"🔔 Rappel : votre journée au Club de Plage", html }) });
                                 alert(`🔔 Relance envoyée à ${email}`);
@@ -7482,6 +7480,7 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
                             <button onClick={() => { if(window.confirm("Supprimer ?")) supprimerResaClub(r.id); }}
                               style={{ background:"#FFF0F0", border:"none", color:C.sunset, borderRadius:8, padding:"5px 8px", cursor:"pointer", fontSize:13, fontFamily:"inherit" }}>🗑</button>
                           </div>
+                          )}
                         </div>
                       );
                     })}
