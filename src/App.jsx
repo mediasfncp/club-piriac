@@ -8732,6 +8732,361 @@ ${mpHtml}
   );
 }
 
+// ── EQUIPE TAB ────────────────────────────────────────────
+const POSTES = [
+  { id: "maitre_nageur", label: "Maître-nageur",  emoji: "🏊", color: "#1A8FE3" },
+  { id: "animateur",     label: "Animateur",       emoji: "🏖️", color: "#FF8E53" },
+  { id: "admin",         label: "Administration",  emoji: "📋", color: "#6366F1" },
+];
+const JOURS_SEMAINE = ["Lun","Mar","Mer","Jeu","Ven","Sam"];
+const JOURS_IDS     = ["lun","mar","mer","jeu","ven","sam"];
+
+const POSTE_INFO = Object.fromEntries(POSTES.map(p => [p.id, p]));
+
+const STATUTS = [
+  { id: "actif",  label: "Actif",  color: "#6BCB77", dot: "🟢" },
+  { id: "conge",  label: "Congé",  color: "#FF9500", dot: "🟡" },
+  { id: "absent", label: "Absent", color: "#FF6B6B", dot: "🔴" },
+];
+const STATUT_INFO = Object.fromEntries(STATUTS.map(s => [s.id, s]));
+
+const CONTRATS = ["CDI","CDD","Saisonnier","Vacataire","Stagiaire"];
+
+function EquipeTab() {
+  const [employes, setEmployes]   = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [selected, setSelected]   = useState(null); // fiche ouverte
+  const [showForm, setShowForm]   = useState(false);
+  const [editEmp, setEditEmp]     = useState(null);
+  const [filterPoste, setFilterPoste] = useState("tous");
+  const [saving, setSaving]       = useState(false);
+  const [error, setError]         = useState("");
+
+  const emptyForm = { prenom:"", nom:"", poste:"maitre_nageur", email:"", telephone:"", contrat:"Saisonnier", date_debut:"2026-07-06", date_fin:"2026-08-22", horaires_matin:false, horaires_apmidi:false, jours:[], statut:"actif", notes:"" };
+  const [form, setForm]           = useState(emptyForm);
+
+  const load = async () => {
+    setLoading(true);
+    const { data } = await sb.from("employes").select("*").order("nom");
+    setEmployes(data || []);
+    setLoading(false);
+  };
+
+  useEffect(() => { load().catch(() => setLoading(false)); }, []);
+
+  const openNew = () => { setForm(emptyForm); setEditEmp(null); setShowForm(true); };
+  const openEdit = (e) => { setForm({ ...emptyForm, ...e, jours: e.jours || [] }); setEditEmp(e); setShowForm(true); setSelected(null); };
+
+  const saveEmploye = async () => {
+    if (!form.prenom.trim() || !form.nom.trim()) { setError("Prénom et nom requis"); return; }
+    setSaving(true); setError("");
+    const payload = { ...form, prenom: form.prenom.trim(), nom: form.nom.trim() };
+    if (editEmp) {
+      await sb.from("employes").update(payload).eq("id", editEmp.id);
+    } else {
+      await sb.from("employes").insert([payload]);
+    }
+    await load();
+    setSaving(false); setShowForm(false);
+  };
+
+  const deleteEmploye = async (id) => {
+    if (!window.confirm("Supprimer cet employé ?")) return;
+    await sb.from("employes").delete().eq("id", id);
+    setSelected(null); await load();
+  };
+
+  const toggleStatut = async (emp) => {
+    const next = emp.statut === "actif" ? "absent" : emp.statut === "absent" ? "conge" : "actif";
+    await sb.from("employes").update({ statut: next }).eq("id", emp.id);
+    setEmployes(prev => prev.map(e => e.id === emp.id ? { ...e, statut: next } : e));
+  };
+
+  const filtered = filterPoste === "tous" ? employes : employes.filter(e => e.poste === filterPoste);
+  const actifs   = employes.filter(e => e.statut === "actif").length;
+
+  // ── Fiche détail
+  const FicheModal = ({ emp }) => {
+    const poste  = POSTE_INFO[emp.poste] || POSTES[0];
+    const statut = STATUT_INFO[emp.statut] || STATUTS[0];
+    return (
+      <div style={{ position:"fixed", inset:0, zIndex:1000, display:"flex", flexDirection:"column" }}>
+        <div onClick={() => setSelected(null)} style={{ position:"absolute", inset:0, background:"rgba(0,20,50,0.65)", backdropFilter:"blur(5px)" }} />
+        <div style={{ position:"relative", marginTop:"auto", background:"#F0F4F8", borderRadius:"28px 28px 0 0", maxHeight:"90vh", display:"flex", flexDirection:"column", boxShadow:"0 -12px 48px rgba(0,0,0,0.3)" }}>
+          <div style={{ display:"flex", justifyContent:"center", padding:"12px 0 4px" }}>
+            <div style={{ width:40, height:5, borderRadius:10, background:"#ddd" }} />
+          </div>
+          {/* Header */}
+          <div style={{ background:`linear-gradient(135deg,${poste.color},${poste.color}cc)`, margin:"0 16px", borderRadius:20, padding:"16px 18px", position:"relative" }}>
+            <button onClick={() => setSelected(null)} style={{ position:"absolute", top:10, right:12, background:"rgba(255,255,255,0.25)", border:"none", color:"#fff", borderRadius:"50%", width:30, height:30, cursor:"pointer", fontWeight:900, fontSize:16, fontFamily:"inherit" }}>✕</button>
+            <div style={{ display:"flex", alignItems:"center", gap:14 }}>
+              <div style={{ width:60, height:60, borderRadius:18, background:"rgba(255,255,255,0.25)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:28, flexShrink:0 }}>{poste.emoji}</div>
+              <div>
+                <div style={{ color:"#fff", fontWeight:900, fontSize:20 }}>{PRENOM(emp.prenom)} {NOM(emp.nom)}</div>
+                <div style={{ color:"rgba(255,255,255,0.85)", fontSize:13 }}>{poste.label} · {emp.contrat}</div>
+                <div style={{ marginTop:6, display:"flex", gap:6, alignItems:"center" }}>
+                  <span style={{ background:"rgba(255,255,255,0.2)", color:"#fff", borderRadius:50, padding:"3px 12px", fontSize:12, fontWeight:800 }}>{statut.dot} {statut.label}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          {/* Body */}
+          <div style={{ overflowY:"auto", padding:"14px 18px 32px", display:"flex", flexDirection:"column", gap:12 }}>
+            {/* Contact */}
+            <div style={{ background:"#fff", borderRadius:16, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
+              <div style={{ fontWeight:800, color:"#2C3E50", fontSize:13, marginBottom:10 }}>📞 Contact</div>
+              {emp.email && <div style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:"1px solid #f5f5f5", fontSize:13 }}><span style={{ color:"#aaa" }}>Email</span><span style={{ fontWeight:700 }}>{emp.email}</span></div>}
+              {emp.telephone && <div style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", fontSize:13 }}><span style={{ color:"#aaa" }}>Tél.</span><span style={{ fontWeight:700 }}>{emp.telephone}</span></div>}
+            </div>
+            {/* Contrat */}
+            <div style={{ background:"#fff", borderRadius:16, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
+              <div style={{ fontWeight:800, color:"#2C3E50", fontSize:13, marginBottom:10 }}>📄 Contrat</div>
+              <div style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:"1px solid #f5f5f5", fontSize:13 }}><span style={{ color:"#aaa" }}>Type</span><span style={{ fontWeight:700 }}>{emp.contrat}</span></div>
+              <div style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:"1px solid #f5f5f5", fontSize:13 }}><span style={{ color:"#aaa" }}>Début</span><span style={{ fontWeight:700 }}>{emp.date_debut ? new Date(emp.date_debut).toLocaleDateString("fr-FR") : "—"}</span></div>
+              <div style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", fontSize:13 }}><span style={{ color:"#aaa" }}>Fin</span><span style={{ fontWeight:700 }}>{emp.date_fin ? new Date(emp.date_fin).toLocaleDateString("fr-FR") : "—"}</span></div>
+            </div>
+            {/* Planning */}
+            <div style={{ background:"#fff", borderRadius:16, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
+              <div style={{ fontWeight:800, color:"#2C3E50", fontSize:13, marginBottom:10 }}>🗓️ Planning hebdomadaire</div>
+              <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginBottom:10 }}>
+                {JOURS_IDS.map((j, i) => {
+                  const actif = (emp.jours || []).includes(j);
+                  return (
+                    <div key={j} style={{ background: actif ? `${poste.color}18` : "#f5f5f5", border:`2px solid ${actif ? poste.color : "#eee"}`, borderRadius:10, padding:"5px 10px", fontSize:12, fontWeight:800, color: actif ? poste.color : "#bbb" }}>
+                      {JOURS_SEMAINE[i]}
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{ display:"flex", gap:8 }}>
+                {emp.horaires_matin  && <span style={{ background:"#FFF4E8", color:"#FF8E53", borderRadius:50, padding:"4px 12px", fontSize:12, fontWeight:800 }}>☀️ Matin</span>}
+                {emp.horaires_apmidi && <span style={{ background:"#E8F4FF", color:C.ocean,  borderRadius:50, padding:"4px 12px", fontSize:12, fontWeight:800 }}>🌊 Après-midi</span>}
+              </div>
+            </div>
+            {emp.notes && (
+              <div style={{ background:"#FFFBEA", borderRadius:16, padding:"12px 16px", border:"1.5px solid #FFD93D40" }}>
+                <div style={{ fontWeight:800, color:"#2C3E50", fontSize:12, marginBottom:6 }}>📝 Notes</div>
+                <div style={{ fontSize:13, color:"#555" }}>{emp.notes}</div>
+              </div>
+            )}
+            {/* Actions */}
+            <div style={{ display:"flex", gap:10 }}>
+              <button onClick={() => openEdit(emp)} style={{ flex:1, background:`${poste.color}15`, border:`2px solid ${poste.color}40`, color:poste.color, borderRadius:14, padding:"12px", fontWeight:900, fontSize:14, cursor:"pointer", fontFamily:"inherit" }}>✏️ Modifier</button>
+              <button onClick={() => deleteEmploye(emp.id)} style={{ background:"#FFF0F0", border:"2px solid #FF6B6B40", color:"#FF6B6B", borderRadius:14, padding:"12px 16px", fontWeight:900, fontSize:14, cursor:"pointer", fontFamily:"inherit" }}>🗑️</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ── Formulaire ajout/édition
+  const FormModal = () => {
+    const poste = POSTE_INFO[form.poste] || POSTES[0];
+    const toggleJour = (j) => setForm(f => ({ ...f, jours: f.jours.includes(j) ? f.jours.filter(x => x !== j) : [...f.jours, j] }));
+    return (
+      <div style={{ position:"fixed", inset:0, zIndex:1000, display:"flex", flexDirection:"column" }}>
+        <div onClick={() => setShowForm(false)} style={{ position:"absolute", inset:0, background:"rgba(0,20,50,0.65)", backdropFilter:"blur(5px)" }} />
+        <div style={{ position:"relative", marginTop:"auto", background:"#F0F4F8", borderRadius:"28px 28px 0 0", maxHeight:"92vh", display:"flex", flexDirection:"column", boxShadow:"0 -12px 48px rgba(0,0,0,0.3)" }}>
+          <div style={{ display:"flex", justifyContent:"center", padding:"12px 0 4px" }}>
+            <div style={{ width:40, height:5, borderRadius:10, background:"#ddd" }} />
+          </div>
+          <div style={{ background:`linear-gradient(135deg,${poste.color},${poste.color}cc)`, margin:"0 16px", borderRadius:20, padding:"14px 18px", position:"relative" }}>
+            <button onClick={() => setShowForm(false)} style={{ position:"absolute", top:10, right:12, background:"rgba(255,255,255,0.25)", border:"none", color:"#fff", borderRadius:"50%", width:30, height:30, cursor:"pointer", fontWeight:900, fontSize:16, fontFamily:"inherit" }}>✕</button>
+            <div style={{ color:"#fff", fontWeight:900, fontSize:18 }}>{editEmp ? "✏️ Modifier" : "➕ Nouvel employé"}</div>
+          </div>
+          <div style={{ overflowY:"auto", padding:"14px 18px 32px", display:"flex", flexDirection:"column", gap:12 }}>
+            {error && <div style={{ background:"#FFF0F0", color:"#e74c3c", borderRadius:12, padding:"10px 14px", fontSize:13, fontWeight:700 }}>⚠️ {error}</div>}
+            {/* Identité */}
+            <div style={{ background:"#fff", borderRadius:16, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
+              <div style={{ fontWeight:800, color:"#2C3E50", fontSize:13, marginBottom:10 }}>👤 Identité</div>
+              <div style={{ display:"flex", gap:10, marginBottom:10 }}>
+                <div style={{ flex:1 }}><div style={{ fontSize:11, color:"#aaa", marginBottom:4 }}>Prénom *</div><FInput value={form.prenom} onChange={v => setForm(f => ({...f, prenom:v}))} placeholder="Prénom" /></div>
+                <div style={{ flex:1 }}><div style={{ fontSize:11, color:"#aaa", marginBottom:4 }}>Nom *</div><FInput value={form.nom} onChange={v => setForm(f => ({...f, nom:v}))} placeholder="NOM" /></div>
+              </div>
+              {/* Poste */}
+              <div style={{ fontSize:11, color:"#aaa", marginBottom:6 }}>Poste</div>
+              <div style={{ display:"flex", gap:6, marginBottom:10 }}>
+                {POSTES.map(p => (
+                  <button key={p.id} onClick={() => setForm(f => ({...f, poste:p.id}))} style={{ flex:1, background: form.poste===p.id ? `${p.color}18` : "#f5f5f5", border:`2px solid ${form.poste===p.id ? p.color : "#eee"}`, color: form.poste===p.id ? p.color : "#aaa", borderRadius:12, padding:"8px 4px", cursor:"pointer", fontWeight:900, fontSize:11, fontFamily:"inherit" }}>{p.emoji} {p.label.split(" ")[0]}</button>
+                ))}
+              </div>
+              {/* Statut */}
+              <div style={{ fontSize:11, color:"#aaa", marginBottom:6 }}>Statut</div>
+              <div style={{ display:"flex", gap:6 }}>
+                {STATUTS.map(s => (
+                  <button key={s.id} onClick={() => setForm(f => ({...f, statut:s.id}))} style={{ flex:1, background: form.statut===s.id ? `${s.color}18` : "#f5f5f5", border:`2px solid ${form.statut===s.id ? s.color : "#eee"}`, color: form.statut===s.id ? s.color : "#aaa", borderRadius:12, padding:"8px 4px", cursor:"pointer", fontWeight:900, fontSize:11, fontFamily:"inherit" }}>{s.dot} {s.label}</button>
+                ))}
+              </div>
+            </div>
+            {/* Contact */}
+            <div style={{ background:"#fff", borderRadius:16, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
+              <div style={{ fontWeight:800, color:"#2C3E50", fontSize:13, marginBottom:10 }}>📞 Contact</div>
+              <div style={{ marginBottom:10 }}><div style={{ fontSize:11, color:"#aaa", marginBottom:4 }}>Email</div><FInput value={form.email} onChange={v => setForm(f => ({...f, email:v}))} placeholder="email@exemple.fr" /></div>
+              <div><div style={{ fontSize:11, color:"#aaa", marginBottom:4 }}>Téléphone</div><FInput value={form.telephone} onChange={v => setForm(f => ({...f, telephone:v}))} placeholder="06 00 00 00 00" /></div>
+            </div>
+            {/* Contrat */}
+            <div style={{ background:"#fff", borderRadius:16, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
+              <div style={{ fontWeight:800, color:"#2C3E50", fontSize:13, marginBottom:10 }}>📄 Contrat</div>
+              <div style={{ fontSize:11, color:"#aaa", marginBottom:6 }}>Type de contrat</div>
+              <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:12 }}>
+                {CONTRATS.map(c => (
+                  <button key={c} onClick={() => setForm(f => ({...f, contrat:c}))} style={{ background: form.contrat===c ? `${poste.color}18` : "#f5f5f5", border:`2px solid ${form.contrat===c ? poste.color : "#eee"}`, color: form.contrat===c ? poste.color : "#aaa", borderRadius:12, padding:"6px 14px", cursor:"pointer", fontWeight:800, fontSize:12, fontFamily:"inherit" }}>{c}</button>
+                ))}
+              </div>
+              <div style={{ display:"flex", gap:10 }}>
+                <div style={{ flex:1 }}><div style={{ fontSize:11, color:"#aaa", marginBottom:4 }}>Date de début</div><FInput value={form.date_debut} onChange={v => setForm(f => ({...f, date_debut:v}))} placeholder="2026-07-06" /></div>
+                <div style={{ flex:1 }}><div style={{ fontSize:11, color:"#aaa", marginBottom:4 }}>Date de fin</div><FInput value={form.date_fin} onChange={v => setForm(f => ({...f, date_fin:v}))} placeholder="2026-08-22" /></div>
+              </div>
+            </div>
+            {/* Planning */}
+            <div style={{ background:"#fff", borderRadius:16, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
+              <div style={{ fontWeight:800, color:"#2C3E50", fontSize:13, marginBottom:10 }}>🗓️ Planning</div>
+              <div style={{ fontSize:11, color:"#aaa", marginBottom:8 }}>Jours de travail</div>
+              <div style={{ display:"flex", gap:6, marginBottom:12 }}>
+                {JOURS_IDS.map((j, i) => (
+                  <button key={j} onClick={() => toggleJour(j)} style={{ flex:1, background: form.jours.includes(j) ? `${poste.color}18` : "#f5f5f5", border:`2px solid ${form.jours.includes(j) ? poste.color : "#eee"}`, color: form.jours.includes(j) ? poste.color : "#bbb", borderRadius:10, padding:"7px 0", cursor:"pointer", fontWeight:900, fontSize:11, fontFamily:"inherit" }}>{JOURS_SEMAINE[i]}</button>
+                ))}
+              </div>
+              <div style={{ fontSize:11, color:"#aaa", marginBottom:8 }}>Horaires</div>
+              <div style={{ display:"flex", gap:8 }}>
+                {[["horaires_matin","☀️ Matin","#FF8E53"],["horaires_apmidi","🌊 Après-midi",C.ocean]].map(([k,l,col]) => (
+                  <button key={k} onClick={() => setForm(f => ({...f, [k]:!f[k]}))} style={{ flex:1, background: form[k] ? `${col}18` : "#f5f5f5", border:`2px solid ${form[k] ? col : "#eee"}`, color: form[k] ? col : "#bbb", borderRadius:12, padding:"9px", cursor:"pointer", fontWeight:900, fontSize:12, fontFamily:"inherit" }}>{l}</button>
+                ))}
+              </div>
+            </div>
+            {/* Notes */}
+            <div style={{ background:"#fff", borderRadius:16, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
+              <div style={{ fontWeight:800, color:"#2C3E50", fontSize:13, marginBottom:8 }}>📝 Notes</div>
+              <textarea value={form.notes} onChange={e => setForm(f => ({...f, notes:e.target.value}))} placeholder="Informations complémentaires…" style={{ width:"100%", minHeight:70, border:"2px solid #eee", borderRadius:12, padding:"10px 12px", fontSize:13, fontFamily:"inherit", resize:"vertical", outline:"none", boxSizing:"border-box" }} />
+            </div>
+            <SunBtn color={poste.color} full onClick={saveEmploye} disabled={saving}>
+              {saving ? "Enregistrement…" : editEmp ? "✅ Mettre à jour" : "✅ Ajouter l'employé"}
+            </SunBtn>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ── Render principal
+  const aujourd = new Date().toLocaleDateString("fr-FR",{weekday:"long"}).slice(0,3).toLowerCase();
+  const presentAujourd = employes.filter(e => e.statut==="actif" && (e.jours||[]).includes(aujourd));
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+      {selected && <FicheModal emp={selected} />}
+      {showForm && <FormModal />}
+
+      {/* KPIs */}
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10 }}>
+        {[
+          { label:"Total équipe",   val:employes.length,        color:"#6366F1", emoji:"👨‍💼" },
+          { label:"Actifs saison",  val:actifs,                  color:C.green,   emoji:"🟢" },
+          { label:"Présents auj.", val:presentAujourd.length,   color:C.ocean,   emoji:"📍" },
+        ].map(k => (
+          <div key={k.label} style={{ background:"#fff", borderRadius:18, padding:"14px 12px", boxShadow:"0 2px 10px rgba(0,0,0,0.06)", textAlign:"center" }}>
+            <div style={{ fontSize:22 }}>{k.emoji}</div>
+            <div style={{ fontWeight:900, fontSize:24, color:k.color, lineHeight:1.1, marginTop:4 }}>{k.val}</div>
+            <div style={{ fontSize:10, color:"#aaa", marginTop:4, fontWeight:700 }}>{k.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Filtre poste + bouton ajout */}
+      <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+        <div style={{ display:"flex", gap:5, flex:1, background:"#fff", borderRadius:14, padding:5, boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
+          {[{ id:"tous", label:"Tous", emoji:"👥" }, ...POSTES].map(p => (
+            <button key={p.id} onClick={() => setFilterPoste(p.id)} style={{ flex:1, background: filterPoste===p.id ? (p.color ? `${p.color}18` : "#F0F4F8") : "transparent", border:`2px solid ${filterPoste===p.id ? (p.color||"#ddd") : "transparent"}`, color: filterPoste===p.id ? (p.color||C.dark) : "#aaa", borderRadius:10, padding:"6px 2px", cursor:"pointer", fontWeight:900, fontSize:10, fontFamily:"inherit" }}>{p.emoji} {p.label?.split(" ")[0] || p.label}</button>
+          ))}
+        </div>
+        <button onClick={openNew} style={{ background:`linear-gradient(135deg,${C.ocean},${C.sea})`, border:"none", color:"#fff", borderRadius:14, padding:"10px 14px", cursor:"pointer", fontWeight:900, fontSize:13, fontFamily:"inherit", whiteSpace:"nowrap", boxShadow:`0 4px 14px ${C.ocean}44` }}>➕ Ajouter</button>
+      </div>
+
+      {/* Liste employés */}
+      {loading ? (
+        <div style={{ textAlign:"center", padding:"32px 0", color:"#bbb" }}>Chargement…</div>
+      ) : filtered.length === 0 ? (
+        <div style={{ textAlign:"center", padding:"32px 0", color:"#bbb", background:"#fff", borderRadius:18, boxShadow:"0 2px 10px rgba(0,0,0,0.05)" }}>
+          <div style={{ fontSize:48, marginBottom:8 }}>👨‍💼</div>
+          <div style={{ fontSize:14 }}>Aucun employé{filterPoste!=="tous"?" pour ce poste":""}</div>
+          <div style={{ fontSize:12, color:"#ccc", marginTop:4 }}>Cliquez sur ➕ pour ajouter</div>
+        </div>
+      ) : (
+        <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+          {filtered.map(emp => {
+            const poste  = POSTE_INFO[emp.poste]  || POSTES[0];
+            const statut = STATUT_INFO[emp.statut] || STATUTS[0];
+            const joursActifs = (emp.jours||[]);
+            return (
+              <div key={emp.id} onClick={() => setSelected(emp)} style={{ background:"#fff", borderRadius:18, padding:"14px 16px", boxShadow:"0 2px 10px rgba(0,0,0,0.05)", cursor:"pointer", display:"flex", alignItems:"center", gap:12, transition:"transform .15s" }}
+                onMouseEnter={e => e.currentTarget.style.transform="translateY(-2px)"}
+                onMouseLeave={e => e.currentTarget.style.transform=""}>
+                {/* Avatar */}
+                <div style={{ width:52, height:52, borderRadius:16, background:`linear-gradient(135deg,${poste.color},${poste.color}aa)`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:24, flexShrink:0 }}>{poste.emoji}</div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontWeight:900, color:"#2C3E50", fontSize:15 }}>{PRENOM(emp.prenom)} <span style={{ fontWeight:700 }}>{NOM(emp.nom)}</span></div>
+                  <div style={{ fontSize:11, color:"#aaa" }}>{poste.label} · {emp.contrat}</div>
+                  {/* Jours */}
+                  <div style={{ display:"flex", gap:3, marginTop:5, flexWrap:"wrap" }}>
+                    {JOURS_IDS.map((j, i) => (
+                      <span key={j} style={{ background: joursActifs.includes(j) ? `${poste.color}18` : "#f5f5f5", color: joursActifs.includes(j) ? poste.color : "#ccc", borderRadius:6, padding:"2px 6px", fontSize:10, fontWeight:800 }}>{JOURS_SEMAINE[i]}</span>
+                    ))}
+                  </div>
+                </div>
+                <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:8 }}>
+                  <button onClick={ev => { ev.stopPropagation(); toggleStatut(emp); }} style={{ background:`${statut.color}18`, border:`1.5px solid ${statut.color}40`, color:statut.color, borderRadius:50, padding:"4px 10px", fontWeight:800, fontSize:11, cursor:"pointer", fontFamily:"inherit", whiteSpace:"nowrap" }}>{statut.dot} {statut.label}</button>
+                  {(emp.horaires_matin || emp.horaires_apmidi) && (
+                    <div style={{ fontSize:10, color:"#bbb" }}>
+                      {emp.horaires_matin  && "☀️"}
+                      {emp.horaires_apmidi && "🌊"}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Planning semaine résumé */}
+      {employes.length > 0 && !loading && (
+        <div style={{ background:"#fff", borderRadius:18, overflow:"hidden", boxShadow:"0 2px 10px rgba(0,0,0,0.05)" }}>
+          <div style={{ padding:"12px 16px", background:"#F0F4F8" }}>
+            <div style={{ fontWeight:900, color:C.dark, fontSize:14 }}>🗓️ Vue semaine — Présences</div>
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(6,1fr)", background:"#F8FBFF" }}>
+            {JOURS_SEMAINE.map(j => (
+              <div key={j} style={{ textAlign:"center", padding:"8px 4px", fontSize:11, fontWeight:900, color:"#aaa", borderRight:"1px solid #F0F4F8" }}>{j}</div>
+            ))}
+          </div>
+          {POSTES.map(p => {
+            const empPoste = employes.filter(e => e.poste === p.id && e.statut === "actif");
+            if (empPoste.length === 0) return null;
+            return (
+              <div key={p.id}>
+                <div style={{ padding:"6px 14px", background:`${p.color}10`, fontSize:10, fontWeight:900, color:p.color }}>{p.emoji} {p.label}</div>
+                <div style={{ display:"grid", gridTemplateColumns:"repeat(6,1fr)" }}>
+                  {JOURS_IDS.map((j, ji) => {
+                    const present = empPoste.filter(e => (e.jours||[]).includes(j));
+                    return (
+                      <div key={j} style={{ textAlign:"center", padding:"8px 4px", borderRight:"1px solid #F0F4F8", borderBottom:"1px solid #F0F4F8" }}>
+                        {present.length > 0
+                          ? <div style={{ background:`${p.color}18`, color:p.color, borderRadius:8, padding:"4px 2px", fontSize:12, fontWeight:900 }}>{present.length}</div>
+                          : <div style={{ color:"#e0e0e0", fontSize:14 }}>—</div>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSessions, setAllSeasonSessions, clubPlaces, setClubPlaces }) {
   const [tab, setTab] = useState("dashboard");
   const [dbResas, setDbResas]               = useState([]);
@@ -8887,6 +9242,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
 
   const tabs = [
     { id: "dashboard",    emoji: "📊", label: "Dashboard"  },
+    { id: "equipe",       emoji: "👨‍💼", label: "Équipe"     },
     { id: "seances",      emoji: "🏊", label: "Séances"    },
     { id: "reservations", emoji: "📋", label: "Réservations" },
     { id: "membres",      emoji: "👥", label: "Membres"    },
@@ -9194,6 +9550,10 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
           </div>
           );
         })()}
+
+        {tab === "equipe" && (
+          <EquipeTab />
+        )}
 
         {tab === "seances" && (
           <SeancesTab sessions={allSeasonSessions} setSessions={setAllSeasonSessions} />
