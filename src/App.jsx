@@ -4930,41 +4930,30 @@ function PaiementsTab({ onValidate }) {
     const nbApmidi = resas.filter(r => r.session === "apmidi").length;
     const isJournee = nbMatin > 0 && nbApmidi > 0 && Math.abs(nbMatin - nbApmidi) <= 1;
 
-    // Nb de jours réels (journée = 1 jour = 2 résas matin+apmidi)
+    // Nb de jours réels
     const nbJours = isJournee ? Math.round(resas.length / 2) : resas.length;
-
-    // Pour journée : montant par jour (colonne montant) × nb jours
-    if (isJournee) {
-      const r0 = resas.find(r => r.session === "matin") || resas[0];
-      if (r0?.montant) return `${r0.montant * nbJours} €`;
-      const m = (r0?.label_jour||"").match(/\[MONTANT:(\d+)\]/);
-      if (m) return `${Number(m[1]) * nbJours} €`;
-    }
-
-    // Pour matin ou apmidi : montant par jour × nb jours
-    const r0 = resas[0];
-    if (r0?.montant) return `${r0.montant * nbJours} €`;
-    const montantMatch = (r0?.label_jour||"").match(/\[MONTANT:(\d+)\]/);
-    if (montantMatch) return `${Number(montantMatch[1]) * nbJours} €`;
     const nbSemaines = Math.round(nbJours / 6);
-
-    // Nb enfants
     const nbEnfants = (resas[0]?.enfants || []).length || 1;
 
-    const tarif = session === "matin" ? TARIFS_MATIN : session === "apmidi" ? TARIFS_APMIDI : TARIFS_JOURNEE;
+    // Choisir le bon barème tarifaire
+    const tarif = isJournee ? TARIFS_JOURNEE
+      : nbMatin >= nbApmidi ? TARIFS_MATIN : TARIFS_APMIDI;
 
-    // Trouver la bonne ligne selon nb semaines/jours
+    // Trouver la ligne tarifaire selon nb semaines/jours
     let rowIdx = 0;
-    if (nbSemaines >= 4) rowIdx = 4;
+    if      (nbSemaines >= 4) rowIdx = 4;
     else if (nbSemaines === 3) rowIdx = 3;
     else if (nbSemaines === 2) rowIdx = 2;
     else if (nbSemaines === 1) rowIdx = 1;
-    else rowIdx = 0; // 1 demi-journée
+    else rowIdx = 0; // 1 demi-journée / 1 journée
 
     const row = tarif.rows[rowIdx];
     if (!row) return "—";
 
-    let prix = nbEnfants === 1 ? row.e1 : nbEnfants === 2 ? row.e2 : nbEnfants === 3 ? row.e3 : row.e3 + (nbEnfants - 3) * row.sup;
+    const prix = nbEnfants === 1 ? row.e1
+      : nbEnfants === 2 ? row.e2
+      : nbEnfants === 3 ? row.e3
+      : row.e3 + (nbEnfants - 3) * row.sup;
     return `${prix} €`;
   };
 
