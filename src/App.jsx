@@ -4941,21 +4941,41 @@ function PaiementsTab({ onValidate }) {
       return `${total} €`;
     }
 
-    // Fallback pour anciennes résas sans commandes_club : TARIFS
+    // Fallback pour anciennes résas sans commandes_club : calculer par session séparément
     const resas = g.resas.filter(r => !(Array.isArray(r.enfants) && Number(r.enfants[0]) >= 6));
     if (resas.length === 0) return "—";
-    const nbMatin  = resas.filter(r => r.session === "matin").length;
-    const nbApmidi = resas.filter(r => r.session === "apmidi").length;
-    const isJournee = nbMatin > 0 && nbApmidi > 0 && Math.abs(nbMatin - nbApmidi) <= 1;
-    const nbJours = isJournee ? Math.round(resas.length / 2) : resas.length;
-    const nbSemaines = Math.round(nbJours / 6);
     const nbEnfants = (resas[0]?.enfants||[]).length || 1;
-    const tarif = isJournee ? TARIFS_JOURNEE : nbMatin >= nbApmidi ? TARIFS_MATIN : TARIFS_APMIDI;
-    let rowIdx = nbSemaines >= 4 ? 4 : nbSemaines === 3 ? 3 : nbSemaines === 2 ? 2 : nbSemaines === 1 ? 1 : 0;
-    const row = tarif.rows[rowIdx];
-    if (!row) return "—";
-    const prix = nbEnfants === 1 ? row.e1 : nbEnfants === 2 ? row.e2 : nbEnfants === 3 ? row.e3 : row.e3 + (nbEnfants-3)*row.sup;
-    return `${prix} €`;
+
+    const calcSession = (resasSess, tarif) => {
+      const nbJ = resasSess.length;
+      if (nbJ === 0) return 0;
+      // Chercher la ligne tarifaire exacte (forfait semaine ou unitaire)
+      const nbSem = Math.floor(nbJ / 6);
+      const resteJours = nbJ % 6;
+      let total = 0;
+      if (nbSem > 0) {
+        // Forfait semaine(s)
+        const rowIdx = nbSem >= 4 ? 4 : nbSem;
+        const row = tarif.rows[rowIdx];
+        if (row) total += nbEnfants === 1 ? row.e1 : nbEnfants === 2 ? row.e2 : nbEnfants === 3 ? row.e3 : row.e3 + (nbEnfants-3)*row.sup;
+      }
+      if (resteJours > 0) {
+        // Jours restants au tarif unitaire
+        const row = tarif.rows[0];
+        if (row) {
+          const pu = nbEnfants === 1 ? row.e1 : nbEnfants === 2 ? row.e2 : nbEnfants === 3 ? row.e3 : row.e3 + (nbEnfants-3)*row.sup;
+          total += pu * resteJours;
+        }
+      }
+      return total;
+    };
+
+    const resasMatin  = resas.filter(r => r.session === "matin");
+    const resasApmidi = resas.filter(r => r.session === "apmidi");
+    const totalMatin  = calcSession(resasMatin,  TARIFS_MATIN);
+    const totalApmidi = calcSession(resasApmidi, TARIFS_APMIDI);
+    const total = totalMatin + totalApmidi;
+    return total > 0 ? `${total} €` : "—";
   };
 
   const getMontant = (g) => {
