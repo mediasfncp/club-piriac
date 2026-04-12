@@ -4810,14 +4810,18 @@ function PaiementsTab({ onValidate }) {
   const [dateFilter, setDateFilter] = useState("");
   const [subTab, setSubTab]   = useState("liste"); // "liste" | "suivi"
 
+  const [commandesClub, setCommandesClub] = useState([]);
+
   const loadAll = async () => {
-    const [{ data: nat }, { data: club }] = await Promise.all([
+    const [{ data: nat }, { data: club }, { data: commandes }] = await Promise.all([
       sb.from("reservations_natation").select("*, membres(prenom, nom, email)").order("created_at"),
       sb.from("reservations_club").select("*, membres(prenom, nom, email)").order("created_at"),
+      sb.from("commandes_club").select("*, membres(prenom, nom, email)").order("created_at"),
     ]);
     const natFmt  = (nat  || []).map(r => ({ ...r, _type:"natation", _date:r.date_seance,      _label:`🏊 ${r.heure}` }));
     const clubFmt = (club || []).map(r => ({ ...r, _type:"club",     _date:r.date_reservation, _label: (!isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6) ? "🎟️ Carte Liberté" : `🏖️ ${r.session==="matin"?"Matin":"Après-midi"}` }));
     setResas([...natFmt, ...clubFmt].sort((a,b) => (a.created_at||"").localeCompare(b.created_at||"")));
+    setCommandesClub(commandes || []);
     setLoading(false);
   };
 
@@ -4922,38 +4926,30 @@ function PaiementsTab({ onValidate }) {
       const nb = Number(g.resas[0]?.enfants?.[0]) || 0;
       return LIBERTE_PRIX[nb] ? `${LIBERTE_PRIX[nb]} €` : "—";
     }
+    // Chercher la commande_club correspondante (même membre, même minute de création)
+    const membreId = g.resas[0]?.membre_id;
+    const minuteCreation = (g.created_at||"").slice(0,16);
+    const commande = commandesClub.find(c =>
+      c.membre_id === membreId &&
+      (c.created_at||"").slice(0,16) === minuteCreation
+    );
+    if (commande?.montant_total) return `${commande.montant_total} €`;
 
+    // Fallback : lire depuis TARIFS selon session + nbJours + nbEnfants
     const resas = g.resas.filter(r => !(Array.isArray(r.enfants) && Number(r.enfants[0]) >= 6));
     if (resas.length === 0) return "—";
-
-    // Séparer matin et apmidi
-    const resasMatin  = resas.filter(r => r.session === "matin");
-    const resasApmidi = resas.filter(r => r.session === "apmidi");
-
-    // Cas matin+apmidi : additionner les deux montants séparément (pas tarif journée)
-    if (resasMatin.length > 0 && resasApmidi.length > 0) {
-      const montantMatin  = resasMatin.reduce((s, r) => {
-        if (r.montant) return s + Number(r.montant);
-        const m = (r.label_jour||"").match(/\[MONTANT:(\d+)\]/);
-        return s + (m ? Number(m[1]) : 0);
-      }, 0);
-      const montantApmidi = resasApmidi.reduce((s, r) => {
-        if (r.montant) return s + Number(r.montant);
-        const m = (r.label_jour||"").match(/\[MONTANT:(\d+)\]/);
-        return s + (m ? Number(m[1]) : 0);
-      }, 0);
-      return `${montantMatin + montantApmidi} €`;
-    }
-
-    // Cas matin seul ou apmidi seul : somme des montants par jour
-    const total = resas.reduce((s, r) => {
-      if (r.montant) return s + Number(r.montant);
-      const m = (r.label_jour||"").match(/\[MONTANT:(\d+)\]/);
-      return s + (m ? Number(m[1]) : 0);
-    }, 0);
-    if (total > 0) return `${total} €`;
-
-    return "—";
+    const nbMatin  = resas.filter(r => r.session === "matin").length;
+    const nbApmidi = resas.filter(r => r.session === "apmidi").length;
+    const isJournee = nbMatin > 0 && nbApmidi > 0 && Math.abs(nbMatin - nbApmidi) <= 1;
+    const nbJours = isJournee ? Math.round(resas.length / 2) : resas.length;
+    const nbSemaines = Math.round(nbJours / 6);
+    const nbEnfants = (resas[0]?.enfants||[]).length || 1;
+    const tarif = isJournee ? TARIFS_JOURNEE : nbMatin >= nbApmidi ? TARIFS_MATIN : TARIFS_APMIDI;
+    let rowIdx = nbSemaines >= 4 ? 4 : nbSemaines === 3 ? 3 : nbSemaines === 2 ? 2 : nbSemaines === 1 ? 1 : 0;
+    const row = tarif.rows[rowIdx];
+    if (!row) return "—";
+    const prix = nbEnfants === 1 ? row.e1 : nbEnfants === 2 ? row.e2 : nbEnfants === 3 ? row.e3 : row.e3 + (nbEnfants-3)*row.sup;
+    return `${prix} €`;
   };
 
   const getMontant = (g) => {
@@ -9336,7 +9332,6 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
           const doublons = [];
           for (const iso of (item.dates || [])) {
             for (const sess of sessions) {
-              // Vérifier si un des enfants est déjà inscrit ce jour/session
               const enfantsDeja = (item.enfants||[]).filter(enf =>
                 existingSet.has(`${iso}-${sess}-${enf}`)
               );
@@ -9344,16 +9339,13 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
                 doublons.push(`${new Date(iso).toLocaleDateString("fr-FR",{day:"numeric",month:"short"})} ${sess==="matin"?"matin":"après-midi"} (${enfantsDeja.join(", ")})`);
                 continue;
               }
-              const _nbDates = (item.dates||[]).length || 1;
-              const _montantParJour = Math.round(item.prix / _nbDates);
               const { error: e } = await sb.from("reservations_club").insert([{
                 membre_id:        user.supabaseId,
                 date_reservation: iso,
                 session:          sess,
                 statut:           "pending",
                 enfants:          item.enfants || [],
-                montant:          _montantParJour,
-                label_jour:       `[MONTANT:${_montantParJour}] ${new Date(iso).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}`,
+                label_jour:       new Date(iso).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"}),
               }]);
               if (e) throw e;
             }
@@ -9361,6 +9353,19 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
           if (doublons.length > 0) {
             alert(`⚠️ Inscription(s) ignorée(s) car déjà existante(s) :\n${doublons.join("\n")}`);
           }
+          // Enregistrer la commande globale avec le VRAI montant total
+          const { error: eCom } = await sb.from("commandes_club").insert([{
+            membre_id:     user.supabaseId,
+            session:       item.session,
+            formule:       item.label,
+            nb_enfants:    (item.enfants||[]).length,
+            enfants:       item.enfants || [],
+            nb_jours:      (item.dates||[]).length,
+            montant_total: item.prix,
+            statut:        "pending",
+            dates:         item.dates || [],
+          }]);
+          if (eCom) console.warn("commandes_club insert:", eCom);
         } else if (item.type === "liberte") {
           const { error: e } = await sb.from("reservations_club").insert([{
             membre_id:        user.supabaseId,
