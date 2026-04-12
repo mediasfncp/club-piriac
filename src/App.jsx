@@ -4937,9 +4937,7 @@ function PaiementsTab({ onValidate }) {
       Array.isArray(c.dates) &&
       c.dates.some(d => datesGroupe.has(d))
     );
-    if (process.env.NODE_ENV !== "production") {
-      console.log("DEBUG getClubMontant", { membreId, datesGroupe: [...datesGroupe], commandesClubCount: commandesClub.length, commandesTrouvees: commandesTrouvees.length });
-    }
+    alert(`DEBUG: membreId=${membreId}\ncommandesClub total=${commandesClub.length}\ntrouvées=${commandesTrouvees.length}\ndatesGroupe=${[...datesGroupe].slice(0,3).join(",")}`);
     if (commandesTrouvees.length > 0) {
       const total = commandesTrouvees.reduce((s, c) => s + Number(c.montant_total || 0), 0);
       return `${total} €`;
