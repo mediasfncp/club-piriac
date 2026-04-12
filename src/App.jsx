@@ -2212,21 +2212,25 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser, pa
                             } catch(e) { console.warn("update activite:", e); }
                           }
                         }
+                        const _prixU = selectedRow?.price || 0;
+                        const _nbJ   = selectedDates.length;
+                        const _prixT = _prixU * _nbJ;
                         setPanier(prev => [...prev, {
                           id: `club-${Date.now()}`,
                           type: "club",
                           label: `Club · ${formulType==="journee"?"Journée":formulType==="matin"?"☀️ Matin":"🌊 Après-midi"} · ${selectedRow?.label||""}`,
                           emoji: "🏖️",
                           color: C.coral,
-                          prix: selectedRow?.price || 0,
+                          prix: _prixT,
+                          prixUnitaire: _prixU,
                           enfants: selectedEnfantsClub,
                           session: formulType,
                           dates: selectedDates,
-                          details: `${selectedDates.length} jour${selectedDates.length>1?"s":""}`,
+                          details: `${_nbJ} jour${_nbJ>1?"s":""} × ${_prixU} €`,
                         }]);
                         onNav("panier");
                       }} style={{ background:`linear-gradient(135deg,${C.coral},${C.sun})`, border:"none", color:"#fff", borderRadius:14, padding:"14px", cursor:"pointer", fontWeight:900, fontSize:14, fontFamily:"inherit", boxShadow:`0 4px 14px ${C.coral}44` }}>
-                        🛒 Ajouter au panier · {selectedRow?.price} €
+                        🛒 Ajouter au panier · {(selectedRow?.price||0) * selectedDates.length} €
                       </button>
                     </>
                   ) : (
@@ -9361,7 +9365,7 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
                 session:          sess,
                 statut:           "pending",
                 enfants:          item.enfants || [],
-                label_jour:       `[MONTANT:${item.prix}] ${new Date(iso).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}`,
+                label_jour:       `[MONTANT:${item.prixUnitaire || item.prix}] ${new Date(iso).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}`,
               }]);
               if (e) throw e;
             }
