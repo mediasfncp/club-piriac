@@ -1935,7 +1935,7 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser, pa
                   <div style={{ fontWeight: 800, color: C.dark, fontSize: 14 }}>👧 Nombre d'enfants</div>
                   {clubPlaces && (
                     <div style={{ fontSize: 11, marginTop: 3, fontWeight: 700, color: (clubPlaces[formulType] || 45) <= 5 ? C.sunset : C.green }}>
-                      {(clubPlaces[formulType] || 45)} place{(clubPlaces[formulType] || 45) > 1 ? "s" : ""} restante{(clubPlaces[formulType] || 45) > 1 ? "s" : ""} (max 45)
+                      Inscriptions ouvertes
                     </div>
                   )}
                 </div>
@@ -2903,52 +2903,7 @@ function MesReservationsScreen({ onNav, user }) {
           );
         })()}
 
-        {/* Bouton renvoyer le mail de confirmation */}
-        {(resasNat.length > 0 || resasClub.length > 0) && (
-          <div style={{ margin:"8px 0 16px", padding:"0 4px" }}>
-            <button onClick={async () => {
-              if (!user?.email) { alert("Aucun email associé à votre compte."); return; }
-              try {
-                const resp = await fetch("https://rnaosrftcntomehaepjh.supabase.co/functions/v1/send-email", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json", "Authorization": "Bearer sb_publishable_n9m3QjIKt9OnyN_d8n9cAQ_VQpUpnOu" },
-                  body: JSON.stringify({
-                    type: "confirmation",
-                    to: user.email,
-                    toName: `${user.prenom} ${user.nom || ""}`.trim(),
-                    subject: "🏖️ Eole Beach Club — Rappel de votre demande de réservation",
-                    htmlContent: `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="font-family:Arial,sans-serif;color:#2C3E50;padding:30px;max-width:600px;margin:0 auto">
-                      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f0f4f8;padding:20px 0"><tr><td align="center">
-                      <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden">
-                      <tr><td style="background-color:#1A8FE3;padding:24px 28px">
-                        <p style="margin:0 0 4px;font-size:22px;font-weight:900;color:#ffffff">🏖️ Eole Beach Club</p>
-                        <p style="margin:0;font-size:13px;color:rgba(255,255,255,0.85)">Club de Plage · École de Natation · Piriac-sur-Mer · Saison 2026</p>
-                      </td></tr>
-                      <tr><td style="padding:24px 28px">
-                        <p style="font-size:14px;color:#2C3E50;line-height:1.7;margin:0 0 16px">Bonjour <strong>${user.prenom}</strong>,</p>
-                        <p style="font-size:14px;color:#2C3E50;line-height:1.7;margin:0 0 16px">Voici un rappel de votre demande de réservation pour la saison 2026 à l'Eole Beach Club.</p>
-                        <p style="font-size:14px;color:#2C3E50;line-height:1.7;margin:0 0 16px">Vous avez <strong>${resasNat.filter(r=>r.statut==="pending").length + resasClub.filter(r=>r.statut==="pending").length}</strong> réservation(s) en attente de validation.</p>
-                        <p style="font-size:13px;color:#555;line-height:1.8;margin:0 0 20px">Pour toute question :<br/>📞 07 67 78 69 22<br/>✉️ clubdeplage.piriacsurmer@hotmail.com</p>
-                        <table width="100%" cellpadding="0" cellspacing="0" border="0">
-                          <tr><td style="background:#F0F4F8;border-radius:10px;padding:14px;text-align:center;font-size:11px;color:#888;line-height:1.8">
-                            <strong>Eole Beach Club · Club de Plage / École de Natation</strong><br/>
-                            Plage Saint-Michel · 44420 Piriac-sur-Mer
-                          </td></tr>
-                        </table>
-                      </td></tr>
-                      </table></td></tr></table>
-                    </body></html>`,
-                  }),
-                });
-                const result = await resp.json();
-                if (result.success) alert(`✅ Mail de rappel envoyé à ${user.email}`);
-                else throw new Error(result.error);
-              } catch(e) { alert("Erreur : " + e.message); }
-            }} style={{ width:"100%", background:`${C.ocean}10`, border:`1.5px solid ${C.ocean}30`, color:C.ocean, borderRadius:14, padding:"12px", cursor:"pointer", fontWeight:800, fontSize:13, fontFamily:"inherit" }}>
-              📧 Renvoyer le mail de confirmation
-            </button>
-          </div>
-        )}
+
       </div>
     </div>
   );
@@ -5123,7 +5078,10 @@ function PaiementsTab({ onValidate }) {
                       const membre = g.membre ? `${g.membre.prenom} ${(g.membre.nom||"").toUpperCase()}` : "—";
                       const label = g.type === "natation" ? getForfaitLabel(g) : isLiberte(g) ? "🎟️ Carte Liberté" : getForfaitLabel(g);
                       // Enfants
-                      const enfantsNoms = [...new Set(g.resas.flatMap(r => Array.isArray(r.enfants) ? r.enfants.filter(e => isNaN(Number(e))) : []))].join(", ");
+                      // Enrichir les prénoms avec le nom de famille du membre
+      const prenoms = [...new Set(g.resas.flatMap(r => Array.isArray(r.enfants) ? r.enfants.filter(e => isNaN(Number(e))) : []))];
+      const nomFamille = (g.membre?.nom || "").toUpperCase();
+      const enfantsNoms = prenoms.map(p => nomFamille ? `${p} ${nomFamille}` : p).join(", ");
                       return (
                         <div key={gi} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"6px 8px", background: isOffert ? "#FDF2F8" : isCompte ? "#EEF2FF" : "#f8fbff", borderRadius:8, opacity: isOffert||isCompte ? 0.85 : 1 }}>
                           <div style={{ flex:1 }}>
@@ -7441,8 +7399,7 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
                           )}
                         </div>
                         <div style={{ display:"flex", gap:6 }}>
-                          <button onClick={() => setModifierResa({ resa: r, type:"natation" })}
-                            style={{ flex:1, background:`${C.ocean}15`, border:"none", color:C.ocean, borderRadius:8, padding:"5px 0", cursor:"pointer", fontSize:12, fontFamily:"inherit", fontWeight:700 }}>✏️ Modifier</button>
+
                           <button onClick={async () => {
                             const email = g.membre?.email; if (!email) return alert("Email introuvable");
                             const prenom = g.membre?.prenom || "";
