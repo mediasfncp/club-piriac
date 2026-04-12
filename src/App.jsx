@@ -9354,8 +9354,7 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
             alert(`⚠️ Inscription(s) ignorée(s) car déjà existante(s) :\n${doublons.join("\n")}`);
           }
           // Enregistrer la commande globale avec le VRAI montant total
-          alert(`DEBUG: membre=${user.supabaseId} montant=${item.prix} nbDates=${(item.dates||[]).length} session=${item.session}`);
-          const { error: eCom } = await sb.from("commandes_club").insert([{
+          const { data: comData, error: eCom } = await sb.from("commandes_club").insert([{
             membre_id:     user.supabaseId,
             session:       item.session,
             formule:       item.label,
@@ -9365,8 +9364,9 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
             montant_total: item.prix,
             statut:        "pending",
             dates:         item.dates || [],
-          }]);
-          if (eCom) alert("ERREUR: " + JSON.stringify(eCom));
+          }]).select();
+          if (eCom) alert("ERREUR commandes_club: " + JSON.stringify(eCom));
+          else alert("OK inséré: " + JSON.stringify(comData));
         } else if (item.type === "liberte") {
           const { error: e } = await sb.from("reservations_club").insert([{
             membre_id:        user.supabaseId,
