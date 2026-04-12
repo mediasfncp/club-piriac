@@ -2212,25 +2212,21 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser, pa
                             } catch(e) { console.warn("update activite:", e); }
                           }
                         }
-                        const _prixU = selectedRow?.price || 0;
-                        const _nbJ   = selectedDates.length;
-                        const _prixT = _prixU * _nbJ;
                         setPanier(prev => [...prev, {
                           id: `club-${Date.now()}`,
                           type: "club",
                           label: `Club · ${formulType==="journee"?"Journée":formulType==="matin"?"☀️ Matin":"🌊 Après-midi"} · ${selectedRow?.label||""}`,
                           emoji: "🏖️",
                           color: C.coral,
-                          prix: _prixT,
-                          prixUnitaire: _prixU,
+                          prix: selectedRow?.price || 0,
                           enfants: selectedEnfantsClub,
                           session: formulType,
                           dates: selectedDates,
-                          details: `${_nbJ} jour${_nbJ>1?"s":""} × ${_prixU} €`,
+                          details: `${selectedDates.length} jour${selectedDates.length>1?"s":""}`,
                         }]);
                         onNav("panier");
                       }} style={{ background:`linear-gradient(135deg,${C.coral},${C.sun})`, border:"none", color:"#fff", borderRadius:14, padding:"14px", cursor:"pointer", fontWeight:900, fontSize:14, fontFamily:"inherit", boxShadow:`0 4px 14px ${C.coral}44` }}>
-                        🛒 Ajouter au panier · {(selectedRow?.price||0) * selectedDates.length} €
+                        🛒 Ajouter au panier · {selectedRow?.price} €
                       </button>
                     </>
                   ) : (
@@ -4934,25 +4930,22 @@ function PaiementsTab({ onValidate }) {
     const nbApmidi = resas.filter(r => r.session === "apmidi").length;
     const isJournee = nbMatin > 0 && nbApmidi > 0 && Math.abs(nbMatin - nbApmidi) <= 1;
 
-    // Nb de jours réels (journée = 1 ligne matin, donc resas.length = nbJours pour matin/apmidi)
-    const nbJoursReel = isJournee ? Math.round(resas.length / 2) : resas.length;
+    // Nb de jours réels (journée = 1 jour = 2 résas matin+apmidi)
+    const nbJours = isJournee ? Math.round(resas.length / 2) : resas.length;
 
-    // Pour journée : montant unitaire (par jour) × nb jours
+    // Pour journée : montant par jour (colonne montant) × nb jours
     if (isJournee) {
       const r0 = resas.find(r => r.session === "matin") || resas[0];
-      if (r0?.montant) return `${r0.montant * nbJoursReel} €`;
+      if (r0?.montant) return `${r0.montant * nbJours} €`;
       const m = (r0?.label_jour||"").match(/\[MONTANT:(\d+)\]/);
-      if (m) return `${Number(m[1]) * nbJoursReel} €`;
+      if (m) return `${Number(m[1]) * nbJours} €`;
     }
 
-    // Pour matin ou apmidi : montant unitaire (par jour) × nb jours
+    // Pour matin ou apmidi : montant par jour × nb jours
     const r0 = resas[0];
-    if (r0?.montant) return `${r0.montant * nbJoursReel} €`;
+    if (r0?.montant) return `${r0.montant * nbJours} €`;
     const montantMatch = (r0?.label_jour||"").match(/\[MONTANT:(\d+)\]/);
-    if (montantMatch) return `${Number(montantMatch[1]) * nbJoursReel} €`;
-
-    // Nb de jours réels (journée = 1 jour = 2 résas)
-    const nbJours = isJournee ? Math.round(resas.length / 2) : resas.length;
+    if (montantMatch) return `${Number(montantMatch[1]) * nbJours} €`;
     const nbSemaines = Math.round(nbJours / 6);
 
     // Nb enfants
@@ -7669,11 +7662,11 @@ function ComptesTab({ dbMembres, dbResas, dbResasClub, onRefresh }) {
       const r0 = g[0];
       const nb = Number(r0.enfants?.[0]);
       if (nb >= 6 && LP[nb]) return s + LP[nb];
-      // Montant unitaire (par jour) × nombre de jours dans le groupe
-      const nbJours = g.length;
-      if (r0.montant) return s + Number(r0.montant) * nbJours;
+      // montant = prix par jour → multiplier par nb de jours du groupe
+      const nbJ = g.length;
+      if (r0.montant) return s + Number(r0.montant) * nbJ;
       const match = (r0.label_jour||"").match(/\[MONTANT:(\d+)\]/);
-      return s + (match ? Number(match[1]) * nbJours : 0);
+      return s + (match ? Number(match[1]) * nbJ : 0);
     }, 0);
 
     const totalPrestations = totalNat + totalClub;
@@ -9363,13 +9356,16 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
                 doublons.push(`${new Date(iso).toLocaleDateString("fr-FR",{day:"numeric",month:"short"})} ${sess==="matin"?"matin":"après-midi"} (${enfantsDeja.join(", ")})`);
                 continue;
               }
+              const _nbDates = (item.dates||[]).length || 1;
+              const _montantParJour = Math.round(item.prix / _nbDates);
               const { error: e } = await sb.from("reservations_club").insert([{
                 membre_id:        user.supabaseId,
                 date_reservation: iso,
                 session:          sess,
                 statut:           "pending",
                 enfants:          item.enfants || [],
-                label_jour:       `[MONTANT:${item.prixUnitaire || item.prix}] ${new Date(iso).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}`,
+                montant:          _montantParJour,
+                label_jour:       `[MONTANT:${_montantParJour}] ${new Date(iso).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}`,
               }]);
               if (e) throw e;
             }
