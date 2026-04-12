@@ -7536,7 +7536,228 @@ function ModePaiementModal({ onConfirm, onClose, titre }) {
   );
 }
 
-function ComptesTab({ dbMembres, dbResas, dbResasClub, onRefresh }) {
+// ── COMPTABILITE TAB ──────────────────────────────────────
+function ComptabiliteTab({ dbMembres, dbResas, dbResasClub, dbCommandesClub = [] }) {
+  const [loading, setLoading] = useState(true);
+  const [acomptes, setAcomptes] = useState({});
+  const [remises, setRemises]   = useState({});
+  const [exclusions, setExclusions] = useState({});
+
+  useEffect(() => {
+    Promise.all([
+      sb.from("comptes_acomptes").select("*"),
+      sb.from("comptes_exclusions").select("*"),
+    ]).then(([{ data: ac }, { data: ex }]) => {
+      const acMap = {};
+      (ac || []).forEach(a => { if (!acMap[a.membre_id]) acMap[a.membre_id] = []; acMap[a.membre_id].push(a); });
+      setAcomptes(acMap);
+      const exMap = {};
+      (ex || []).forEach(e => { exMap[e.resa_id] = e.resa_type; });
+      setExclusions(exMap);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
+
+  const PRIX_NAT = { 1:20,2:40,3:60,4:80,5:95,6:113,7:131,8:147,9:162,10:170 };
+  const LP = { 6:96,12:180,18:252,24:288,30:330 };
+
+  // Calcule le montant des prestations par membre (identique à getCompte dans ComptesTab)
+  const getMontantMembre = (m) => {
+    const resasNat  = dbResas.filter(r => r.membre_id === m.id && r.statut === "confirmed" && !exclusions[r.id]);
+    const resasClub = dbResasClub.filter(r => r.membre_id === m.id && r.statut === "confirmed" && !exclusions[r.id]);
+    const natGroups = {};
+    resasNat.forEach(r => {
+      const k = `${(Array.isArray(r.enfants)?[...r.enfants].sort().join(","):"")}-(${(r.created_at||"").slice(0,16)})`;
+      if (!natGroups[k]) natGroups[k] = [];
+      natGroups[k].push(r);
+    });
+    const totalNat = Object.values(natGroups).reduce((s, g) => {
+      const n = g.length;
+      return s + (n <= 10 ? (PRIX_NAT[n] || n*20) : 170+(n-10)*17);
+    }, 0);
+    const resasLiberte  = resasClub.filter(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6);
+    const totalLiberte  = resasLiberte.reduce((s, r) => s + (LP[Number(r.enfants?.[0])] || 0), 0);
+    const resasNormales = resasClub.filter(r => isNaN(Number(r.enfants?.[0])) || Number(r.enfants?.[0]) < 6);
+    const datesResasNormales = new Set(resasNormales.map(r => r.date_reservation?.slice(0,10)).filter(Boolean));
+    const commandesMembre = (dbCommandesClub || []).filter(c => c.membre_id === m.id && Array.isArray(c.dates) && c.dates.some(d => datesResasNormales.has(d)));
+    const totalClubNormal = commandesMembre.length > 0
+      ? commandesMembre.reduce((s, c) => s + Number(c.montant_total || 0), 0)
+      : resasNormales.reduce((s, r) => { const match = (r.label_jour||"").match(/\[MONTANT:(\d+)\]/); return s + (r.montant ? Number(r.montant) : match ? Number(match[1]) : 0); }, 0);
+    const totalPrestations = totalNat + totalLiberte + totalClubNormal;
+    const totalAcomptes    = (acomptes[m.id] || []).reduce((s, a) => s + a.montant, 0);
+    const remise           = remises[m.id] || 0;
+    const solde            = Math.max(0, totalPrestations - totalAcomptes - remise);
+    return { totalNat, totalClub: totalLiberte + totalClubNormal, totalPrestations, totalAcomptes, remise, solde, nbNat: resasNat.length, nbClub: resasClub.length };
+  };
+
+  // Tous les membres (pas uniquement ceux en compte fin de saison)
+  const tousMembres = dbMembres || [];
+  const MODES_LABEL = { especes:"💵 Espèces", cheque:"📝 Chèque", virement:"🏦 Virement", cb:"💳 CB", paypal:"🅿️ PayPal", offert:"🎁 Offert", compte_fin_saison:"📒 Fin de saison" };
+
+  // Calcul global à partir des réservations confirmées
+  const PRIX_NAT_G = { 1:20,2:40,3:60,4:80,5:95,6:113,7:131,8:147,9:162,10:170 };
+  const LP_G = { 6:96,12:180,18:252,24:288,30:330 };
+
+  const confirmedNat  = (dbResas || []).filter(r => r.statut === "confirmed");
+  const confirmedClub = (dbResasClub || []).filter(r => r.statut === "confirmed");
+
+  // Total encaissé paiements directs (hors fin saison et offerts)
+  const confirmedNatPaie  = confirmedNat.filter(r => r.mode_paiement && r.mode_paiement !== "compte_fin_saison" && r.mode_paiement !== "offert");
+  const confirmedClubPaie = confirmedClub.filter(r => r.mode_paiement && r.mode_paiement !== "compte_fin_saison" && r.mode_paiement !== "offert");
+
+  const totalEncNat = (() => {
+    const g = {};
+    confirmedNatPaie.forEach(r => { const k = `${r.membre_id}|${(Array.isArray(r.enfants)?[...r.enfants].sort().join(","):"")}|${(r.created_at||"").slice(0,16)}`; if (!g[k]) g[k]=[]; g[k].push(r); });
+    return Object.values(g).reduce((s, gr) => { const n = gr.length; return s + (n<=10?(PRIX_NAT_G[n]||n*20):170+(n-10)*17); }, 0);
+  })();
+  const totalEncClub = (() => {
+    const g = {};
+    confirmedClubPaie.forEach(r => { const k = `${r.membre_id}|${r.session}|${(Array.isArray(r.enfants)?[...r.enfants].sort().join(","):"")}|${(r.created_at||"").slice(0,16)}`; if (!g[k]) g[k]=[]; g[k].push(r); });
+    return Object.values(g).reduce((s, gr) => {
+      const r0 = gr[0]; const nb = Number(Array.isArray(r0.enfants)?r0.enfants[0]:0);
+      if (nb>=6 && LP_G[nb]) return s+LP_G[nb];
+      if (r0.montant) return s+Number(r0.montant);
+      return s+gr.reduce((a,r)=>{ const m=(r.label_jour||"").match(/\[MONTANT:(\d+)\]/); return a+(m?Number(m[1]):0); },0);
+    }, 0);
+  })();
+
+  // Comptes fin de saison — totaux
+  const membresCompte = tousMembres.filter(m => m.compte_fin_saison && !m.compte_solde);
+  const bilanComptes  = loading ? [] : membresCompte.map(m => ({ m, ...getMontantMembre(m) }));
+  const totalPrestationsComptes = bilanComptes.reduce((s, c) => s + c.totalPrestations, 0);
+  const totalAcomptesComptes    = bilanComptes.reduce((s, c) => s + c.totalAcomptes, 0);
+  const totalRemisesComptes     = bilanComptes.reduce((s, c) => s + c.remise, 0);
+  const totalSoldesComptes      = bilanComptes.reduce((s, c) => s + c.solde, 0);
+
+  // Totaux globaux saison
+  const totalEncaisse  = totalEncNat + totalEncClub + totalAcomptesComptes;
+  const totalCA        = totalEncNat + totalEncClub + totalPrestationsComptes;
+  const resteAEncaisser = Math.max(0, totalSoldesComptes - totalRemisesComptes);
+  const pctEncaisse    = totalCA > 0 ? Math.min(100, Math.round((totalEncaisse / totalCA) * 100)) : 0;
+
+  // Répartition par mode de paiement
+  const byMode = {};
+  [...confirmedNat, ...confirmedClub].forEach(r => {
+    const mode = r.mode_paiement || "non_renseigne";
+    if (!byMode[mode]) byMode[mode] = { count: 0, montant: 0 };
+    byMode[mode].count++;
+  });
+
+  if (loading) return <div style={{ textAlign:"center", padding:40, color:"#bbb" }}>Chargement…</div>;
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+
+      {/* ── Bilan global sombre ── */}
+      <div style={{ background:"linear-gradient(135deg,#0F2027,#203A43,#2C5364)", borderRadius:20, padding:20, boxShadow:"0 8px 28px rgba(0,0,0,0.2)" }}>
+        <div style={{ color:"rgba(255,255,255,0.6)", fontSize:11, fontWeight:800, letterSpacing:1, textTransform:"uppercase", marginBottom:14 }}>🧮 Comptabilité saison 2026</div>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:16 }}>
+          {[
+            { label:"CA total saison",    val:`${totalCA} €`,        color:"#fff",    emoji:"💶" },
+            { label:"Encaissé",           val:`${totalEncaisse} €`,   color:"#6BCB77", emoji:"✅" },
+            { label:"Reste à encaisser",  val:`${resteAEncaisser} €`, color: resteAEncaisser===0?"#6BCB77":"#FF6B6B", emoji:"⏳" },
+            { label:"Comptes fin saison", val:`${membresCompte.length}`, color:"#FFD93D", emoji:"📒" },
+          ].map(k => (
+            <div key={k.label} style={{ background:"rgba(255,255,255,0.08)", borderRadius:14, padding:"14px 12px" }}>
+              <div style={{ fontSize:20 }}>{k.emoji}</div>
+              <div style={{ fontWeight:900, fontSize:20, color:k.color, marginTop:4 }}>{k.val}</div>
+              <div style={{ fontSize:10, color:"rgba(255,255,255,0.55)", marginTop:2 }}>{k.label}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ background:"rgba(255,255,255,0.12)", borderRadius:50, height:10, overflow:"hidden", marginBottom:6 }}>
+          <div style={{ height:"100%", width:`${pctEncaisse}%`, background:"linear-gradient(90deg,#6BCB77,#4ECDC4)", borderRadius:50, transition:"width .5s" }} />
+        </div>
+        <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, color:"rgba(255,255,255,0.55)" }}>
+          <span>Progression encaissement</span><span>{pctEncaisse}%</span>
+        </div>
+      </div>
+
+      {/* ── Ventilation par catégorie ── */}
+      <div style={{ background:"#fff", borderRadius:18, padding:16, boxShadow:"0 2px 10px rgba(0,0,0,0.05)" }}>
+        <div style={{ fontWeight:900, color:C.dark, fontSize:14, marginBottom:12 }}>📂 Ventilation des recettes</div>
+        {[
+          { label:"🏊 Natation (paiements directs)",  val:totalEncNat,  color:C.ocean },
+          { label:"🏖️ Club de Plage (paiements directs)", val:totalEncClub, color:C.coral },
+          { label:"📒 Acomptes comptes fin saison",   val:totalAcomptesComptes, color:"#6366F1" },
+          { label:"⏳ Soldes restants fin saison",    val:totalSoldesComptes,   color:"#FF9500" },
+          { label:"🎁 Remises accordées",             val:totalRemisesComptes,  color:C.green },
+        ].map(row => (
+          <div key={row.label} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 0", borderBottom:"1px solid #f5f5f5" }}>
+            <span style={{ fontSize:13, color:"#555" }}>{row.label}</span>
+            <span style={{ fontWeight:900, color:row.color, fontSize:14 }}>{row.val} €</span>
+          </div>
+        ))}
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 0 0", marginTop:4 }}>
+          <span style={{ fontWeight:900, color:C.dark, fontSize:14 }}>TOTAL CA SAISON</span>
+          <span style={{ fontWeight:900, color:C.dark, fontSize:18 }}>{totalCA} €</span>
+        </div>
+      </div>
+
+      {/* ── Comptes fin de saison : tableau actualisé ── */}
+      <div style={{ background:"#fff", borderRadius:18, overflow:"hidden", boxShadow:"0 2px 10px rgba(0,0,0,0.05)" }}>
+        <div style={{ padding:"12px 16px", background:"#F0F4F8" }}>
+          <div style={{ fontWeight:900, color:C.dark, fontSize:14 }}>📒 Comptes fin de saison — Soldes</div>
+          <div style={{ fontSize:11, color:"#aaa", marginTop:2 }}>Calculé en temps réel depuis les réservations confirmées</div>
+        </div>
+        {bilanComptes.length === 0 ? (
+          <div style={{ textAlign:"center", padding:"24px 0", color:"#bbb", fontSize:13 }}>Aucun compte fin de saison actif</div>
+        ) : (
+          <>
+            {/* Header */}
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 72px 72px 72px 72px", padding:"8px 16px", background:"#F8FBFF", fontSize:10, fontWeight:900 }}>
+              <div style={{ color:"#aaa" }}>MEMBRE</div>
+              <div style={{ color:C.ocean, textAlign:"center" }}>NAT.</div>
+              <div style={{ color:C.coral, textAlign:"center" }}>CLUB</div>
+              <div style={{ color:C.green, textAlign:"center" }}>VERSÉ</div>
+              <div style={{ color:"#FF9500", textAlign:"center" }}>SOLDE</div>
+            </div>
+            {bilanComptes.map(({ m, totalNat, totalClub, totalAcomptes, remise, solde, nbNat, nbClub }, i) => (
+              <div key={m.id} style={{ display:"grid", gridTemplateColumns:"1fr 72px 72px 72px 72px", padding:"10px 16px", borderTop:"1px solid #F0F4F8", alignItems:"center", background: solde===0 ? `${C.green}06` : "#fff" }}>
+                <div>
+                  <div style={{ fontWeight:800, color:C.dark, fontSize:13 }}>{PRENOM(m.prenom)} {NOM(m.nom)}</div>
+                  <div style={{ fontSize:10, color:"#bbb" }}>{nbNat} séance{nbNat>1?"s":""} nat. · {nbClub} club</div>
+                </div>
+                <div style={{ textAlign:"center", fontWeight:800, color:totalNat>0?C.ocean:"#ccc", fontSize:13 }}>{totalNat>0?`${totalNat} €`:"—"}</div>
+                <div style={{ textAlign:"center", fontWeight:800, color:totalClub>0?C.coral:"#ccc", fontSize:13 }}>{totalClub>0?`${totalClub} €`:"—"}</div>
+                <div style={{ textAlign:"center", fontWeight:800, color:totalAcomptes>0?C.green:"#ccc", fontSize:13 }}>{totalAcomptes>0?`${totalAcomptes} €`:"—"}</div>
+                <div style={{ textAlign:"center" }}>
+                  {solde === 0
+                    ? <span style={{ color:C.green, fontSize:16 }}>✅</span>
+                    : <span style={{ fontWeight:900, color:"#FF9500", fontSize:14 }}>{solde} €</span>}
+                  {remise > 0 && <div style={{ fontSize:9, color:C.green }}>-{remise} € remise</div>}
+                </div>
+              </div>
+            ))}
+            {/* Ligne totaux */}
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 72px 72px 72px 72px", padding:"12px 16px", background:"#F0F4F8", borderTop:"2px solid #E0E8F0" }}>
+              <div style={{ fontWeight:900, color:C.dark, fontSize:12 }}>TOTAL</div>
+              <div style={{ textAlign:"center", fontWeight:900, color:C.ocean }}>{bilanComptes.reduce((s,c)=>s+c.totalNat,0)} €</div>
+              <div style={{ textAlign:"center", fontWeight:900, color:C.coral }}>{bilanComptes.reduce((s,c)=>s+c.totalClub,0)} €</div>
+              <div style={{ textAlign:"center", fontWeight:900, color:C.green }}>{totalAcomptesComptes} €</div>
+              <div style={{ textAlign:"center", fontWeight:900, color: totalSoldesComptes===0?C.green:"#FF9500" }}>
+                {totalSoldesComptes===0 ? "✅" : `${totalSoldesComptes} €`}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* ── Mode de paiement ── */}
+      <div style={{ background:"#fff", borderRadius:18, padding:16, boxShadow:"0 2px 10px rgba(0,0,0,0.05)" }}>
+        <div style={{ fontWeight:900, color:C.dark, fontSize:14, marginBottom:12 }}>💳 Répartition modes de paiement</div>
+        {Object.entries(byMode).sort((a,b)=>b[1].count-a[1].count).map(([mode, data]) => (
+          <div key={mode} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 0", borderBottom:"1px solid #f5f5f5" }}>
+            <span style={{ fontSize:13, color:"#555" }}>{MODES_LABEL[mode] || mode}</span>
+            <span style={{ fontWeight:900, color:C.dark }}>{data.count} résa{data.count>1?"s":""}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ComptesTab({ dbMembres, dbResas, dbResasClub, dbCommandesClub = [], onRefresh }) {
   const [acomptes, setAcomptes]       = useState({});
   const [exclusions, setExclusions]   = useState({});
   const [showAcompte, setShowAcompte] = useState(null);
@@ -7601,26 +7822,39 @@ function ComptesTab({ dbMembres, dbResas, dbResasClub, onRefresh }) {
       return s + (n <= 10 ? (PRIX_NAT[n] || n*20) : 170+(n-10)*17);
     }, 0);
 
-    // Club : grouper par enfants + montant (1 ligne par formule achetée)
-    const clubGroups = {};
-    resasClub.forEach(r => {
-      const enfantsKey = Array.isArray(r.enfants) ? [...r.enfants].sort().join(",") : "";
-      const montantR = r.montant || ((r.label_jour||"").match(/\[MONTANT:(\d+)\]/)||[])[1] || "0";
-      const k = `${enfantsKey}-${montantR}`;
-      if (!clubGroups[k]) clubGroups[k] = [];
-      clubGroups[k].push(r);
-    });
+    // Club : utiliser commandes_club pour le montant exact (même logique que PaiementsTab)
     const LP = {6:96,12:180,18:252,24:288,30:330};
-    const totalClub = Object.values(clubGroups).reduce((s, g) => {
-      const r0 = g[0];
-      const nb = Number(r0.enfants?.[0]);
-      if (nb >= 6 && LP[nb]) return s + LP[nb];
-      // montant = prix par jour → multiplier par nb de jours du groupe
-      const nbJ = g.length;
-      if (r0.montant) return s + Number(r0.montant) * nbJ;
-      const match = (r0.label_jour||"").match(/\[MONTANT:(\d+)\]/);
-      return s + (match ? Number(match[1]) * nbJ : 0);
+    const TARIFS_MATIN_rows  = [{e1:15,e2:28,e3:39,sup:11},{e1:78,e2:144,e3:198,sup:54},{e1:144,e2:264,e3:360,sup:96},{e1:189,e2:342,e3:459,sup:126},{e1:216,e2:384,e3:504,sup:144}];
+    const TARIFS_APMIDI_rows = [{e1:17,e2:32,e3:45,sup:13},{e1:90,e2:168,e3:234,sup:66},{e1:168,e2:312,e3:432,sup:120},{e1:225,e2:414,e3:567,sup:162},{e1:264,e2:480,e3:648,sup:192}];
+
+    // Liberté
+    const resasLiberte = resasClub.filter(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6);
+    const totalLiberte = resasLiberte.reduce((s, r) => {
+      const nb = Number(r.enfants?.[0]);
+      return s + (LP[nb] || 0);
     }, 0);
+
+    // Club normal : lire depuis commandes_club
+    const resasNormales = resasClub.filter(r => isNaN(Number(r.enfants?.[0])) || Number(r.enfants?.[0]) < 6);
+    const datesResasNormales = new Set(resasNormales.map(r => r.date_reservation?.slice(0,10)).filter(Boolean));
+    const commandesMembre = dbCommandesClub.filter(c =>
+      c.membre_id === membre.id &&
+      Array.isArray(c.dates) &&
+      c.dates.some(d => datesResasNormales.has(d))
+    );
+    let totalClubNormal = 0;
+    if (commandesMembre.length > 0) {
+      totalClubNormal = commandesMembre.reduce((s, c) => s + Number(c.montant_total || 0), 0);
+    } else {
+      // Fallback tarif unitaire
+      const nbMatin  = resasNormales.filter(r => r.session === "matin").length;
+      const nbApmidi = resasNormales.filter(r => r.session === "apmidi").length;
+      const nbEnfants = (resasNormales[0]?.enfants||[]).length || 1;
+      const puM = nbEnfants===1?15:nbEnfants===2?28:nbEnfants===3?39:39+(nbEnfants-3)*11;
+      const puA = nbEnfants===1?17:nbEnfants===2?32:nbEnfants===3?45:45+(nbEnfants-3)*13;
+      totalClubNormal = nbMatin * puM + nbApmidi * puA;
+    }
+    const totalClub = totalLiberte + totalClubNormal;
 
     const totalPrestations = totalNat + totalClub;
     const totalAcomptes = (acomptes[membre.id] || []).reduce((s, a) => s + a.montant, 0);
@@ -7716,6 +7950,7 @@ Document généré le ${new Date().toLocaleDateString("fr-FR")}
 
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+
       {/* En-tête */}
       <div style={{ background:"#fff", borderRadius:16, padding:"14px 18px", boxShadow:"0 2px 10px rgba(0,0,0,0.05)" }}>
         <div style={{ fontWeight:900, color:C.dark, fontSize:15, marginBottom:4 }}>📒 Comptes fin de saison</div>
@@ -8499,10 +8734,11 @@ ${mpHtml}
 
 function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSessions, setAllSeasonSessions, clubPlaces, setClubPlaces }) {
   const [tab, setTab] = useState("dashboard");
-  const [dbResas, setDbResas]         = useState([]);
-  const [dbResasClub, setDbResasClub] = useState([]);
-  const [dbMembres, setDbMembres]     = useState([]);
-  const [dbPaiements, setDbPaiements] = useState([]);
+  const [dbResas, setDbResas]               = useState([]);
+  const [dbResasClub, setDbResasClub]       = useState([]);
+  const [dbMembres, setDbMembres]           = useState([]);
+  const [dbPaiements, setDbPaiements]       = useState([]);
+  const [dbCommandesClub, setDbCommandesClub] = useState([]);
   const [showNouvelleResa, setShowNouvelleResa] = useState(false);
   const [modifierResa, setModifierResa]         = useState(null);
   const [pendingModalConfirm, setPendingModalConfirm] = useState(null); // { groupe } pour dashboard
@@ -8558,6 +8794,8 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
   useEffect(() => {
     refreshResas();
     getAllMembres().then(d => setDbMembres(d)).catch(() => {});
+    sb.from("commandes_club").select("*").order("created_at")
+      .then(({ data }) => setDbCommandesClub(data || [])).catch(() => {});
   }, []);
 
   // Uniquement les vraies données Supabase
@@ -8656,6 +8894,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
     { id: "paiements",    emoji: "💳", label: "Paiements"  },
     { id: "libertes",     emoji: "🎟️", label: "Liberté"   },
     { id: "comptes",      emoji: "📒", label: "Comptes"    },
+    { id: "comptabilite", emoji: "🧮", label: "Compta"     },
     { id: "factures",     emoji: "🧾", label: "Factures"   },
     { id: "recherche",    emoji: "🔍", label: "Recherche"  },
   ];
@@ -9185,7 +9424,11 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
         )}
 
         {tab === "comptes" && (
-          <ComptesTab dbMembres={dbMembres} dbResas={dbResas} dbResasClub={dbResasClub} onRefresh={() => getAllMembres().then(d => setDbMembres(d)).catch(() => {})} />
+          <ComptesTab dbMembres={dbMembres} dbResas={dbResas} dbResasClub={dbResasClub} dbCommandesClub={dbCommandesClub} onRefresh={() => getAllMembres().then(d => setDbMembres(d)).catch(() => {})} />
+        )}
+
+        {tab === "comptabilite" && (
+          <ComptabiliteTab dbMembres={dbMembres} dbResas={dbResas} dbResasClub={dbResasClub} dbCommandesClub={dbCommandesClub} />
         )}
 
         {tab === "factures" && (
