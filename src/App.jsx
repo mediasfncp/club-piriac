@@ -4949,25 +4949,11 @@ function PaiementsTab({ onValidate }) {
     const calcSession = (resasSess, tarif) => {
       const nbJ = resasSess.length;
       if (nbJ === 0) return 0;
-      // Chercher la ligne tarifaire exacte (forfait semaine ou unitaire)
-      const nbSem = Math.floor(nbJ / 6);
-      const resteJours = nbJ % 6;
-      let total = 0;
-      if (nbSem > 0) {
-        // Forfait semaine(s)
-        const rowIdx = nbSem >= 4 ? 4 : nbSem;
-        const row = tarif.rows[rowIdx];
-        if (row) total += nbEnfants === 1 ? row.e1 : nbEnfants === 2 ? row.e2 : nbEnfants === 3 ? row.e3 : row.e3 + (nbEnfants-3)*row.sup;
-      }
-      if (resteJours > 0) {
-        // Jours restants au tarif unitaire
-        const row = tarif.rows[0];
-        if (row) {
-          const pu = nbEnfants === 1 ? row.e1 : nbEnfants === 2 ? row.e2 : nbEnfants === 3 ? row.e3 : row.e3 + (nbEnfants-3)*row.sup;
-          total += pu * resteJours;
-        }
-      }
-      return total;
+      // Toujours tarif unitaire × nbJours (impossible de savoir si c'est un forfait semaine sans commandes_club)
+      const row = tarif.rows[0];
+      if (!row) return 0;
+      const pu = nbEnfants === 1 ? row.e1 : nbEnfants === 2 ? row.e2 : nbEnfants === 3 ? row.e3 : row.e3 + (nbEnfants-3)*row.sup;
+      return pu * nbJ;
     };
 
     const resasMatin  = resas.filter(r => r.session === "matin");
