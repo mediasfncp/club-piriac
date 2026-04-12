@@ -4934,19 +4934,22 @@ function PaiementsTab({ onValidate }) {
     const nbApmidi = resas.filter(r => r.session === "apmidi").length;
     const isJournee = nbMatin > 0 && nbApmidi > 0 && Math.abs(nbMatin - nbApmidi) <= 1;
 
-    // Pour journée : prendre r.montant une seule fois (pas matin+apmidi)
+    // Nb de jours réels (journée = 1 ligne matin, donc resas.length = nbJours pour matin/apmidi)
+    const nbJoursReel = isJournee ? Math.round(resas.length / 2) : resas.length;
+
+    // Pour journée : montant unitaire (par jour) × nb jours
     if (isJournee) {
       const r0 = resas.find(r => r.session === "matin") || resas[0];
-      if (r0?.montant) return `${r0.montant} €`;
+      if (r0?.montant) return `${r0.montant * nbJoursReel} €`;
       const m = (r0?.label_jour||"").match(/\[MONTANT:(\d+)\]/);
-      if (m) return `${m[1]} €`;
+      if (m) return `${Number(m[1]) * nbJoursReel} €`;
     }
 
-    // Pour matin ou apmidi seul : r.montant de la première résa (= total du groupe)
+    // Pour matin ou apmidi : montant unitaire (par jour) × nb jours
     const r0 = resas[0];
-    if (r0?.montant) return `${r0.montant} €`;
+    if (r0?.montant) return `${r0.montant * nbJoursReel} €`;
     const montantMatch = (r0?.label_jour||"").match(/\[MONTANT:(\d+)\]/);
-    if (montantMatch) return `${montantMatch[1]} €`;
+    if (montantMatch) return `${Number(montantMatch[1]) * nbJoursReel} €`;
 
     // Nb de jours réels (journée = 1 jour = 2 résas)
     const nbJours = isJournee ? Math.round(resas.length / 2) : resas.length;
@@ -7666,10 +7669,11 @@ function ComptesTab({ dbMembres, dbResas, dbResasClub, onRefresh }) {
       const r0 = g[0];
       const nb = Number(r0.enfants?.[0]);
       if (nb >= 6 && LP[nb]) return s + LP[nb];
-      // Pour une journée (matin+apmidi), prendre r.montant une seule fois
-      if (r0.montant) return s + Number(r0.montant);
+      // Montant unitaire (par jour) × nombre de jours dans le groupe
+      const nbJours = g.length;
+      if (r0.montant) return s + Number(r0.montant) * nbJours;
       const match = (r0.label_jour||"").match(/\[MONTANT:(\d+)\]/);
-      return s + (match ? Number(match[1]) : 0);
+      return s + (match ? Number(match[1]) * nbJours : 0);
     }, 0);
 
     const totalPrestations = totalNat + totalClub;
