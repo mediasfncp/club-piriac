@@ -4928,16 +4928,17 @@ function PaiementsTab({ onValidate }) {
     }
 
     const membreId = g.resas[0]?.membre_id;
-    const minuteGroupe = (g.created_at||"").slice(0,16);
+    // Dates de toutes les résas du groupe
+    const datesGroupe = new Set(g.resas.map(r => r.date_reservation?.slice(0,10)).filter(Boolean));
 
-    // Sommer TOUTES les commandes du même membre créées à la même minute
-    // (une commande par formule achetée dans le même panier)
-    const commandesGroupe = commandesClub.filter(c =>
+    // Trouver toutes les commandes_club dont AU MOINS UNE date est dans le groupe
+    const commandesTrouvees = commandesClub.filter(c =>
       c.membre_id === membreId &&
-      (c.created_at||"").slice(0,16) === minuteGroupe
+      Array.isArray(c.dates) &&
+      c.dates.some(d => datesGroupe.has(d))
     );
-    if (commandesGroupe.length > 0) {
-      const total = commandesGroupe.reduce((s, c) => s + Number(c.montant_total || 0), 0);
+    if (commandesTrouvees.length > 0) {
+      const total = commandesTrouvees.reduce((s, c) => s + Number(c.montant_total || 0), 0);
       return `${total} €`;
     }
 
