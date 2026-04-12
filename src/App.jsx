@@ -4926,35 +4926,34 @@ function PaiementsTab({ onValidate }) {
     const resas = g.resas.filter(r => !(Array.isArray(r.enfants) && Number(r.enfants[0]) >= 6));
     if (resas.length === 0) return "—";
 
-    const nbMatin  = resas.filter(r => r.session === "matin").length;
-    const nbApmidi = resas.filter(r => r.session === "apmidi").length;
-    const isJournee = nbMatin > 0 && nbApmidi > 0 && Math.abs(nbMatin - nbApmidi) <= 1;
+    // Séparer matin et apmidi
+    const resasMatin  = resas.filter(r => r.session === "matin");
+    const resasApmidi = resas.filter(r => r.session === "apmidi");
 
-    // Nb de jours réels
-    const nbJours = isJournee ? Math.round(resas.length / 2) : resas.length;
-    const nbSemaines = Math.round(nbJours / 6);
-    const nbEnfants = (resas[0]?.enfants || []).length || 1;
+    // Cas matin+apmidi : additionner les deux montants séparément (pas tarif journée)
+    if (resasMatin.length > 0 && resasApmidi.length > 0) {
+      const montantMatin  = resasMatin.reduce((s, r) => {
+        if (r.montant) return s + Number(r.montant);
+        const m = (r.label_jour||"").match(/\[MONTANT:(\d+)\]/);
+        return s + (m ? Number(m[1]) : 0);
+      }, 0);
+      const montantApmidi = resasApmidi.reduce((s, r) => {
+        if (r.montant) return s + Number(r.montant);
+        const m = (r.label_jour||"").match(/\[MONTANT:(\d+)\]/);
+        return s + (m ? Number(m[1]) : 0);
+      }, 0);
+      return `${montantMatin + montantApmidi} €`;
+    }
 
-    // Choisir le bon barème tarifaire
-    const tarif = isJournee ? TARIFS_JOURNEE
-      : nbMatin >= nbApmidi ? TARIFS_MATIN : TARIFS_APMIDI;
+    // Cas matin seul ou apmidi seul : somme des montants par jour
+    const total = resas.reduce((s, r) => {
+      if (r.montant) return s + Number(r.montant);
+      const m = (r.label_jour||"").match(/\[MONTANT:(\d+)\]/);
+      return s + (m ? Number(m[1]) : 0);
+    }, 0);
+    if (total > 0) return `${total} €`;
 
-    // Trouver la ligne tarifaire selon nb semaines/jours
-    let rowIdx = 0;
-    if      (nbSemaines >= 4) rowIdx = 4;
-    else if (nbSemaines === 3) rowIdx = 3;
-    else if (nbSemaines === 2) rowIdx = 2;
-    else if (nbSemaines === 1) rowIdx = 1;
-    else rowIdx = 0; // 1 demi-journée / 1 journée
-
-    const row = tarif.rows[rowIdx];
-    if (!row) return "—";
-
-    const prix = nbEnfants === 1 ? row.e1
-      : nbEnfants === 2 ? row.e2
-      : nbEnfants === 3 ? row.e3
-      : row.e3 + (nbEnfants - 3) * row.sup;
-    return `${prix} €`;
+    return "—";
   };
 
   const getMontant = (g) => {
