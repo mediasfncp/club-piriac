@@ -7319,7 +7319,7 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
               // ── Insert paiement ──
               if (mode !== "compte_fin_saison" && mode !== "offert") {
                 const PRIX_NAT = {1:20,2:40,3:60,4:80,5:95,6:113,7:131,8:147,9:162,10:170};
-                // Compter toutes les séances confirmées du même forfait (même membre+enfants+minute)
+                const nbEnfants = Math.max(1, Array.isArray(resa.enfants) ? resa.enfants.length : 1);
                 const { data: allNat } = await sb.from("reservations_natation").select("id,enfants,created_at,statut").eq("membre_id", resa.membre_id);
                 const enfKey = Array.isArray(resa.enfants) ? [...resa.enfants].sort().join(",") : "";
                 const minute = (resa.created_at||"").slice(0,16);
@@ -7328,8 +7328,9 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
                   return k2 === enfKey && (r.created_at||"").slice(0,16) === minute;
                 });
                 const n = sameGroup.length;
-                const montantNat = n <= 10 ? (PRIX_NAT[n] || n*20) : 170+(n-10)*17;
-                await sb.from("paiements").insert([{ membre_id:resa.membre_id, montant:montantNat, type:"natation", label:`Natation · ${n} leçon${n>1?"s":""}`, statut:"completed" }]);
+                const prixParEnfant = n <= 10 ? (PRIX_NAT[n] || n*20) : 170+(n-10)*17;
+                const montantNat = prixParEnfant * nbEnfants;
+                await sb.from("paiements").insert([{ membre_id:resa.membre_id, montant:montantNat, type:"natation", label:`Natation · ${n} leçon${n>1?"s":""} · ${nbEnfants} enfant${nbEnfants>1?"s":""}`, statut:"completed" }]);
               }
             } else {
               let montant = 0;
@@ -9268,10 +9269,11 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                 await sb.from("paiements").insert([{ membre_id:membreId, montant:totalMontantClub, type:"club", label:`Club · ${g.resas.length} réservation${g.resas.length>1?"s":""}`, statut:"completed" }]);
               }
             } else {
-              // Natation : calculer montant forfait
+              // Natation : calculer montant forfait × nombre d'enfants
               const PRIX_NAT_V = {1:20,2:40,3:60,4:80,5:95,6:113,7:131,8:147,9:162,10:170};
               const membreId = g.resas[0]?.membre_id;
               const r0 = g.resas[0];
+              const nbEnfants = Math.max(1, Array.isArray(r0?.enfants) ? r0.enfants.length : 1);
               const enfKey = Array.isArray(r0?.enfants)?[...r0.enfants].sort().join(","):"";
               const minute = (r0?.created_at||"").slice(0,16);
               const { data: allNat } = await sb.from("reservations_natation").select("id,enfants,created_at").eq("membre_id", membreId);
@@ -9280,10 +9282,11 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                 return k2 === enfKey && (r.created_at||"").slice(0,16) === minute;
               });
               const n = sameGroup.length;
-              const montantNat = n <= 10 ? (PRIX_NAT_V[n]||n*20) : 170+(n-10)*17;
+              const prixParEnfant = n <= 10 ? (PRIX_NAT_V[n]||n*20) : 170+(n-10)*17;
+              const montantNat = prixParEnfant * nbEnfants;
               await Promise.all(g.resas.map(r => sb.from(table).update({ statut:"confirmed", validated_at:new Date().toISOString(), mode_paiement:mode }).eq("id", r.id)));
               // ── Insert paiement natation ──
-              await sb.from("paiements").insert([{ membre_id:membreId, montant:montantNat, type:"natation", label:`Natation · ${n} leçon${n>1?"s":""}`, statut:"completed" }]);
+              await sb.from("paiements").insert([{ membre_id:membreId, montant:montantNat, type:"natation", label:`Natation · ${n} leçon${n>1?"s":""} · ${nbEnfants} enfant${nbEnfants>1?"s":""}`, statut:"completed" }]);
             }
             // Carte liberté → créditer
             if (g.type === "club" && g.resas.some(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6)) {
