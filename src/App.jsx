@@ -6429,47 +6429,45 @@ th{background:#1A8FE3;color:#fff;padding:9px 12px;text-align:left}
         ))}
       </div>
 
-      {/* List — repliable */}
+      {/* List repliable */}
       {(() => {
         const [listOpen, setListOpen] = React.useState(false);
         return (
           <>
-            {/* Header cliquable */}
             <div
               onClick={() => setListOpen(v => !v)}
-              style={{ display:"flex", alignItems:"center", justifyContent:"space-between", background: listOpen ? C.ocean : "#F0F4F8", borderRadius: listOpen ? "12px 12px 0 0" : 12, padding:"10px 14px", cursor:"pointer", transition:"all .2s", marginBottom: listOpen ? 0 : 0 }}
+              style={{ display:"flex", alignItems:"center", justifyContent:"space-between", background: listOpen ? C.ocean : "#F0F4F8", borderRadius: listOpen ? "12px 12px 0 0" : 12, padding:"10px 14px", cursor:"pointer", transition:"all .2s" }}
             >
               <div style={{ fontWeight:900, color: listOpen ? "#fff" : C.dark, fontSize:13 }}>
                 👧 Liste des enfants ({filteredEnfants.length})
               </div>
-              <div style={{ fontSize:18, color: listOpen ? "#fff" : "#aaa", transition:"transform .2s", transform: listOpen ? "rotate(180deg)" : "rotate(0deg)" }}>▾</div>
+              <div style={{ fontSize:16, color: listOpen ? "#fff" : "#aaa", transition:"transform .2s", transform: listOpen ? "rotate(180deg)" : "rotate(0deg)" }}>▾</div>
             </div>
-
             {listOpen && (
-              <div style={{ borderRadius: "0 0 12px 12px", overflow:"hidden", border:"1px solid #F0F4F8", borderTop:"none" }}>
-                <div style={{ display: "grid", gridTemplateColumns: "24px 1fr 1fr 44px", background: "#F8FBFF", padding: "7px 10px" }}>
-                  <div style={{ fontSize: 9, fontWeight: 900, color: "#aaa" }}>#</div>
-                  <div style={{ fontSize: 9, fontWeight: 900, color: "#aaa" }}>NOM · PRÉNOM</div>
-                  <div style={{ fontSize: 9, fontWeight: 900, color: "#aaa" }}>ACTIVITÉ</div>
-                  <div style={{ fontSize: 9, fontWeight: 900, color: "#aaa", textAlign: "center" }}>ÂGE</div>
+              <div style={{ borderRadius:"0 0 12px 12px", overflow:"hidden", border:"1px solid #F0F4F8", borderTop:"none" }}>
+                <div style={{ display:"grid", gridTemplateColumns:"24px 1fr 1fr 44px", background:"#F8FBFF", padding:"7px 10px" }}>
+                  <div style={{ fontSize:9, fontWeight:900, color:"#aaa" }}>#</div>
+                  <div style={{ fontSize:9, fontWeight:900, color:"#aaa" }}>NOM · PRÉNOM</div>
+                  <div style={{ fontSize:9, fontWeight:900, color:"#aaa" }}>ACTIVITÉ</div>
+                  <div style={{ fontSize:9, fontWeight:900, color:"#aaa", textAlign:"center" }}>ÂGE</div>
                 </div>
                 {filteredEnfants.length === 0 ? (
-                  <div style={{ textAlign: "center", padding: "20px 0", color: "#bbb", fontSize: 13 }}>Aucun enfant</div>
+                  <div style={{ textAlign:"center", padding:"20px 0", color:"#bbb", fontSize:13 }}>Aucun enfant</div>
                 ) : filteredEnfants.map((e, i) => {
                   const grp = AGE_GROUPS.find(g => e.age >= g.min && e.age <= g.max);
                   return (
-                    <div key={i} onClick={() => setSelectedEnfant(e)} style={{ display: "grid", gridTemplateColumns: "24px 1fr 1fr 44px", background: i%2===0?"#fff":"#F8FBFF", padding: "8px 10px", alignItems: "center", borderTop: "1px solid #F0F4F8", cursor:"pointer" }}>
-                      <div style={{ fontSize: 10, color: "#ccc" }}>{i+1}</div>
+                    <div key={i} onClick={() => setSelectedEnfant(e)} style={{ display:"grid", gridTemplateColumns:"24px 1fr 1fr 44px", background:i%2===0?"#fff":"#F8FBFF", padding:"8px 10px", alignItems:"center", borderTop:"1px solid #F0F4F8", cursor:"pointer" }}>
+                      <div style={{ fontSize:10, color:"#ccc" }}>{i+1}</div>
                       <div>
-                        <div style={{ fontWeight: 900, color: "#2C3E50", fontSize: 12 }}>{e.nom.toUpperCase()} <span style={{ fontWeight: 600 }}>{e.prenom}</span></div>
-                        {e.allergies && <div style={{ fontSize: 9, color: C.sunset }}>⚠️ {e.allergies}</div>}
+                        <div style={{ fontWeight:900, color:"#2C3E50", fontSize:12 }}>{e.nom.toUpperCase()} <span style={{ fontWeight:600 }}>{e.prenom}</span></div>
+                        {e.allergies && <div style={{ fontSize:9, color:C.sunset }}>⚠️ {e.allergies}</div>}
                       </div>
-                      <div style={{ fontSize: 11, color: e.activite==="natation"?C.ocean:e.activite==="club"?C.coral:"#9B59B6", fontWeight: 700 }}>
+                      <div style={{ fontSize:11, color:e.activite==="natation"?C.ocean:e.activite==="club"?C.coral:"#9B59B6", fontWeight:700 }}>
                         {e.activite==="natation"?"🏊":e.activite==="club"?"🏖️":"🏖️🏊"}
                       </div>
-                      <div style={{ textAlign: "center" }}>
-                        <div style={{ fontWeight: 900, fontSize: 14, color: grp?.color||C.ocean }}>{e.age}</div>
-                        <div style={{ fontSize: 8, color: "#ccc" }}>ans</div>
+                      <div style={{ textAlign:"center" }}>
+                        <div style={{ fontWeight:900, fontSize:14, color:grp?.color||C.ocean }}>{e.age}</div>
+                        <div style={{ fontSize:8, color:"#ccc" }}>ans</div>
                       </div>
                     </div>
                   );
@@ -6479,7 +6477,6 @@ th{background:#1A8FE3;color:#fff;padding:9px 12px;text-align:left}
           </>
         );
       })()}
-
       <div style={{ marginTop: 8, fontSize: 10, color: "#bbb", textAlign: "center" }}>
         {filteredEnfants.length} enfant{filteredEnfants.length>1?"s":""} · {periodLabel}
       </div>
@@ -9129,6 +9126,8 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
     getAllMembres().then(d => setDbMembres(d)).catch(() => {});
     sb.from("commandes_club").select("*").order("created_at")
       .then(({ data }) => setDbCommandesClub(data || [])).catch(() => {});
+    sb.from("paiements").select("*").eq("statut", "completed").order("created_at", { ascending: false })
+      .then(({ data }) => setDbPaiements(data || [])).catch(() => {});
   }, []);
 
   // Uniquement les vraies données Supabase
@@ -9149,56 +9148,11 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
   const confirmedNatToday  = dbResas.filter(r => r.statut === "confirmed" && toLocalDate(r.validated_at || r.created_at) === todayISO);
   const confirmedClubToday = dbResasClub.filter(r => r.statut === "confirmed" && toLocalDate(r.validated_at || r.created_at) === todayISO);
 
-  // Montant natation selon forfait (groupé par membre+date_creation)
-  const montantNat = (resas) => {
-    // Grouper par membre + enfants (triés) + minute de création = même logique que le reste
-    const groups = {};
-    resas.forEach(r => {
-      const enfantsKey = Array.isArray(r.enfants) ? [...r.enfants].sort().join(",") : "";
-      const minute = (r.created_at||"").slice(0,16);
-      const key = `${r.membre_id}-${enfantsKey}-${minute}`;
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(r);
-    });
-    const PRIX_NAT = { 1:20, 2:40, 3:60, 4:80, 5:95, 6:113, 7:131, 8:147, 9:162, 10:170 };
-    return Object.values(groups).reduce((total, g) => {
-      if (g[0].mode_paiement === "offert" || g[0].mode_paiement === "compte_fin_saison") return total; // Offerts et comptes fin saison → exclus
-      const n = g.length;
-      const prix = n <= 10 ? (PRIX_NAT[n] || n*20) : 170 + (n-10)*17;
-      return total + prix;
-    }, 0);
-  };
-
-  const LIBERTE_PRIX = { 6:96, 12:180, 18:252, 24:288, 30:330 };
-  const montantClub = (resas) => {
-    // Grouper par membre + session + enfants + minute
-    const groups = {};
-    resas.forEach(r => {
-      const enfantsKey = Array.isArray(r.enfants) ? [...r.enfants].sort().join(",") : "";
-      const minute = (r.created_at||"").slice(0,16);
-      const key = `${r.membre_id}-${r.session}-${enfantsKey}-${minute}`;
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(r);
-    });
-    return Object.values(groups).reduce((total, g) => {
-      const r0 = g[0];
-      // Offerts → exclus du total
-      if (r0.mode_paiement === "offert" || r0.mode_paiement === "compte_fin_saison") return total;
-      // Carte liberté : prix fixe unique
-      const nb = Number(Array.isArray(r0.enfants) ? r0.enfants[0] : 0);
-      if (nb >= 6 && LIBERTE_PRIX[nb]) return total + LIBERTE_PRIX[nb];
-      // Montant stocké sur la première résa = total du groupe
-      if (r0.montant) return total + Number(r0.montant);
-      // Fallback : lire [MONTANT:XX] × nb résas
-      const parLabelJour = g.reduce((s, r) => {
-        const match = (r.label_jour||"").match(/\[MONTANT:(\d+)\]/);
-        return s + (match ? Number(match[1]) : 0);
-      }, 0);
-      return total + parLabelJour;
-    }, 0);
-  };
-
-  const realTotal = montantNat(confirmedNatToday) + montantClub(confirmedClubToday);
+  // Paiements du jour depuis table paiements (montants corrects, multi-enfants inclus)
+  const paiementsAujourdhui = (dbPaiements||[]).filter(p =>
+    p.statut === "completed" && p.type !== "offert" && toLocalDate(p.created_at) === todayISO
+  );
+  const realTotal = paiementsAujourdhui.reduce((s, p) => s + Number(p.montant||0), 0);
   const pendingCount = dbResas.filter(r => r.statut === "pending").length + dbResasClub.filter(r => r.statut === "pending").length;
 
   // Taux de remplissage natation — toute la saison
@@ -9272,15 +9226,47 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
 
             if (g.type === "club") {
               const LIBERTE_PRIX_V = {6:96,12:180,18:252,24:288,30:330};
+              let totalMontantClub = 0;
               for (const r of g.resas) {
                 let montant = 0;
                 const isLib = !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6;
                 if (isLib) { montant = LIBERTE_PRIX_V[Number(r.enfants[0])]||0; }
                 else { const m2=(r.label_jour||"").match(/\[MONTANT:(\d+)\]/); montant=m2?Number(m2[1]):0; }
                 await sb.from(table).update({ statut:"confirmed", validated_at:new Date().toISOString(), montant, mode_paiement:mode }).eq("id", r.id);
+                totalMontantClub += montant;
+              }
+              // Si montant 0 (forfait semaine via commandes_club), chercher dans commandes_club
+              if (totalMontantClub === 0) {
+                const membreIdClub = g.resas[0]?.membre_id;
+                const datesResas = new Set(g.resas.map(r => r.date_reservation?.slice(0,10)).filter(Boolean));
+                const { data: cmds } = await sb.from("commandes_club").select("montant_total, dates").eq("membre_id", membreIdClub);
+                const cmdMatching = (cmds||[]).filter(c => Array.isArray(c.dates) && c.dates.some(d => datesResas.has(d)));
+                totalMontantClub = cmdMatching.reduce((s, c) => s + Number(c.montant_total||0), 0);
+              }
+              // ── Insert paiement club ──
+              if (totalMontantClub > 0) {
+                const membreId = g.resas[0]?.membre_id;
+                await sb.from("paiements").insert([{ membre_id:membreId, montant:totalMontantClub, type:"club", label:`Club · ${g.resas.length} réservation${g.resas.length>1?"s":""}`, statut:"completed" }]);
               }
             } else {
+              // Natation : calculer montant forfait × nombre d'enfants
+              const PRIX_NAT_V = {1:20,2:40,3:60,4:80,5:95,6:113,7:131,8:147,9:162,10:170};
+              const membreId = g.resas[0]?.membre_id;
+              const r0 = g.resas[0];
+              const nbEnfants = Math.max(1, Array.isArray(r0?.enfants) ? r0.enfants.length : 1);
+              const enfKey = Array.isArray(r0?.enfants)?[...r0.enfants].sort().join(","):"";
+              const minute = (r0?.created_at||"").slice(0,16);
+              const { data: allNat } = await sb.from("reservations_natation").select("id,enfants,created_at").eq("membre_id", membreId);
+              const sameGroup = (allNat||[]).filter(r => {
+                const k2 = Array.isArray(r.enfants)?[...r.enfants].sort().join(","):"";
+                return k2 === enfKey && (r.created_at||"").slice(0,16) === minute;
+              });
+              const n = sameGroup.length;
+              const prixParEnfant = n <= 10 ? (PRIX_NAT_V[n]||n*20) : 170+(n-10)*17;
+              const montantNat = prixParEnfant * nbEnfants;
               await Promise.all(g.resas.map(r => sb.from(table).update({ statut:"confirmed", validated_at:new Date().toISOString(), mode_paiement:mode }).eq("id", r.id)));
+              // ── Insert paiement natation ──
+              await sb.from("paiements").insert([{ membre_id:membreId, montant:montantNat, type:"natation", label:`Natation · ${n} leçon${n>1?"s":""} · ${nbEnfants} enfant${nbEnfants>1?"s":""}`, statut:"completed" }]);
             }
             // Carte liberté → créditer
             if (g.type === "club" && g.resas.some(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6)) {
@@ -9302,6 +9288,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
             }
             setPendingModalConfirm(null);
             refreshResas();
+            sb.from("paiements").select("*").eq("statut","completed").order("created_at",{ascending:false}).then(({data})=>setDbPaiements(data||[])).catch(()=>{});
           }}
         />
       )}
@@ -9420,34 +9407,38 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                   <div style={{ fontWeight:800, color:"#2C3E50", fontSize:14 }}>💳 Paiements du jour</div>
                   <div style={{ background:`${C.green}18`, color:C.green, borderRadius:50, padding:"4px 14px", fontWeight:900, fontSize:13 }}>{realTotal} €</div>
                 </div>
-                {confirmedNatToday.length + confirmedClubToday.length === 0 ? (
+                {paiementsAujourdhui.length === 0 ? (
                   <div style={{ textAlign:"center", padding:"16px 0", color:"#bbb", fontSize:13 }}>Aucun paiement aujourd'hui</div>
                 ) : (
                   <div style={{ display:"flex", flexDirection:"column", gap:0 }}>
                     {(() => {
                       // Grouper par membre_id — un seul affichage par client
                       const byMembre = {};
-                      [...confirmedNatToday, ...confirmedClubToday].forEach(r => {
-                        const mid = r.membre_id || "inconnu";
-                        if (!byMembre[mid]) byMembre[mid] = { membre: r.membres, resas: [], isNat: false, isClub: false };
-                        if (r.date_seance) byMembre[mid].isNat = true;
-                        else byMembre[mid].isClub = true;
-                        byMembre[mid].resas.push(r);
+                      paiementsAujourdhui.forEach(p => {
+                        const mid = p.membre_id || "inconnu";
+                        if (!byMembre[mid]) byMembre[mid] = { membreId: mid, paiements: [] };
+                        byMembre[mid].paiements.push(p);
                       });
+                      // Récupérer le nom depuis dbMembres
                       return Object.entries(byMembre).map(([mid, g], i, arr) => {
-                        const color = g.isNat && g.isClub ? "#9B59B6" : g.isNat ? C.ocean : C.coral;
-                        const label = g.isNat && g.isClub ? "🏊🏖️ Natation & Club"
-                          : g.isNat ? `🏊 Natation · ${g.resas.filter(r=>r.date_seance).length} séance${g.resas.filter(r=>r.date_seance).length>1?"s":""}`
-                          : `🏖️ Club · ${g.resas.filter(r=>!r.date_seance).length} résa${g.resas.filter(r=>!r.date_seance).length>1?"s":""}`;
+                        const membre = dbMembres.find(m => m.id === mid);
+                        const hasNat  = g.paiements.some(p => p.type === "natation");
+                        const hasClub = g.paiements.some(p => p.type === "club");
+                        const color   = hasNat && hasClub ? "#9B59B6" : hasNat ? C.ocean : C.coral;
+                        const total   = g.paiements.reduce((s, p) => s + Number(p.montant||0), 0);
+                        const label   = hasNat && hasClub ? "🏊🏖️ Natation & Club"
+                          : hasNat ? "🏊 Natation"
+                          : "🏖️ Club";
                         return (
                           <div key={mid} style={{ display:"flex", alignItems:"center", gap:10, padding:"9px 0", borderBottom:i<arr.length-1?"1px solid #F0F4F8":"none" }}>
                             <div style={{ width:32, height:32, borderRadius:10, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, background:`${color}18`, color, fontWeight:900 }}>✓</div>
                             <div style={{ flex:1, minWidth:0 }}>
                               <div style={{ fontWeight:800, fontSize:13, color:"#2C3E50", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-                                {g.membre ? `${PRENOM(g.membre.prenom)} ${NOM(g.membre.nom)}` : "—"}
+                                {membre ? `${PRENOM(membre.prenom)} ${NOM(membre.nom)}` : "—"}
                               </div>
                               <div style={{ fontSize:11, color:"#aaa" }}>{label}</div>
                             </div>
+                            <div style={{ fontWeight:900, fontSize:13, color:C.green, flexShrink:0 }}>{total} €</div>
                           </div>
                         );
                       });
