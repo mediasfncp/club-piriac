@@ -9121,6 +9121,8 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
     getAllMembres().then(d => setDbMembres(d)).catch(() => {});
     sb.from("commandes_club").select("*").order("created_at")
       .then(({ data }) => setDbCommandesClub(data || [])).catch(() => {});
+    sb.from("paiements").select("*").eq("statut", "completed").order("created_at", { ascending: false })
+      .then(({ data }) => setDbPaiements(data || [])).catch(() => {});
   }, []);
 
   // Uniquement les vraies données Supabase
@@ -9141,56 +9143,13 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
   const confirmedNatToday  = dbResas.filter(r => r.statut === "confirmed" && toLocalDate(r.validated_at || r.created_at) === todayISO);
   const confirmedClubToday = dbResasClub.filter(r => r.statut === "confirmed" && toLocalDate(r.validated_at || r.created_at) === todayISO);
 
-  // Montant natation selon forfait (groupé par membre+date_creation)
-  const montantNat = (resas) => {
-    // Grouper par membre + enfants (triés) + minute de création = même logique que le reste
-    const groups = {};
-    resas.forEach(r => {
-      const enfantsKey = Array.isArray(r.enfants) ? [...r.enfants].sort().join(",") : "";
-      const minute = (r.created_at||"").slice(0,16);
-      const key = `${r.membre_id}-${enfantsKey}-${minute}`;
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(r);
-    });
-    const PRIX_NAT = { 1:20, 2:40, 3:60, 4:80, 5:95, 6:113, 7:131, 8:147, 9:162, 10:170 };
-    return Object.values(groups).reduce((total, g) => {
-      if (g[0].mode_paiement === "offert" || g[0].mode_paiement === "compte_fin_saison") return total; // Offerts et comptes fin saison → exclus
-      const n = g.length;
-      const prix = n <= 10 ? (PRIX_NAT[n] || n*20) : 170 + (n-10)*17;
-      return total + prix;
-    }, 0);
-  };
-
-  const LIBERTE_PRIX = { 6:96, 12:180, 18:252, 24:288, 30:330 };
-  const montantClub = (resas) => {
-    // Grouper par membre + session + enfants + minute
-    const groups = {};
-    resas.forEach(r => {
-      const enfantsKey = Array.isArray(r.enfants) ? [...r.enfants].sort().join(",") : "";
-      const minute = (r.created_at||"").slice(0,16);
-      const key = `${r.membre_id}-${r.session}-${enfantsKey}-${minute}`;
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(r);
-    });
-    return Object.values(groups).reduce((total, g) => {
-      const r0 = g[0];
-      // Offerts → exclus du total
-      if (r0.mode_paiement === "offert" || r0.mode_paiement === "compte_fin_saison") return total;
-      // Carte liberté : prix fixe unique
-      const nb = Number(Array.isArray(r0.enfants) ? r0.enfants[0] : 0);
-      if (nb >= 6 && LIBERTE_PRIX[nb]) return total + LIBERTE_PRIX[nb];
-      // Montant stocké sur la première résa = total du groupe
-      if (r0.montant) return total + Number(r0.montant);
-      // Fallback : lire [MONTANT:XX] × nb résas
-      const parLabelJour = g.reduce((s, r) => {
-        const match = (r.label_jour||"").match(/\[MONTANT:(\d+)\]/);
-        return s + (match ? Number(match[1]) : 0);
-      }, 0);
-      return total + parLabelJour;
-    }, 0);
-  };
-
-  const realTotal = montantNat(confirmedNatToday) + montantClub(confirmedClubToday);
+  // Montant encaissé aujourd'hui — lu depuis la table paiements (source unique de vérité)
+  const paiementsAujourdhui = (dbPaiements||[]).filter(p =>
+    p.statut === "completed" &&
+    p.type !== "offert" &&
+    toLocalDate(p.created_at) === todayISO
+  );
+  const realTotal = paiementsAujourdhui.reduce((s, p) => s + Number(p.montant||0), 0);
   const pendingCount = dbResas.filter(r => r.statut === "pending").length + dbResasClub.filter(r => r.statut === "pending").length;
 
   // Taux de remplissage natation — toute la saison
@@ -9326,6 +9285,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
             }
             setPendingModalConfirm(null);
             refreshResas();
+            sb.from("paiements").select("*").eq("statut","completed").order("created_at",{ascending:false}).then(({data})=>setDbPaiements(data||[])).catch(()=>{});
           }}
         />
       )}
