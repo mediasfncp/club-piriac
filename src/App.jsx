@@ -7339,8 +7339,18 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
               else { const m2=(resa.label_jour||"").match(/\[MONTANT:(\d+)\]/); montant=m2?Number(m2[1]):0; }
               await sb.from("reservations_club").update({ statut:"confirmed", validated_at:new Date().toISOString(), montant, mode_paiement:mode }).eq("id", resa.id);
               // ── Insert paiement ──
-              if (mode !== "compte_fin_saison" && mode !== "offert" && montant > 0) {
-                await sb.from("paiements").insert([{ membre_id:resa.membre_id, montant, type:"club", label:`Club · ${resa.label_jour||resa.session||""}`, statut:"completed" }]);
+              if (mode !== "compte_fin_saison" && mode !== "offert") {
+                let montantFinal = montant;
+                // Si montant 0 (forfait semaine via commandes_club), chercher dans commandes_club
+                if (montantFinal === 0) {
+                  const dateResa = resa.date_reservation?.slice(0,10);
+                  const { data: cmds } = await sb.from("commandes_club").select("montant_total, dates").eq("membre_id", resa.membre_id);
+                  const cmd = (cmds||[]).find(c => Array.isArray(c.dates) && c.dates.includes(dateResa));
+                  if (cmd) montantFinal = Number(cmd.montant_total||0);
+                }
+                if (montantFinal > 0) {
+                  await sb.from("paiements").insert([{ membre_id:resa.membre_id, montant:montantFinal, type:"club", label:`Club · ${resa.label_jour||resa.session||""}`, statut:"completed" }]);
+                }
               }
             }
             // Compte fin de saison → activer sur le membre
@@ -9262,6 +9272,14 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                 else { const m2=(r.label_jour||"").match(/\[MONTANT:(\d+)\]/); montant=m2?Number(m2[1]):0; }
                 await sb.from(table).update({ statut:"confirmed", validated_at:new Date().toISOString(), montant, mode_paiement:mode }).eq("id", r.id);
                 totalMontantClub += montant;
+              }
+              // Si montant 0 (forfait semaine via commandes_club), chercher dans commandes_club
+              if (totalMontantClub === 0) {
+                const membreIdClub = g.resas[0]?.membre_id;
+                const datesResas = new Set(g.resas.map(r => r.date_reservation?.slice(0,10)).filter(Boolean));
+                const { data: cmds } = await sb.from("commandes_club").select("montant_total, dates").eq("membre_id", membreIdClub);
+                const cmdMatching = (cmds||[]).filter(c => Array.isArray(c.dates) && c.dates.some(d => datesResas.has(d)));
+                totalMontantClub = cmdMatching.reduce((s, c) => s + Number(c.montant_total||0), 0);
               }
               // ── Insert paiement club ──
               if (totalMontantClub > 0) {
