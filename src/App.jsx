@@ -8796,10 +8796,11 @@ function EquipeTab() {
   const openNew = () => { setForm(emptyForm); setEditEmp(null); setShowForm(true); };
   const openEdit = (e) => { setForm({ ...emptyForm, ...e, jours: e.jours || [] }); setEditEmp(e); setShowForm(true); setSelected(null); };
 
-  const saveEmploye = async () => {
-    if (!form.prenom.trim() || !form.nom.trim()) { setError("Prénom et nom requis"); return; }
+  const saveEmploye = async (overrides = {}) => {
+    const finalForm = { ...form, ...overrides };
+    if (!finalForm.prenom.trim() || !finalForm.nom.trim()) { setError("Prénom et nom requis"); return; }
     setSaving(true); setError("");
-    const payload = { ...form, prenom: form.prenom.trim(), nom: form.nom.trim() };
+    const payload = { ...finalForm, prenom: finalForm.prenom.trim(), nom: finalForm.nom.trim() };
     if (editEmp) {
       await sb.from("employes").update(payload).eq("id", editEmp.id);
     } else {
@@ -8993,7 +8994,10 @@ function EmployeFormModal({ form, setForm, editEmp, saving, error, onClose, onSa
               <div style={{ fontWeight:800, color:"#2C3E50", fontSize:13, marginBottom:8 }}>📝 Notes</div>
               <textarea value={form.notes} onChange={e => setForm(f => ({...f, notes:e.target.value}))} placeholder="Informations complémentaires…" style={{ width:"100%", minHeight:70, border:"2px solid #eee", borderRadius:12, padding:"10px 12px", fontSize:13, fontFamily:"inherit", resize:"vertical", outline:"none", boxSizing:"border-box" }} />
             </div>
-            <SunBtn color={poste.color} full onClick={onSave} disabled={saving}>
+            <SunBtn color={poste.color} full onClick={() => {
+              // Synchronise les champs locaux avant sauvegarde (sans attendre onBlur)
+              onSave({ prenom: prenomLocal, nom: nomLocal, email: emailLocal, telephone: telLocal, num_social: numSocialLocal });
+            }} disabled={saving}>
               {saving ? "Enregistrement…" : editEmp ? "✅ Mettre à jour" : "✅ Ajouter l'employé"}
             </SunBtn>
           </div>
