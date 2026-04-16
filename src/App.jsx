@@ -7701,38 +7701,31 @@ function ComptabiliteTab({ dbMembres, dbResas, dbResasClub, dbCommandesClub = []
   const totalSoldesComptes      = bilanComptes.reduce((s, c) => s + c.solde, 0);
 
   // Totaux globaux saison
-  const totalEncaisse  = totalEncNat + totalEncClub + totalAcomptesComptes;
-  const totalCA        = totalEncNat + totalEncClub + totalPrestationsComptes;
+  // CA = uniquement ce qui est encaissé (paiements directs + acomptes) — les soldes restants N'entrent PAS dans le CA
+  const totalCA         = totalEncNat + totalEncClub + totalAcomptesComptes;
   const resteAEncaisser = Math.max(0, totalSoldesComptes - totalRemisesComptes);
-  const pctEncaisse    = totalCA > 0 ? Math.min(100, Math.round((totalEncaisse / totalCA) * 100)) : 0;
-
-  // Répartition par mode de paiement
-  const byMode = {};
-  [...confirmedNat, ...confirmedClub].forEach(r => {
-    const mode = r.mode_paiement || "non_renseigne";
-    if (!byMode[mode]) byMode[mode] = { count: 0, montant: 0 };
-    byMode[mode].count++;
-  });
+  const pctEncaisse     = (totalCA + resteAEncaisser) > 0 ? Math.min(100, Math.round((totalCA / (totalCA + resteAEncaisser)) * 100)) : 100;
 
   if (loading) return <div style={{ textAlign:"center", padding:40, color:"#bbb" }}>Chargement…</div>;
 
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
 
-      {/* ── Bilan global sombre ── */}
+      {/* ── Bilan global sombre — 5 encadrés sur une ligne ── */}
       <div style={{ background:"linear-gradient(135deg,#0F2027,#203A43,#2C5364)", borderRadius:20, padding:20, boxShadow:"0 8px 28px rgba(0,0,0,0.2)" }}>
         <div style={{ color:"rgba(255,255,255,0.6)", fontSize:11, fontWeight:800, letterSpacing:1, textTransform:"uppercase", marginBottom:14 }}>🧮 Comptabilité saison 2026</div>
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:16 }}>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:8, marginBottom:16 }}>
           {[
-            { label:"CA total saison",    val:`${totalCA} €`,        color:"#fff",    emoji:"💶" },
-            { label:"Encaissé",           val:`${totalEncaisse} €`,   color:"#6BCB77", emoji:"✅" },
-            { label:"Reste à encaisser",  val:`${resteAEncaisser} €`, color: resteAEncaisser===0?"#6BCB77":"#FF6B6B", emoji:"⏳" },
+            { label:"CA",                 val:`${totalCA} €`,           color:"#fff",    emoji:"💶" },
+            { label:"Natation encaissé",  val:`${totalEncNat} €`,       color:"#87CEEB", emoji:"🏊" },
+            { label:"Club encaissé",      val:`${totalEncClub + totalAcomptesComptes} €`, color:"#FF8E53", emoji:"🏖️" },
+            { label:"Reste à encaisser",  val:`${resteAEncaisser} €`,   color: resteAEncaisser===0?"#6BCB77":"#FF6B6B", emoji:"⏳" },
             { label:"Comptes fin saison", val:`${membresCompte.length}`, color:"#FFD93D", emoji:"📒" },
           ].map(k => (
-            <div key={k.label} style={{ background:"rgba(255,255,255,0.08)", borderRadius:14, padding:"14px 12px" }}>
-              <div style={{ fontSize:20 }}>{k.emoji}</div>
-              <div style={{ fontWeight:900, fontSize:20, color:k.color, marginTop:4 }}>{k.val}</div>
-              <div style={{ fontSize:10, color:"rgba(255,255,255,0.55)", marginTop:2 }}>{k.label}</div>
+            <div key={k.label} style={{ background:"rgba(255,255,255,0.08)", borderRadius:12, padding:"12px 8px", textAlign:"center" }}>
+              <div style={{ fontSize:18 }}>{k.emoji}</div>
+              <div style={{ fontWeight:900, fontSize:15, color:k.color, marginTop:4, lineHeight:1.2 }}>{k.val}</div>
+              <div style={{ fontSize:9, color:"rgba(255,255,255,0.5)", marginTop:3, lineHeight:1.3 }}>{k.label}</div>
             </div>
           ))}
         </div>
@@ -7814,16 +7807,6 @@ function ComptabiliteTab({ dbMembres, dbResas, dbResasClub, dbCommandesClub = []
         )}
       </div>
 
-      {/* ── Mode de paiement ── */}
-      <div style={{ background:"#fff", borderRadius:18, padding:16, boxShadow:"0 2px 10px rgba(0,0,0,0.05)" }}>
-        <div style={{ fontWeight:900, color:C.dark, fontSize:14, marginBottom:12 }}>💳 Répartition modes de paiement</div>
-        {Object.entries(byMode).sort((a,b)=>b[1].count-a[1].count).map(([mode, data]) => (
-          <div key={mode} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 0", borderBottom:"1px solid #f5f5f5" }}>
-            <span style={{ fontSize:13, color:"#555" }}>{MODES_LABEL[mode] || mode}</span>
-            <span style={{ fontWeight:900, color:C.dark }}>{data.count} résa{data.count>1?"s":""}</span>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }
