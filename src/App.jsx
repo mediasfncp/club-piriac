@@ -2321,6 +2321,7 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser, pa
                     if (emailDest) {
                       const prenom = user?.prenom || "";
                       const nom    = user?.nom    || "";
+                    const blocReglement = `<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:20px"><tr><td style="background:#FFF9F0;border:2px solid #FFD93D;border-radius:12px;padding:18px 20px"><p style="margin:0 0 10px;color:#b45309;font-size:14px;font-weight:700">💳 Comment régler votre inscription ?</p><p style="margin:0 0 12px;font-size:13px;color:#555;line-height:1.7">Vous pouvez régler selon les modes suivants :</p><table cellpadding="0" cellspacing="3" border="0" style="width:100%;margin-bottom:10px"><tr><td style="background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:4px 8px;font-size:10px;font-weight:700;color:#555;text-align:center">🏦 Virement</td><td width="3"></td><td style="background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:4px 8px;font-size:10px;font-weight:700;color:#555;text-align:center">✉️ Chèque</td><td width="3"></td><td style="background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:4px 8px;font-size:10px;font-weight:700;color:#555;text-align:center">💶 Espèces</td><td width="3"></td><td style="background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:4px 8px;font-size:10px;font-weight:700;color:#555;text-align:center">🎫 Chèques vacances</td></tr></table><p style="margin:4px 0;font-size:11px;color:#e67e22;font-weight:700;font-style:italic">⚠️ Virement bancaire accepté jusqu'au 15 juin.</p><p style="margin:4px 0;font-size:12px;color:#888;line-height:1.8">Pour le virement ou chèque, merci de préciser le nom de votre enfant en référence. Le chèque est à libeller à l'ordre de : SAUZEAU Charlène. En avant saison, à envoyer à : Mme SAUZEAU Charlène, 4 allée des Roitelets, 44500 LA BAULE.</p><table width="100%" style="margin-top:14px"><tr><td style="background:#EFF6FF;border:1.5px solid #1A8FE3;border-radius:10px;padding:14px 16px"><p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#1A8FE3">🏦 Coordonnées bancaires pour virement</p><table style="font-size:12px;color:#2C3E50;line-height:2"><tr><td style="font-weight:700;padding-right:12px">Titulaire</td><td>SAUZEAU CHARLENE</td></tr><tr><td style="font-weight:700;padding-right:12px">IBAN</td><td>FR76 1027 8360 6600 0130 5200 228</td></tr><tr><td style="font-weight:700;padding-right:12px">BIC</td><td>CMCIFR2A</td></tr></table></td></tr></table></td></tr></table>`;
                       const emailHtml = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"></head><body style="margin:0;padding:0;background:#f5f9ff;font-family:'Segoe UI',Arial,sans-serif;">
 <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:30px 10px;">
 <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
@@ -2328,25 +2329,16 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser, pa
     <div style="font-size:48px;margin-bottom:8px;">🎟️</div>
     <h1 style="color:#fff;margin:0;font-size:24px;font-weight:900;">Demande de Carte Liberté</h1>
     <p style="color:rgba(255,255,255,0.85);margin:8px 0 0;font-size:14px;">Eole Beach Club · Saison 2026</p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#EFF6FF;border-radius:10px;padding:14px;margin-top:20px;text-align:left;">
+      <tr><td style="font-size:15px;font-weight:700;color:#1A8FE3;">🎟️ Carte Liberté · ${selectedLiberte.label}</td></tr>
+      <tr><td style="font-size:22px;font-weight:900;color:#FF8E53;padding:6px 0;">${selectedLiberte.price} €</td></tr>
+      <tr><td style="font-size:13px;color:#555;">📅 Valable du 6 juillet au 22 août 2026</td></tr>
+    </table>
   </td></tr>
   <tr><td style="padding:32px 40px;">
     <p style="font-size:16px;color:#2C3E50;">Bonjour <strong>${prenom} ${nom}</strong>,</p>
     <p style="font-size:14px;color:#555;line-height:1.7;">Votre demande de <strong>Carte Liberté · ${selectedLiberte.label}</strong> a bien été enregistrée.</p>
-    <table width="100%" cellpadding="0" cellspacing="0" style="background:#FFF9F0;border-radius:12px;margin:20px 0;">
-      <tr><td style="padding:20px 24px;">
-        <div style="font-size:13px;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">Récapitulatif</div>
-        <table width="100%" cellpadding="4" cellspacing="0" style="font-size:14px;">
-          <tr><td style="color:#555;">🎟️ Formule</td><td style="text-align:right;font-weight:700;color:#2C3E50;">${selectedLiberte.label}</td></tr>
-          <tr><td style="color:#555;">💶 Montant</td><td style="text-align:right;font-weight:900;color:#FF8E53;font-size:18px;">${selectedLiberte.price} €</td></tr>
-          <tr><td style="color:#555;">📅 Validité</td><td style="text-align:right;font-weight:700;color:#2C3E50;">6 juillet – 22 août 2026</td></tr>
-        </table>
-      </td></tr>
-    </table>
-    <div style="background:#FFF3CD;border-radius:12px;padding:16px 20px;margin:16px 0;border-left:4px solid #FFD93D;">
-      <p style="margin:0;font-size:14px;color:#856404;font-weight:700;">⏳ Prochaine étape — Paiement</p>
-      <p style="margin:8px 0 0;font-size:13px;color:#856404;">L'équipe Eole Beach Club va vous contacter pour organiser le règlement :</p>
-      <div style="margin-top:10px;font-size:13px;color:#555;">🏦 Virement &nbsp;·&nbsp; ✉️ Chèque &nbsp;·&nbsp; 💶 Espèces &nbsp;·&nbsp; 🎫 Chèques vacances</div>
-    </div>
+    ${blocReglement}
     <p style="font-size:13px;color:#888;margin-top:8px;">Vos demi-journées seront créditées sur votre Carte Liberté <strong>dès réception du paiement</strong>.</p>
     <hr style="border:none;border-top:1px solid #eee;margin:24px 0;">
     <table width="100%" cellpadding="0" cellspacing="0">
