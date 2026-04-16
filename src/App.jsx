@@ -2391,9 +2391,10 @@ function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSession
     }).catch(() => {});
   }, []);
 
+  const sortByTime = (a, b) => a.time.localeCompare(b.time);
   const allForDay = (allSeasonSessions || []).filter(s => s.day === effectiveDayId);
-  const morning   = allForDay.filter(s => { const [h] = s.time.split(":").map(Number); return h < 13; });
-  const afternoon = allForDay.filter(s => { const [h] = s.time.split(":").map(Number); return h >= 13; });
+  const morning   = allForDay.filter(s => { const [h] = s.time.split(":").map(Number); return h < 13; }).sort(sortByTime);
+  const afternoon = allForDay.filter(s => { const [h] = s.time.split(":").map(Number); return h >= 13; }).sort(sortByTime);
 
   const getDateISO = (day) => {
     if (!day?.date) return "";
