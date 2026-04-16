@@ -7686,9 +7686,9 @@ function ComptabiliteTab({ dbMembres, dbResas, dbResasClub, dbCommandesClub = []
   const totalRemisesComptes     = bilanComptes.reduce((s, c) => s + c.remise, 0);
   const totalSoldesComptes      = bilanComptes.reduce((s, c) => s + c.solde, 0);
 
-  // CA total = encaissé direct (nat + club hors offerts) + prestations comptes fin saison (hors remises)
+  // CA total = encaissé direct (nat + club hors offerts) + acomptes comptes fin saison (pas les soldes)
   const totalEncaisse   = totalEncNat + totalEncClub + totalAcomptesComptes;
-  const totalCA         = totalEncNat + totalEncClub + totalPrestationsComptes;
+  const totalCA         = totalEncNat + totalEncClub + totalAcomptesComptes; // soldes restants exclus du CA
   const resteAEncaisser = Math.max(0, totalSoldesComptes);
   const pctEncaisse     = totalCA > 0 ? Math.min(100, Math.round((totalEncaisse / totalCA) * 100)) : 0;
 
@@ -7703,15 +7703,105 @@ function ComptabiliteTab({ dbMembres, dbResas, dbResasClub, dbCommandesClub = []
 
   if (loading) return <div style={{ textAlign:"center", padding:40, color:"#bbb" }}>Chargement…</div>;
 
+  const printBilan = () => {
+    const dateImpression = new Date().toLocaleDateString("fr-FR", { day:"2-digit", month:"long", year:"numeric" });
+    const lignesComptes = bilanComptes.map(({ m, totalNat, totalClub, totalAcomptes, remise, solde, nbNat, nbClub }) => `
+      <tr style="background:${solde===0?"#f0fff4":"#fff"}">
+        <td style="padding:8px 12px;font-weight:700">${PRENOM(m.prenom)} ${NOM(m.nom)}</td>
+        <td style="padding:8px 12px;text-align:center;color:#1A8FE3">${totalNat>0?totalNat+" €":"—"}</td>
+        <td style="padding:8px 12px;text-align:center;color:#FF8E53">${totalClub>0?totalClub+" €":"—"}</td>
+        <td style="padding:8px 12px;text-align:center;color:#6BCB77">${totalAcomptes>0?totalAcomptes+" €":"—"}</td>
+        <td style="padding:8px 12px;text-align:center;color:${solde===0?"#6BCB77":"#FF9500"};font-weight:900">${solde===0?"✅":solde+" €"}${remise>0?" (-"+remise+" €)":""}</td>
+      </tr>`).join("");
+
+    const ventilRows = [
+      ["🏊 Natation (paiements validés)", totalEncNat, "#1A8FE3"],
+      ["🏖️ Club de Plage (paiements validés)", totalEncClub, "#FF8E53"],
+      ["📒 Acomptes comptes fin saison", totalAcomptesComptes, "#6366F1"],
+      ["⏳ Soldes restants fin saison", totalSoldesComptes, "#FF9500"],
+      ["🎁 Remises accordées", totalRemisesComptes, "#6BCB77"],
+    ].map(([l,v,c]) => `<tr><td style="padding:6px 12px;font-size:13px">${l}</td><td style="padding:6px 12px;text-align:right;font-weight:900;color:${c}">${v} €</td></tr>`).join("");
+
+    const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
+    <title>Bilan FNCP 2026</title>
+    <style>
+      body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 30px; color: #2C3E50; }
+      h1 { font-size: 24px; margin: 0 0 4px; } h2 { font-size: 16px; font-weight: 700; margin: 24px 0 8px; color: #0066CC; }
+      .header { background: linear-gradient(135deg,#0F2027,#203A43,#2C5364); color:#fff; border-radius:14px; padding:20px 24px; margin-bottom:24px; }
+      .subtitle { color:rgba(255,255,255,0.6); font-size:11px; letter-spacing:1px; text-transform:uppercase; margin-bottom:12px; }
+      .kpis { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:8px; }
+      .kpi { background:rgba(255,255,255,0.12); border-radius:10px; padding:12px 16px; min-width:110px; }
+      .kpi-val { font-size:20px; font-weight:900; margin:4px 0 2px; }
+      .kpi-label { font-size:10px; color:rgba(255,255,255,0.55); }
+      .bar-bg { background:rgba(255,255,255,0.15); border-radius:50px; height:8px; overflow:hidden; margin:10px 0 4px; }
+      .bar { height:100%; background:linear-gradient(90deg,#6BCB77,#4ECDC4); border-radius:50px; }
+      .pct { font-size:11px; color:rgba(255,255,255,0.55); text-align:right; }
+      table { width:100%; border-collapse:collapse; font-size:13px; }
+      th { background:#F0F4F8; padding:8px 12px; text-align:left; font-size:11px; font-weight:900; color:#888; text-transform:uppercase; }
+      tr:nth-child(even) { background:#FAFBFF; }
+      .total-row { background:#F0F4F8 !important; font-weight:900; font-size:14px; border-top:2px solid #E0E8F0; }
+      .footer { margin-top:30px; font-size:11px; color:#bbb; border-top:1px solid #eee; padding-top:10px; }
+      @media print { body { padding:10px; } }
+    </style></head><body>
+    <div class="header">
+      <div class="subtitle">🧮 Comptabilité saison 2026</div>
+      <h1>Bilan FNCP — Saison 2026</h1>
+      <p style="color:rgba(255,255,255,0.7);font-size:13px;margin:4px 0 16px">Édité le ${dateImpression}</p>
+      <div class="kpis">
+        <div class="kpi"><div style="font-size:18px">💶</div><div class="kpi-val" style="color:#fff">${totalCA} €</div><div class="kpi-label">CA total</div></div>
+        <div class="kpi"><div style="font-size:18px">✅</div><div class="kpi-val" style="color:#6BCB77">${totalEncaisse} €</div><div class="kpi-label">Encaissé</div></div>
+        <div class="kpi"><div style="font-size:18px">⏳</div><div class="kpi-val" style="color:${resteAEncaisser===0?"#6BCB77":"#FF6B6B"}">${resteAEncaisser} €</div><div class="kpi-label">Reste à encaisser</div></div>
+        <div class="kpi"><div style="font-size:18px">📒</div><div class="kpi-val" style="color:#FFD93D">${membresCompte.length}</div><div class="kpi-label">Fin de saison</div></div>
+        <div class="kpi"><div style="font-size:18px">🏊</div><div class="kpi-val" style="color:#4ECDC4">${totalEncNat} €</div><div class="kpi-label">Natation enc.</div></div>
+        <div class="kpi"><div style="font-size:18px">🏖️</div><div class="kpi-val" style="color:#FF8E53">${totalEncClub} €</div><div class="kpi-label">Club enc.</div></div>
+      </div>
+      <div class="bar-bg"><div class="bar" style="width:${pctEncaisse}%"></div></div>
+      <div class="pct">Progression encaissement : ${pctEncaisse}%</div>
+    </div>
+
+    <h2>📂 Ventilation des recettes</h2>
+    <table><thead><tr><th>Catégorie</th><th style="text-align:right">Montant</th></tr></thead>
+    <tbody>${ventilRows}
+      <tr class="total-row"><td style="padding:10px 12px">TOTAL CA SAISON</td><td style="padding:10px 12px;text-align:right;font-size:16px">${totalCA} €</td></tr>
+    </tbody></table>
+
+    <h2>📒 Comptes fin de saison</h2>
+    <table><thead><tr>
+      <th>Membre</th><th style="text-align:center;color:#1A8FE3">Natation</th>
+      <th style="text-align:center;color:#FF8E53">Club</th>
+      <th style="text-align:center;color:#6BCB77">Versé</th>
+      <th style="text-align:center;color:#FF9500">Solde</th>
+    </tr></thead><tbody>${lignesComptes}
+      <tr class="total-row">
+        <td style="padding:10px 12px">TOTAL</td>
+        <td style="padding:10px 12px;text-align:center;color:#1A8FE3">${bilanComptes.reduce((s,c)=>s+c.totalNat,0)} €</td>
+        <td style="padding:10px 12px;text-align:center;color:#FF8E53">${bilanComptes.reduce((s,c)=>s+c.totalClub,0)} €</td>
+        <td style="padding:10px 12px;text-align:center;color:#6BCB77">${totalAcomptesComptes} €</td>
+        <td style="padding:10px 12px;text-align:center;color:${totalSoldesComptes===0?"#6BCB77":"#FF9500"}">${totalSoldesComptes===0?"✅":totalSoldesComptes+" €"}</td>
+      </tr>
+    </tbody></table>
+    <div class="footer">FNCP — Club de Plage · Bilan saison 2026 · Imprimé le ${dateImpression}</div>
+    <script>window.onload=()=>window.print();</script>
+    </body></html>`;
+    const w = window.open("","_blank"); w.document.write(html); w.document.close();
+  };
+
   return (
-    <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+    <div style={{ display:"flex", flexDirection:"column", gap:14, alignItems:"center" }}>
+
+      {/* ── Bouton impression ── */}
+      <div style={{ width:"100%", display:"flex", justifyContent:"flex-end" }}>
+        <button onClick={printBilan} style={{ background:"linear-gradient(135deg,#0066CC,#1A8FE3)", color:"#fff", border:"none", borderRadius:50, padding:"10px 20px", fontWeight:900, fontSize:13, cursor:"pointer", fontFamily:"inherit", boxShadow:"0 4px 14px rgba(0,102,204,0.35)", display:"flex", alignItems:"center", gap:8 }}>
+          🖨️ Imprimer le bilan 2026
+        </button>
+      </div>
 
       {/* ── Bilan global sombre ── */}
-      <div style={{ background:"linear-gradient(135deg,#0F2027,#203A43,#2C5364)", borderRadius:20, padding:20, boxShadow:"0 8px 28px rgba(0,0,0,0.2)" }}>
-        <div style={{ color:"rgba(255,255,255,0.6)", fontSize:11, fontWeight:800, letterSpacing:1, textTransform:"uppercase", marginBottom:14 }}>🧮 Comptabilité saison 2026</div>
+      <div style={{ width:"100%", background:"linear-gradient(135deg,#0F2027,#203A43,#2C5364)", borderRadius:20, padding:20, boxShadow:"0 8px 28px rgba(0,0,0,0.2)" }}>
+        <div style={{ color:"rgba(255,255,255,0.6)", fontSize:11, fontWeight:800, letterSpacing:1, textTransform:"uppercase", marginBottom:14, textAlign:"center" }}>🧮 Comptabilité saison 2026</div>
 
         {/* Ligne unique scrollable avec les 6 KPIs */}
-        <div style={{ display:"flex", gap:10, overflowX:"auto", paddingBottom:4, marginBottom:14 }}>
+        <div style={{ display:"flex", gap:10, overflowX:"auto", paddingBottom:4, marginBottom:14, justifyContent:"center", flexWrap:"wrap" }}>
           {[
             { label:"CA total",          val:`${totalCA} €`,           color:"#fff",    emoji:"💶" },
             { label:"Encaissé",          val:`${totalEncaisse} €`,      color:"#6BCB77", emoji:"✅" },
@@ -7720,7 +7810,7 @@ function ComptabiliteTab({ dbMembres, dbResas, dbResasClub, dbCommandesClub = []
             { label:"Natation enc.",     val:`${totalEncNat} €`,        color:"#4ECDC4", emoji:"🏊" },
             { label:"Club enc.",         val:`${totalEncClub} €`,       color:"#FF8E53", emoji:"🏖️" },
           ].map(k => (
-            <div key={k.label} style={{ background:"rgba(255,255,255,0.08)", borderRadius:14, padding:"12px 14px", minWidth:100, flexShrink:0 }}>
+            <div key={k.label} style={{ background:"rgba(255,255,255,0.08)", borderRadius:14, padding:"12px 14px", minWidth:100, textAlign:"center" }}>
               <div style={{ fontSize:18 }}>{k.emoji}</div>
               <div style={{ fontWeight:900, fontSize:17, color:k.color, marginTop:4, whiteSpace:"nowrap" }}>{k.val}</div>
               <div style={{ fontSize:10, color:"rgba(255,255,255,0.5)", marginTop:2, whiteSpace:"nowrap" }}>{k.label}</div>
@@ -7737,9 +7827,9 @@ function ComptabiliteTab({ dbMembres, dbResas, dbResasClub, dbCommandesClub = []
       </div>
 
       {/* ── Ventilation des recettes (depuis paiements validés) ── */}
-      <div style={{ background:"#fff", borderRadius:18, padding:16, boxShadow:"0 2px 10px rgba(0,0,0,0.05)" }}>
-        <div style={{ fontWeight:900, color:C.dark, fontSize:14, marginBottom:4 }}>📂 Ventilation des recettes</div>
-        <div style={{ fontSize:11, color:"#aaa", marginBottom:12 }}>Calculé depuis les paiements validés</div>
+      <div style={{ width:"100%", background:"#fff", borderRadius:18, padding:16, boxShadow:"0 2px 10px rgba(0,0,0,0.05)" }}>
+        <div style={{ fontWeight:900, color:C.dark, fontSize:14, marginBottom:4, textAlign:"center" }}>📂 Ventilation des recettes</div>
+        <div style={{ fontSize:11, color:"#aaa", marginBottom:12, textAlign:"center" }}>Calculé depuis les paiements validés</div>
         {[
           { label:"🏊 Natation (paiements validés)",       val: totalEncNat,           color:C.ocean },
           { label:"🏖️ Club de Plage (paiements validés)",  val: totalEncClub,          color:C.coral },
@@ -7759,7 +7849,7 @@ function ComptabiliteTab({ dbMembres, dbResas, dbResasClub, dbCommandesClub = []
       </div>
 
       {/* ── Comptes fin de saison : tableau actualisé ── */}
-      <div style={{ background:"#fff", borderRadius:18, overflow:"hidden", boxShadow:"0 2px 10px rgba(0,0,0,0.05)" }}>
+      <div style={{ width:"100%", background:"#fff", borderRadius:18, overflow:"hidden", boxShadow:"0 2px 10px rgba(0,0,0,0.05)" }}>
         <div style={{ padding:"12px 16px", background:"#F0F4F8" }}>
           <div style={{ fontWeight:900, color:C.dark, fontSize:14 }}>📒 Comptes fin de saison — Soldes</div>
           <div style={{ fontSize:11, color:"#aaa", marginTop:2 }}>Calculé en temps réel depuis les réservations confirmées</div>
