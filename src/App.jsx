@@ -7666,9 +7666,6 @@ function ComptabiliteTab({ dbMembres, dbResas, dbResasClub, dbCommandesClub = []
   const MODES_LABEL = { especes:"💵 Espèces", cheque:"📝 Chèque", virement:"🏦 Virement", cb:"💳 CB", paypal:"🅿️ PayPal", offert:"🎁 Offert", compte_fin_saison:"📒 Fin de saison" };
 
   // Calcul global à partir des réservations confirmées
-  const PRIX_NAT_G = { 1:20,2:40,3:60,4:80,5:95,6:113,7:131,8:147,9:162,10:170 };
-  const LP_G = { 6:96,12:180,18:252,24:288,30:330 };
-
   const confirmedNat  = (dbResas || []).filter(r => r.statut === "confirmed");
   const confirmedClub = (dbResasClub || []).filter(r => r.statut === "confirmed");
 
@@ -7676,21 +7673,13 @@ function ComptabiliteTab({ dbMembres, dbResas, dbResasClub, dbCommandesClub = []
   const confirmedNatPaie  = confirmedNat.filter(r => r.mode_paiement && r.mode_paiement !== "compte_fin_saison" && r.mode_paiement !== "offert");
   const confirmedClubPaie = confirmedClub.filter(r => r.mode_paiement && r.mode_paiement !== "compte_fin_saison" && r.mode_paiement !== "offert");
 
-  const totalEncNat = (() => {
-    const g = {};
-    confirmedNatPaie.forEach(r => { const k = `${r.membre_id}|${(Array.isArray(r.enfants)?[...r.enfants].sort().join(","):"")}|${(r.created_at||"").slice(0,16)}`; if (!g[k]) g[k]=[]; g[k].push(r); });
-    return Object.values(g).reduce((s, gr) => { const n = gr.length; return s + (n<=10?(PRIX_NAT_G[n]||n*20):170+(n-10)*17); }, 0);
-  })();
-  const totalEncClub = (() => {
-    const g = {};
-    confirmedClubPaie.forEach(r => { const k = `${r.membre_id}|${r.session}|${(Array.isArray(r.enfants)?[...r.enfants].sort().join(","):"")}|${(r.created_at||"").slice(0,16)}`; if (!g[k]) g[k]=[]; g[k].push(r); });
-    return Object.values(g).reduce((s, gr) => {
-      const r0 = gr[0]; const nb = Number(Array.isArray(r0.enfants)?r0.enfants[0]:0);
-      if (nb>=6 && LP_G[nb]) return s+LP_G[nb];
-      if (r0.montant) return s+Number(r0.montant);
-      return s+gr.reduce((a,r)=>{ const m=(r.label_jour||"").match(/\[MONTANT:(\d+)\]/); return a+(m?Number(m[1]):0); },0);
-    }, 0);
-  })();
+  // Somme directe des montants enregistrés sur chaque réservation
+  const totalEncNat  = confirmedNatPaie.reduce((s, r) => s + Number(r.montant || 0), 0);
+  const totalEncClub = confirmedClubPaie.reduce((s, r) => {
+    if (Number(r.montant) > 0) return s + Number(r.montant);
+    const match = (r.label_jour || "").match(/\[MONTANT:(\d+)\]/);
+    return s + (match ? Number(match[1]) : 0);
+  }, 0);
 
   // Comptes fin de saison — totaux
   const membresCompte = tousMembres.filter(m => m.compte_fin_saison && !m.compte_solde);
