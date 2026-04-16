@@ -2316,6 +2316,66 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser, pa
                         enfants: [String(parseInt(selectedLiberte.label))],
                       }]);
                     }
+                    // ── Email de confirmation Carte Liberté ──
+                    const emailDest = user?.email || "";
+                    if (emailDest) {
+                      const prenom = user?.prenom || "";
+                      const nom    = user?.nom    || "";
+                      const emailHtml = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"></head><body style="margin:0;padding:0;background:#f5f9ff;font-family:'Segoe UI',Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:30px 10px;">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+  <tr><td style="background:linear-gradient(135deg,#FF8E53,#FFD93D);padding:32px 40px;text-align:center;">
+    <div style="font-size:48px;margin-bottom:8px;">🎟️</div>
+    <h1 style="color:#fff;margin:0;font-size:24px;font-weight:900;">Demande de Carte Liberté</h1>
+    <p style="color:rgba(255,255,255,0.85);margin:8px 0 0;font-size:14px;">Eole Beach Club · Saison 2026</p>
+  </td></tr>
+  <tr><td style="padding:32px 40px;">
+    <p style="font-size:16px;color:#2C3E50;">Bonjour <strong>${prenom} ${nom}</strong>,</p>
+    <p style="font-size:14px;color:#555;line-height:1.7;">Votre demande de <strong>Carte Liberté · ${selectedLiberte.label}</strong> a bien été enregistrée.</p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#FFF9F0;border-radius:12px;margin:20px 0;">
+      <tr><td style="padding:20px 24px;">
+        <div style="font-size:13px;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">Récapitulatif</div>
+        <table width="100%" cellpadding="4" cellspacing="0" style="font-size:14px;">
+          <tr><td style="color:#555;">🎟️ Formule</td><td style="text-align:right;font-weight:700;color:#2C3E50;">${selectedLiberte.label}</td></tr>
+          <tr><td style="color:#555;">💶 Montant</td><td style="text-align:right;font-weight:900;color:#FF8E53;font-size:18px;">${selectedLiberte.price} €</td></tr>
+          <tr><td style="color:#555;">📅 Validité</td><td style="text-align:right;font-weight:700;color:#2C3E50;">6 juillet – 22 août 2026</td></tr>
+        </table>
+      </td></tr>
+    </table>
+    <div style="background:#FFF3CD;border-radius:12px;padding:16px 20px;margin:16px 0;border-left:4px solid #FFD93D;">
+      <p style="margin:0;font-size:14px;color:#856404;font-weight:700;">⏳ Prochaine étape — Paiement</p>
+      <p style="margin:8px 0 0;font-size:13px;color:#856404;">L'équipe Eole Beach Club va vous contacter pour organiser le règlement :</p>
+      <div style="margin-top:10px;font-size:13px;color:#555;">🏦 Virement &nbsp;·&nbsp; ✉️ Chèque &nbsp;·&nbsp; 💶 Espèces &nbsp;·&nbsp; 🎫 Chèques vacances</div>
+    </div>
+    <p style="font-size:13px;color:#888;margin-top:8px;">Vos demi-journées seront créditées sur votre Carte Liberté <strong>dès réception du paiement</strong>.</p>
+    <hr style="border:none;border-top:1px solid #eee;margin:24px 0;">
+    <table width="100%" cellpadding="0" cellspacing="0">
+      <tr>
+        <td style="font-size:12px;color:#aaa;">
+          <strong style="color:#555;">🏖️ Eole Beach Club</strong><br>
+          Piriac-sur-Mer · 44420<br>
+          <a href="mailto:clubdeplage.piriacsurmer@hotmail.com" style="color:#FF8E53;">clubdeplage.piriacsurmer@hotmail.com</a>
+        </td>
+      </tr>
+    </table>
+  </td></tr>
+</table>
+</td></tr></table>
+</body></html>`;
+                      try {
+                        await fetch("https://rnaosrftcntomehaepjh.supabase.co/functions/v1/send-email", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json", "Authorization": "Bearer sb_publishable_n9m3QjIKt9OnyN_d8n9cAQ_VQpUpnOu" },
+                          body: JSON.stringify({
+                            type: "confirmation",
+                            to: emailDest,
+                            toName: `${prenom} ${nom}`.trim(),
+                            subject: `🎟️ Eole Beach Club — Carte Liberté · ${selectedLiberte.label} (${selectedLiberte.price} €)`,
+                            htmlContent: emailHtml,
+                          }),
+                        });
+                      } catch(mailErr) { console.warn("Email Liberté non envoyé :", mailErr); }
+                    }
                   } catch(e) { console.warn(e); }
                   setDone("liberte");
                 }}>📨 Envoyer la demande · {selectedLiberte.price} €</SunBtn>
@@ -7613,21 +7673,18 @@ function ComptabiliteTab({ dbMembres, dbResas, dbResasClub, dbCommandesClub = []
   const [acomptes, setAcomptes] = useState({});
   const [remises, setRemises]   = useState({});
   const [exclusions, setExclusions] = useState({});
-  const [dbPaiements, setDbPaiements] = useState([]);
 
   useEffect(() => {
     Promise.all([
       sb.from("comptes_acomptes").select("*"),
       sb.from("comptes_exclusions").select("*"),
-      sb.from("paiements").select("*").eq("statut", "completed"),
-    ]).then(([{ data: ac }, { data: ex }, { data: paie }]) => {
+    ]).then(([{ data: ac }, { data: ex }]) => {
       const acMap = {};
       (ac || []).forEach(a => { if (!acMap[a.membre_id]) acMap[a.membre_id] = []; acMap[a.membre_id].push(a); });
       setAcomptes(acMap);
       const exMap = {};
       (ex || []).forEach(e => { exMap[e.resa_id] = e.resa_type; });
       setExclusions(exMap);
-      setDbPaiements(paie || []);
       setLoading(false);
     }).catch(() => setLoading(false));
   }, []);
@@ -7668,156 +7725,77 @@ function ComptabiliteTab({ dbMembres, dbResas, dbResasClub, dbCommandesClub = []
   const tousMembres = dbMembres || [];
   const MODES_LABEL = { especes:"💵 Espèces", cheque:"📝 Chèque", virement:"🏦 Virement", cb:"💳 CB", paypal:"🅿️ PayPal", offert:"🎁 Offert", compte_fin_saison:"📒 Fin de saison" };
 
-  // ── Paiements validés depuis la table paiements (source de vérité) ──
-  const paiementsNat  = dbPaiements.filter(p => p.type === "natation");
-  const paiementsClub = dbPaiements.filter(p => p.type === "club");
-  const paiementsOfferts = dbPaiements.filter(p => p.mode_paiement === "offert" || p.type === "offert");
+  // Calcul global à partir des réservations confirmées
+  const PRIX_NAT_G = { 1:20,2:40,3:60,4:80,5:95,6:113,7:131,8:147,9:162,10:170 };
+  const LP_G = { 6:96,12:180,18:252,24:288,30:330 };
 
-  // Totaux encaissés réels (hors offerts)
-  const totalEncNat  = paiementsNat.filter(p => p.mode_paiement !== "offert").reduce((s, p) => s + Number(p.montant || 0), 0);
-  const totalEncClub = paiementsClub.filter(p => p.mode_paiement !== "offert").reduce((s, p) => s + Number(p.montant || 0), 0);
+  const confirmedNat  = (dbResas || []).filter(r => r.statut === "confirmed");
+  const confirmedClub = (dbResasClub || []).filter(r => r.statut === "confirmed");
+
+  // Total encaissé paiements directs (hors fin saison et offerts)
+  const confirmedNatPaie  = confirmedNat.filter(r => r.mode_paiement && r.mode_paiement !== "compte_fin_saison" && r.mode_paiement !== "offert");
+  const confirmedClubPaie = confirmedClub.filter(r => r.mode_paiement && r.mode_paiement !== "compte_fin_saison" && r.mode_paiement !== "offert");
+
+  const totalEncNat = (() => {
+    const g = {};
+    confirmedNatPaie.forEach(r => { const k = `${r.membre_id}|${(Array.isArray(r.enfants)?[...r.enfants].sort().join(","):"")}|${(r.created_at||"").slice(0,16)}`; if (!g[k]) g[k]=[]; g[k].push(r); });
+    return Object.values(g).reduce((s, gr) => { const n = gr.length; return s + (n<=10?(PRIX_NAT_G[n]||n*20):170+(n-10)*17); }, 0);
+  })();
+  const totalEncClub = (() => {
+    const g = {};
+    confirmedClubPaie.forEach(r => { const k = `${r.membre_id}|${r.session}|${(Array.isArray(r.enfants)?[...r.enfants].sort().join(","):"")}|${(r.created_at||"").slice(0,16)}`; if (!g[k]) g[k]=[]; g[k].push(r); });
+    return Object.values(g).reduce((s, gr) => {
+      const r0 = gr[0]; const nb = Number(Array.isArray(r0.enfants)?r0.enfants[0]:0);
+      if (nb>=6 && LP_G[nb]) return s+LP_G[nb];
+      if (r0.montant) return s+Number(r0.montant);
+      return s+gr.reduce((a,r)=>{ const m=(r.label_jour||"").match(/\[MONTANT:(\d+)\]/); return a+(m?Number(m[1]):0); },0);
+    }, 0);
+  })();
 
   // Comptes fin de saison — totaux
   const membresCompte = tousMembres.filter(m => m.compte_fin_saison && !m.compte_solde);
   const bilanComptes  = loading ? [] : membresCompte.map(m => ({ m, ...getMontantMembre(m) }));
-  // Pour le CA fin de saison : exclure les offerts (remises)
-  const totalPrestationsComptes = bilanComptes.reduce((s, c) => s + Math.max(0, c.totalPrestations - c.remise), 0);
+  const totalPrestationsComptes = bilanComptes.reduce((s, c) => s + c.totalPrestations, 0);
   const totalAcomptesComptes    = bilanComptes.reduce((s, c) => s + c.totalAcomptes, 0);
   const totalRemisesComptes     = bilanComptes.reduce((s, c) => s + c.remise, 0);
   const totalSoldesComptes      = bilanComptes.reduce((s, c) => s + c.solde, 0);
 
-  // CA total = encaissé direct (nat + club hors offerts) + acomptes comptes fin saison (pas les soldes)
-  const totalEncaisse   = totalEncNat + totalEncClub + totalAcomptesComptes;
-  const totalCA         = totalEncNat + totalEncClub + totalAcomptesComptes; // soldes restants exclus du CA
-  const resteAEncaisser = Math.max(0, totalSoldesComptes);
-  const pctEncaisse     = totalCA > 0 ? Math.min(100, Math.round((totalEncaisse / totalCA) * 100)) : 0;
+  // Totaux globaux saison
+  const totalEncaisse  = totalEncNat + totalEncClub + totalAcomptesComptes;
+  const totalCA        = totalEncNat + totalEncClub + totalPrestationsComptes;
+  const resteAEncaisser = Math.max(0, totalSoldesComptes - totalRemisesComptes);
+  const pctEncaisse    = totalCA > 0 ? Math.min(100, Math.round((totalEncaisse / totalCA) * 100)) : 0;
 
-  // Ventilation par mode depuis paiements validés
+  // Répartition par mode de paiement
   const byMode = {};
-  dbPaiements.forEach(p => {
-    const mode = p.mode_paiement || "non_renseigne";
+  [...confirmedNat, ...confirmedClub].forEach(r => {
+    const mode = r.mode_paiement || "non_renseigne";
     if (!byMode[mode]) byMode[mode] = { count: 0, montant: 0 };
     byMode[mode].count++;
-    byMode[mode].montant += Number(p.montant || 0);
   });
 
   if (loading) return <div style={{ textAlign:"center", padding:40, color:"#bbb" }}>Chargement…</div>;
 
-  const printBilan = () => {
-    const dateImpression = new Date().toLocaleDateString("fr-FR", { day:"2-digit", month:"long", year:"numeric" });
-    const lignesComptes = bilanComptes.map(({ m, totalNat, totalClub, totalAcomptes, remise, solde, nbNat, nbClub }) => `
-      <tr style="background:${solde===0?"#f0fff4":"#fff"}">
-        <td style="padding:8px 12px;font-weight:700">${PRENOM(m.prenom)} ${NOM(m.nom)}</td>
-        <td style="padding:8px 12px;text-align:center;color:#1A8FE3">${totalNat>0?totalNat+" €":"—"}</td>
-        <td style="padding:8px 12px;text-align:center;color:#FF8E53">${totalClub>0?totalClub+" €":"—"}</td>
-        <td style="padding:8px 12px;text-align:center;color:#6BCB77">${totalAcomptes>0?totalAcomptes+" €":"—"}</td>
-        <td style="padding:8px 12px;text-align:center;color:${solde===0?"#6BCB77":"#FF9500"};font-weight:900">${solde===0?"✅":solde+" €"}${remise>0?" (-"+remise+" €)":""}</td>
-      </tr>`).join("");
-
-    const ventilRows = [
-      ["🏊 Natation (paiements validés)", totalEncNat, "#1A8FE3"],
-      ["🏖️ Club de Plage (paiements validés)", totalEncClub, "#FF8E53"],
-      ["📒 Acomptes comptes fin saison", totalAcomptesComptes, "#6366F1"],
-      ["⏳ Soldes restants fin saison", totalSoldesComptes, "#FF9500"],
-      ["🎁 Remises accordées", totalRemisesComptes, "#6BCB77"],
-    ].map(([l,v,c]) => `<tr><td style="padding:6px 12px;font-size:13px">${l}</td><td style="padding:6px 12px;text-align:right;font-weight:900;color:${c}">${v} €</td></tr>`).join("");
-
-    const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
-    <title>Bilan FNCP 2026</title>
-    <style>
-      body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 30px; color: #2C3E50; }
-      h1 { font-size: 24px; margin: 0 0 4px; } h2 { font-size: 16px; font-weight: 700; margin: 24px 0 8px; color: #0066CC; }
-      .header { background: linear-gradient(135deg,#0F2027,#203A43,#2C5364); color:#fff; border-radius:14px; padding:20px 24px; margin-bottom:24px; }
-      .subtitle { color:rgba(255,255,255,0.6); font-size:11px; letter-spacing:1px; text-transform:uppercase; margin-bottom:12px; }
-      .kpis { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:8px; }
-      .kpi { background:rgba(255,255,255,0.12); border-radius:10px; padding:12px 16px; min-width:110px; }
-      .kpi-val { font-size:20px; font-weight:900; margin:4px 0 2px; }
-      .kpi-label { font-size:10px; color:rgba(255,255,255,0.55); }
-      .bar-bg { background:rgba(255,255,255,0.15); border-radius:50px; height:8px; overflow:hidden; margin:10px 0 4px; }
-      .bar { height:100%; background:linear-gradient(90deg,#6BCB77,#4ECDC4); border-radius:50px; }
-      .pct { font-size:11px; color:rgba(255,255,255,0.55); text-align:right; }
-      table { width:100%; border-collapse:collapse; font-size:13px; }
-      th { background:#F0F4F8; padding:8px 12px; text-align:left; font-size:11px; font-weight:900; color:#888; text-transform:uppercase; }
-      tr:nth-child(even) { background:#FAFBFF; }
-      .total-row { background:#F0F4F8 !important; font-weight:900; font-size:14px; border-top:2px solid #E0E8F0; }
-      .footer { margin-top:30px; font-size:11px; color:#bbb; border-top:1px solid #eee; padding-top:10px; }
-      @media print { body { padding:10px; } }
-    </style></head><body>
-    <div class="header">
-      <div class="subtitle">🧮 Comptabilité saison 2026</div>
-      <h1>Bilan FNCP — Saison 2026</h1>
-      <p style="color:rgba(255,255,255,0.7);font-size:13px;margin:4px 0 16px">Édité le ${dateImpression}</p>
-      <div class="kpis">
-        <div class="kpi"><div style="font-size:18px">💶</div><div class="kpi-val" style="color:#fff">${totalCA} €</div><div class="kpi-label">CA total</div></div>
-        <div class="kpi"><div style="font-size:18px">✅</div><div class="kpi-val" style="color:#6BCB77">${totalEncaisse} €</div><div class="kpi-label">Encaissé</div></div>
-        <div class="kpi"><div style="font-size:18px">⏳</div><div class="kpi-val" style="color:${resteAEncaisser===0?"#6BCB77":"#FF6B6B"}">${resteAEncaisser} €</div><div class="kpi-label">Reste à encaisser</div></div>
-        <div class="kpi"><div style="font-size:18px">📒</div><div class="kpi-val" style="color:#FFD93D">${membresCompte.length}</div><div class="kpi-label">Fin de saison</div></div>
-        <div class="kpi"><div style="font-size:18px">🏊</div><div class="kpi-val" style="color:#4ECDC4">${totalEncNat} €</div><div class="kpi-label">Natation enc.</div></div>
-        <div class="kpi"><div style="font-size:18px">🏖️</div><div class="kpi-val" style="color:#FF8E53">${totalEncClub} €</div><div class="kpi-label">Club enc.</div></div>
-      </div>
-      <div class="bar-bg"><div class="bar" style="width:${pctEncaisse}%"></div></div>
-      <div class="pct">Progression encaissement : ${pctEncaisse}%</div>
-    </div>
-
-    <h2>📂 Ventilation des recettes</h2>
-    <table><thead><tr><th>Catégorie</th><th style="text-align:right">Montant</th></tr></thead>
-    <tbody>${ventilRows}
-      <tr class="total-row"><td style="padding:10px 12px">TOTAL CA SAISON</td><td style="padding:10px 12px;text-align:right;font-size:16px">${totalCA} €</td></tr>
-    </tbody></table>
-
-    <h2>📒 Comptes fin de saison</h2>
-    <table><thead><tr>
-      <th>Membre</th><th style="text-align:center;color:#1A8FE3">Natation</th>
-      <th style="text-align:center;color:#FF8E53">Club</th>
-      <th style="text-align:center;color:#6BCB77">Versé</th>
-      <th style="text-align:center;color:#FF9500">Solde</th>
-    </tr></thead><tbody>${lignesComptes}
-      <tr class="total-row">
-        <td style="padding:10px 12px">TOTAL</td>
-        <td style="padding:10px 12px;text-align:center;color:#1A8FE3">${bilanComptes.reduce((s,c)=>s+c.totalNat,0)} €</td>
-        <td style="padding:10px 12px;text-align:center;color:#FF8E53">${bilanComptes.reduce((s,c)=>s+c.totalClub,0)} €</td>
-        <td style="padding:10px 12px;text-align:center;color:#6BCB77">${totalAcomptesComptes} €</td>
-        <td style="padding:10px 12px;text-align:center;color:${totalSoldesComptes===0?"#6BCB77":"#FF9500"}">${totalSoldesComptes===0?"✅":totalSoldesComptes+" €"}</td>
-      </tr>
-    </tbody></table>
-    <div class="footer">FNCP — Club de Plage · Bilan saison 2026 · Imprimé le ${dateImpression}</div>
-    <script>window.onload=()=>window.print();</script>
-    </body></html>`;
-    const w = window.open("","_blank"); w.document.write(html); w.document.close();
-  };
-
   return (
-    <div style={{ display:"flex", flexDirection:"column", gap:14, alignItems:"center" }}>
-
-      {/* ── Bouton impression ── */}
-      <div style={{ width:"100%", display:"flex", justifyContent:"flex-end" }}>
-        <button onClick={printBilan} style={{ background:"linear-gradient(135deg,#0066CC,#1A8FE3)", color:"#fff", border:"none", borderRadius:50, padding:"10px 20px", fontWeight:900, fontSize:13, cursor:"pointer", fontFamily:"inherit", boxShadow:"0 4px 14px rgba(0,102,204,0.35)", display:"flex", alignItems:"center", gap:8 }}>
-          🖨️ Imprimer le bilan 2026
-        </button>
-      </div>
+    <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
 
       {/* ── Bilan global sombre ── */}
-      <div style={{ width:"100%", background:"linear-gradient(135deg,#0F2027,#203A43,#2C5364)", borderRadius:20, padding:20, boxShadow:"0 8px 28px rgba(0,0,0,0.2)" }}>
-        <div style={{ color:"rgba(255,255,255,0.6)", fontSize:11, fontWeight:800, letterSpacing:1, textTransform:"uppercase", marginBottom:14, textAlign:"center" }}>🧮 Comptabilité saison 2026</div>
-
-        {/* Ligne unique scrollable avec les 6 KPIs */}
-        <div style={{ display:"flex", gap:10, overflowX:"auto", paddingBottom:4, marginBottom:14, justifyContent:"center", flexWrap:"wrap" }}>
+      <div style={{ background:"linear-gradient(135deg,#0F2027,#203A43,#2C5364)", borderRadius:20, padding:20, boxShadow:"0 8px 28px rgba(0,0,0,0.2)" }}>
+        <div style={{ color:"rgba(255,255,255,0.6)", fontSize:11, fontWeight:800, letterSpacing:1, textTransform:"uppercase", marginBottom:14 }}>🧮 Comptabilité saison 2026</div>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:16 }}>
           {[
-            { label:"CA total",          val:`${totalCA} €`,           color:"#fff",    emoji:"💶" },
-            { label:"Encaissé",          val:`${totalEncaisse} €`,      color:"#6BCB77", emoji:"✅" },
-            { label:"Reste à encaisser", val:`${resteAEncaisser} €`,    color: resteAEncaisser===0?"#6BCB77":"#FF6B6B", emoji:"⏳" },
-            { label:"Fin de saison",     val:`${membresCompte.length}`, color:"#FFD93D", emoji:"📒" },
-            { label:"Natation enc.",     val:`${totalEncNat} €`,        color:"#4ECDC4", emoji:"🏊" },
-            { label:"Club enc.",         val:`${totalEncClub} €`,       color:"#FF8E53", emoji:"🏖️" },
+            { label:"CA total saison",    val:`${totalCA} €`,        color:"#fff",    emoji:"💶" },
+            { label:"Encaissé",           val:`${totalEncaisse} €`,   color:"#6BCB77", emoji:"✅" },
+            { label:"Reste à encaisser",  val:`${resteAEncaisser} €`, color: resteAEncaisser===0?"#6BCB77":"#FF6B6B", emoji:"⏳" },
+            { label:"Comptes fin saison", val:`${membresCompte.length}`, color:"#FFD93D", emoji:"📒" },
           ].map(k => (
-            <div key={k.label} style={{ background:"rgba(255,255,255,0.08)", borderRadius:14, padding:"12px 14px", minWidth:100, textAlign:"center" }}>
-              <div style={{ fontSize:18 }}>{k.emoji}</div>
-              <div style={{ fontWeight:900, fontSize:17, color:k.color, marginTop:4, whiteSpace:"nowrap" }}>{k.val}</div>
-              <div style={{ fontSize:10, color:"rgba(255,255,255,0.5)", marginTop:2, whiteSpace:"nowrap" }}>{k.label}</div>
+            <div key={k.label} style={{ background:"rgba(255,255,255,0.08)", borderRadius:14, padding:"14px 12px" }}>
+              <div style={{ fontSize:20 }}>{k.emoji}</div>
+              <div style={{ fontWeight:900, fontSize:20, color:k.color, marginTop:4 }}>{k.val}</div>
+              <div style={{ fontSize:10, color:"rgba(255,255,255,0.55)", marginTop:2 }}>{k.label}</div>
             </div>
           ))}
         </div>
-
         <div style={{ background:"rgba(255,255,255,0.12)", borderRadius:50, height:10, overflow:"hidden", marginBottom:6 }}>
           <div style={{ height:"100%", width:`${pctEncaisse}%`, background:"linear-gradient(90deg,#6BCB77,#4ECDC4)", borderRadius:50, transition:"width .5s" }} />
         </div>
@@ -7826,16 +7804,15 @@ function ComptabiliteTab({ dbMembres, dbResas, dbResasClub, dbCommandesClub = []
         </div>
       </div>
 
-      {/* ── Ventilation des recettes (depuis paiements validés) ── */}
-      <div style={{ width:"100%", background:"#fff", borderRadius:18, padding:16, boxShadow:"0 2px 10px rgba(0,0,0,0.05)" }}>
-        <div style={{ fontWeight:900, color:C.dark, fontSize:14, marginBottom:4, textAlign:"center" }}>📂 Ventilation des recettes</div>
-        <div style={{ fontSize:11, color:"#aaa", marginBottom:12, textAlign:"center" }}>Calculé depuis les paiements validés</div>
+      {/* ── Ventilation par catégorie ── */}
+      <div style={{ background:"#fff", borderRadius:18, padding:16, boxShadow:"0 2px 10px rgba(0,0,0,0.05)" }}>
+        <div style={{ fontWeight:900, color:C.dark, fontSize:14, marginBottom:12 }}>📂 Ventilation des recettes</div>
         {[
-          { label:"🏊 Natation (paiements validés)",       val: totalEncNat,           color:C.ocean },
-          { label:"🏖️ Club de Plage (paiements validés)",  val: totalEncClub,          color:C.coral },
-          { label:"📒 Acomptes comptes fin saison",        val: totalAcomptesComptes,  color:"#6366F1" },
-          { label:"⏳ Soldes restants fin saison",         val: totalSoldesComptes,    color:"#FF9500" },
-          { label:"🎁 Remises accordées",                  val: totalRemisesComptes,   color:C.green },
+          { label:"🏊 Natation (paiements directs)",  val:totalEncNat,  color:C.ocean },
+          { label:"🏖️ Club de Plage (paiements directs)", val:totalEncClub, color:C.coral },
+          { label:"📒 Acomptes comptes fin saison",   val:totalAcomptesComptes, color:"#6366F1" },
+          { label:"⏳ Soldes restants fin saison",    val:totalSoldesComptes,   color:"#FF9500" },
+          { label:"🎁 Remises accordées",             val:totalRemisesComptes,  color:C.green },
         ].map(row => (
           <div key={row.label} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 0", borderBottom:"1px solid #f5f5f5" }}>
             <span style={{ fontSize:13, color:"#555" }}>{row.label}</span>
@@ -7849,7 +7826,7 @@ function ComptabiliteTab({ dbMembres, dbResas, dbResasClub, dbCommandesClub = []
       </div>
 
       {/* ── Comptes fin de saison : tableau actualisé ── */}
-      <div style={{ width:"100%", background:"#fff", borderRadius:18, overflow:"hidden", boxShadow:"0 2px 10px rgba(0,0,0,0.05)" }}>
+      <div style={{ background:"#fff", borderRadius:18, overflow:"hidden", boxShadow:"0 2px 10px rgba(0,0,0,0.05)" }}>
         <div style={{ padding:"12px 16px", background:"#F0F4F8" }}>
           <div style={{ fontWeight:900, color:C.dark, fontSize:14 }}>📒 Comptes fin de saison — Soldes</div>
           <div style={{ fontSize:11, color:"#aaa", marginTop:2 }}>Calculé en temps réel depuis les réservations confirmées</div>
@@ -7897,7 +7874,16 @@ function ComptabiliteTab({ dbMembres, dbResas, dbResasClub, dbCommandesClub = []
         )}
       </div>
 
-
+      {/* ── Mode de paiement ── */}
+      <div style={{ background:"#fff", borderRadius:18, padding:16, boxShadow:"0 2px 10px rgba(0,0,0,0.05)" }}>
+        <div style={{ fontWeight:900, color:C.dark, fontSize:14, marginBottom:12 }}>💳 Répartition modes de paiement</div>
+        {Object.entries(byMode).sort((a,b)=>b[1].count-a[1].count).map(([mode, data]) => (
+          <div key={mode} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 0", borderBottom:"1px solid #f5f5f5" }}>
+            <span style={{ fontSize:13, color:"#555" }}>{MODES_LABEL[mode] || mode}</span>
+            <span style={{ fontWeight:900, color:C.dark }}>{data.count} résa{data.count>1?"s":""}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
