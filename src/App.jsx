@@ -2687,7 +2687,7 @@ function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSession
             style={{ background:"rgba(255,255,255,0.3)", border:"none", color:"#fff", borderRadius:10, width:32, height:32, cursor:weekIdx===weeks.length-1?"default":"pointer", fontWeight:900, fontSize:16, fontFamily:"inherit", opacity:weekIdx===weeks.length-1?0.4:1 }}>›</button>
         </div>
         {/* Sélecteur jours */}
-        <div style={{ display:"flex", gap:6, overflowX:"auto", paddingBottom:4 }}>
+        <div style={{ display:"flex", gap:6, overflowX:"auto", paddingBottom:4, justifyContent:"center" }}>
           {currentWeek.map(d => {
             const sel = effectiveDayId === d.id;
             const avail = (allSeasonSessions||[]).filter(s => s.day===d.id && s.spots>0).length;
