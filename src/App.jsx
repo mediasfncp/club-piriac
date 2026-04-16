@@ -8781,7 +8781,7 @@ function EquipeTab() {
   const [saving, setSaving]       = useState(false);
   const [error, setError]         = useState("");
 
-  const emptyForm = { prenom:"", nom:"", poste:"maitre_nageur", email:"", telephone:"", contrat:"Saisonnier", date_debut:"2026-07-06", date_fin:"2026-08-22", horaires_matin:false, horaires_apmidi:false, jours:[], notes:"", carte_pro:"", diplome:"", date_recyclage_pse1:"" };
+  const emptyForm = { prenom:"", nom:"", poste:"maitre_nageur", email:"", telephone:"", num_social:"", date_debut:"2026-07-06", date_fin:"2026-08-22", horaires_matin:false, horaires_apmidi:false, jours:[], notes:"", carte_pro:"", diplome:"", date_recyclage_pse1:"" };
   const [form, setForm]           = useState(emptyForm);
 
   const load = async () => {
@@ -8842,7 +8842,7 @@ function EquipeTab() {
               <div style={{ width:60, height:60, borderRadius:18, background:"rgba(255,255,255,0.25)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:28, flexShrink:0 }}>{poste.emoji}</div>
               <div>
                 <div style={{ color:"#fff", fontWeight:900, fontSize:20 }}>{PRENOM(emp.prenom)} {NOM(emp.nom)}</div>
-                <div style={{ color:"rgba(255,255,255,0.85)", fontSize:13 }}>{poste.label} · {emp.contrat}</div>
+                <div style={{ color:"rgba(255,255,255,0.85)", fontSize:13 }}>{poste.label}</div>
               </div>
             </div>
           </div>
@@ -8854,13 +8854,13 @@ function EquipeTab() {
               {emp.email && <div style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:"1px solid #f5f5f5", fontSize:13 }}><span style={{ color:"#aaa" }}>Email</span><span style={{ fontWeight:700 }}>{emp.email}</span></div>}
               {emp.telephone && <div style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", fontSize:13 }}><span style={{ color:"#aaa" }}>Tél.</span><span style={{ fontWeight:700 }}>{emp.telephone}</span></div>}
             </div>
-            {/* Contrat */}
+            {/* Numéro de sécurité sociale */}
+            {emp.num_social && (
             <div style={{ background:"#fff", borderRadius:16, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
-              <div style={{ fontWeight:800, color:"#2C3E50", fontSize:13, marginBottom:10 }}>📄 Contrat</div>
-              <div style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:"1px solid #f5f5f5", fontSize:13 }}><span style={{ color:"#aaa" }}>Type</span><span style={{ fontWeight:700 }}>{emp.contrat}</span></div>
-              <div style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:"1px solid #f5f5f5", fontSize:13 }}><span style={{ color:"#aaa" }}>Début</span><span style={{ fontWeight:700 }}>{emp.date_debut ? new Date(emp.date_debut).toLocaleDateString("fr-FR") : "—"}</span></div>
-              <div style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", fontSize:13 }}><span style={{ color:"#aaa" }}>Fin</span><span style={{ fontWeight:700 }}>{emp.date_fin ? new Date(emp.date_fin).toLocaleDateString("fr-FR") : "—"}</span></div>
+              <div style={{ fontWeight:800, color:"#2C3E50", fontSize:13, marginBottom:10 }}>🪪 Sécurité sociale</div>
+              <div style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", fontSize:13 }}><span style={{ color:"#aaa" }}>N° SS</span><span style={{ fontWeight:700, letterSpacing:1 }}>{emp.num_social}</span></div>
             </div>
+            )}
             {/* Qualifications */}
             <div style={{ background:"#fff", borderRadius:16, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
               <div style={{ fontWeight:800, color:"#2C3E50", fontSize:13, marginBottom:10 }}>🎓 Qualifications</div>
@@ -8890,6 +8890,32 @@ function EquipeTab() {
 // ── Formulaire employé (composant externe pour éviter recréation à chaque frappe)
 function EmployeFormModal({ form, setForm, editEmp, saving, error, onClose, onSave }) {
   const poste = POSTE_INFO[form.poste] || POSTES[0];
+
+  // Champs texte libres avec état local pour éviter la perte de focus à chaque lettre
+  const [prenomLocal, setPrenomLocal]       = React.useState(form.prenom);
+  const [nomLocal, setNomLocal]             = React.useState(form.nom);
+  const [emailLocal, setEmailLocal]         = React.useState(form.email);
+  const [telLocal, setTelLocal]             = React.useState(form.telephone);
+  const [numSocialLocal, setNumSocialLocal] = React.useState(form.num_social || "");
+
+  // Synchronise vers le form parent au blur (perte de focus)
+  const syncPrenom   = () => setForm(f => ({...f, prenom:    prenomLocal}));
+  const syncNom      = () => setForm(f => ({...f, nom:       nomLocal}));
+  const syncEmail    = () => setForm(f => ({...f, email:     emailLocal}));
+  const syncTel      = () => setForm(f => ({...f, telephone: telLocal}));
+  const syncSocial   = () => setForm(f => ({...f, num_social:numSocialLocal}));
+
+  // Si le parent réinitialise le form (nouveau / modification), on resynchronise
+  React.useEffect(() => {
+    setPrenomLocal(form.prenom);
+    setNomLocal(form.nom);
+    setEmailLocal(form.email);
+    setTelLocal(form.telephone);
+    setNumSocialLocal(form.num_social || "");
+  }, [editEmp]);
+
+  const inputStyle = { width:"100%", border:"2px solid #ddd", borderRadius:10, padding:"9px 12px", fontSize:14, fontFamily:"inherit", outline:"none", boxSizing:"border-box" };
+
   return (
       <div style={{ position:"fixed", inset:0, zIndex:1000, display:"flex", flexDirection:"column" }}>
         <div onClick={onClose} style={{ position:"absolute", inset:0, background:"rgba(0,20,50,0.65)", backdropFilter:"blur(5px)" }} />
@@ -8903,17 +8929,18 @@ function EmployeFormModal({ form, setForm, editEmp, saving, error, onClose, onSa
           </div>
           <div style={{ overflowY:"auto", padding:"14px 18px 32px", display:"flex", flexDirection:"column", gap:12 }}>
             {error && <div style={{ background:"#FFF0F0", color:"#e74c3c", borderRadius:12, padding:"10px 14px", fontSize:13, fontWeight:700 }}>⚠️ {error}</div>}
+
             {/* Identité */}
             <div style={{ background:"#fff", borderRadius:16, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
               <div style={{ fontWeight:800, color:"#2C3E50", fontSize:13, marginBottom:10 }}>👤 Identité</div>
               <div style={{ display:"flex", gap:10, marginBottom:10 }}>
                 <div style={{ flex:1 }}>
                   <div style={{ fontSize:11, color:"#aaa", marginBottom:4 }}>Prénom *</div>
-                  <input type="text" value={form.prenom} onChange={e => setForm(f => ({...f, prenom:e.target.value}))} placeholder="Prénom" style={{ width:"100%", border:"2px solid #ddd", borderRadius:10, padding:"9px 12px", fontSize:14, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+                  <input type="text" value={prenomLocal} onChange={e => setPrenomLocal(e.target.value)} onBlur={syncPrenom} placeholder="Prénom" style={inputStyle} />
                 </div>
                 <div style={{ flex:1 }}>
                   <div style={{ fontSize:11, color:"#aaa", marginBottom:4 }}>Nom *</div>
-                  <input type="text" value={form.nom} onChange={e => setForm(f => ({...f, nom:e.target.value}))} placeholder="Nom" style={{ width:"100%", border:"2px solid #ddd", borderRadius:10, padding:"9px 12px", fontSize:14, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+                  <input type="text" value={nomLocal} onChange={e => setNomLocal(e.target.value)} onBlur={syncNom} placeholder="Nom" style={inputStyle} />
                 </div>
               </div>
               <div style={{ fontSize:11, color:"#aaa", marginBottom:6 }}>Poste</div>
@@ -8923,37 +8950,25 @@ function EmployeFormModal({ form, setForm, editEmp, saving, error, onClose, onSa
                 ))}
               </div>
             </div>
+
             {/* Contact */}
             <div style={{ background:"#fff", borderRadius:16, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
               <div style={{ fontWeight:800, color:"#2C3E50", fontSize:13, marginBottom:10 }}>📞 Contact</div>
               <div style={{ marginBottom:10 }}>
                 <div style={{ fontSize:11, color:"#aaa", marginBottom:4 }}>Email</div>
-                <input type="email" value={form.email} onChange={e => setForm(f => ({...f, email:e.target.value}))} placeholder="email@exemple.fr" style={{ width:"100%", border:"2px solid #ddd", borderRadius:10, padding:"9px 12px", fontSize:14, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+                <input type="email" value={emailLocal} onChange={e => setEmailLocal(e.target.value)} onBlur={syncEmail} placeholder="email@exemple.fr" style={inputStyle} />
               </div>
               <div>
                 <div style={{ fontSize:11, color:"#aaa", marginBottom:4 }}>Téléphone</div>
-                <input type="tel" value={form.telephone} onChange={e => setForm(f => ({...f, telephone:e.target.value}))} placeholder="06 00 00 00 00" style={{ width:"100%", border:"2px solid #ddd", borderRadius:10, padding:"9px 12px", fontSize:14, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+                <input type="tel" value={telLocal} onChange={e => setTelLocal(e.target.value)} onBlur={syncTel} placeholder="06 00 00 00 00" style={inputStyle} />
               </div>
             </div>
-            {/* Contrat */}
+
+            {/* Numéro de sécurité sociale */}
             <div style={{ background:"#fff", borderRadius:16, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
-              <div style={{ fontWeight:800, color:"#2C3E50", fontSize:13, marginBottom:10 }}>📄 Contrat</div>
-              <div style={{ fontSize:11, color:"#aaa", marginBottom:6 }}>Type de contrat</div>
-              <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:14 }}>
-                {CONTRATS.map(c => (
-                  <button key={c} onClick={() => setForm(f => ({...f, contrat:c}))} style={{ background: form.contrat===c ? `${poste.color}18` : "#f5f5f5", border:`2px solid ${form.contrat===c ? poste.color : "#eee"}`, color: form.contrat===c ? poste.color : "#aaa", borderRadius:12, padding:"6px 14px", cursor:"pointer", fontWeight:800, fontSize:12, fontFamily:"inherit" }}>{c}</button>
-                ))}
-              </div>
-              <div style={{ display:"flex", gap:10 }}>
-                <div style={{ flex:1 }}>
-                  <div style={{ fontSize:11, color:"#aaa", marginBottom:4 }}>📅 Date de début</div>
-                  <input type="date" value={form.date_debut} onChange={e => setForm(f => ({...f, date_debut:e.target.value}))} style={{ width:"100%", border:"2px solid #ddd", borderRadius:10, padding:"9px 12px", fontSize:14, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
-                </div>
-                <div style={{ flex:1 }}>
-                  <div style={{ fontSize:11, color:"#aaa", marginBottom:4 }}>📅 Date de fin</div>
-                  <input type="date" value={form.date_fin} onChange={e => setForm(f => ({...f, date_fin:e.target.value}))} style={{ width:"100%", border:"2px solid #ddd", borderRadius:10, padding:"9px 12px", fontSize:14, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
-                </div>
-              </div>
+              <div style={{ fontWeight:800, color:"#2C3E50", fontSize:13, marginBottom:10 }}>🪪 Numéro de sécurité sociale</div>
+              <input type="text" value={numSocialLocal} onChange={e => setNumSocialLocal(e.target.value)} onBlur={syncSocial} placeholder="1 85 05 75 XXX XXX XX" maxLength={21} style={inputStyle} />
+              <div style={{ fontSize:11, color:"#bbb", marginTop:4 }}>15 chiffres — confidentiel</div>
             </div>
             {/* Qualifications */}
             <div style={{ background:"#fff", borderRadius:16, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
