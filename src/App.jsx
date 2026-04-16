@@ -5720,6 +5720,17 @@ function PlanningTab({ allSeasonSessions, clubPlaces, reservations = [] }) {
   const getNataSlots = (dayId) => (allSeasonSessions || []).filter(s => s.day === dayId);
   const nataSpotColor = n => n === 0 ? C.sunset : n === 1 ? C.coral : C.green;
 
+  // Calcul des spots réels depuis Supabase (compte les enfants, pas les lignes)
+  const getPlanningSpots = (dayId, time) => {
+    const dayObj = ALL_SEASON_DAYS.find(d => d.id === dayId);
+    if (!dayObj?.date) return 2;
+    const dateISO = `${dayObj.date.getFullYear()}-${String(dayObj.date.getMonth()+1).padStart(2,"0")}-${String(dayObj.date.getDate()).padStart(2,"0")}`;
+    const taken = dbResasNat
+      .filter(r => r.date_seance?.slice(0,10) === dateISO && r.heure === time && r.statut === "confirmed")
+      .reduce((acc, r) => acc + (Array.isArray(r.enfants) ? r.enfants.length : 1), 0);
+    return Math.max(0, 2 - taken);
+  };
+
   // CLUB : 2 demi-journées par jour avec places globales
   const CLUB_SESSIONS = [
     { id: "matin",  label: "Matin",      horaires: "9h30 – 12h30",  color: C.coral, emoji: "☀️", places: clubPlaces?.matin ?? 45 },
@@ -5864,13 +5875,14 @@ ${afternoon.length>0?`<h2>🌊 Après-midi</h2><table><thead><tr><th>Heure</th><
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   {list.map(s => {
                     const enfants = getEnfantsPourCreneau(selectedDayId, s.time);
+                    const realSpots = getPlanningSpots(selectedDayId, s.time);
                     return (
-                      <div key={s.id} style={{ display:"flex", alignItems:"center", gap:10, background:"#F8FBFF", borderRadius:12, padding:"8px 12px", border:`1.5px solid ${nataSpotColor(s.spots)}30` }}>
+                      <div key={s.id} style={{ display:"flex", alignItems:"center", gap:10, background:"#F8FBFF", borderRadius:12, padding:"8px 12px", border:`1.5px solid ${nataSpotColor(realSpots)}30` }}>
                         {/* Heure + dispo */}
                         <div style={{ display:"flex", alignItems:"center", gap:6, minWidth:70 }}>
-                          <div style={{ width:8, height:8, borderRadius:"50%", background:nataSpotColor(s.spots), flexShrink:0 }} />
+                          <div style={{ width:8, height:8, borderRadius:"50%", background:nataSpotColor(realSpots), flexShrink:0 }} />
                           <span style={{ fontWeight:900, fontSize:13, color:C.dark }}>{s.time}</span>
-                          <span style={{ fontSize:10, color:nataSpotColor(s.spots), fontWeight:700 }}>{s.spots}/2</span>
+                          <span style={{ fontSize:10, color:nataSpotColor(realSpots), fontWeight:700 }}>{realSpots}/2</span>
                         </div>
                         {/* Enfants inscrits */}
                         <div style={{ flex:1, display:"flex", gap:6, flexWrap:"wrap" }}>
@@ -5878,7 +5890,7 @@ ${afternoon.length>0?`<h2>🌊 Après-midi</h2><table><thead><tr><th>Heure</th><
                             <div key={i} style={{ background:`${C.ocean}15`, color:C.ocean, borderRadius:8, padding:"3px 8px", fontSize:11, fontWeight:800 }}>
                               👤 {e.prenom}
                             </div>
-                          )) : s.spots === 2 ? (
+                          )) : realSpots === 2 ? (
                             <span style={{ fontSize:11, color:"#bbb" }}>—</span>
                           ) : null}
                         </div>
