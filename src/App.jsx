@@ -8800,12 +8800,43 @@ function EquipeTab() {
     const finalForm = { ...form, ...overrides };
     if (!finalForm.prenom.trim() || !finalForm.nom.trim()) { setError("Prénom et nom requis"); return; }
     setSaving(true); setError("");
-    const payload = { ...finalForm, prenom: finalForm.prenom.trim(), nom: finalForm.nom.trim() };
+
+    // Colonnes connues de la table employes — on n'envoie que celles-là
+    const payload = {
+      prenom:              finalForm.prenom.trim(),
+      nom:                 finalForm.nom.trim(),
+      poste:               finalForm.poste || "maitre_nageur",
+      email:               finalForm.email || "",
+      telephone:           finalForm.telephone || "",
+      num_social:          finalForm.num_social || "",
+      date_debut:          finalForm.date_debut || null,
+      date_fin:            finalForm.date_fin || null,
+      horaires_matin:      finalForm.horaires_matin || false,
+      horaires_apmidi:     finalForm.horaires_apmidi || false,
+      jours:               finalForm.jours || [],
+      notes:               finalForm.notes || "",
+      carte_pro:           finalForm.carte_pro || "",
+      diplome:             finalForm.diplome || "",
+      date_recyclage_pse1: finalForm.date_recyclage_pse1 || null,
+      statut:              finalForm.statut || "actif",
+    };
+
+    let sbError;
     if (editEmp) {
-      await sb.from("employes").update(payload).eq("id", editEmp.id);
+      const { error } = await sb.from("employes").update(payload).eq("id", editEmp.id);
+      sbError = error;
     } else {
-      await sb.from("employes").insert([payload]);
+      const { error } = await sb.from("employes").insert([payload]);
+      sbError = error;
     }
+
+    if (sbError) {
+      console.error("Supabase error:", sbError);
+      setError(`Erreur Supabase : ${sbError.message}`);
+      setSaving(false);
+      return;
+    }
+
     await load();
     setSaving(false); setShowForm(false);
   };
