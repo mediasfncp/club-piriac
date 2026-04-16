@@ -5869,37 +5869,58 @@ ${afternoon.length>0?`<h2>🌊 Après-midi</h2><table><thead><tr><th>Heure</th><
                 <button onClick={handlePrintJour} style={{ background: `linear-gradient(135deg,${C.ocean},${C.sea})`, color: "#fff", border: "none", borderRadius: 50, padding: "5px 12px", cursor: "pointer", fontWeight: 900, fontSize: 11, fontFamily: "inherit", boxShadow: `0 3px 10px ${C.ocean}44` }}>🖨️ Imprimer</button>
               </div>
             </div>
-            {[["☀️ MATIN", morning], ["🌊 APRÈS-MIDI", afternoon]].map(([title, list]) => list.length > 0 && (
-              <div key={title} style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 11, fontWeight: 900, color: title.includes("MATIN") ? C.coral : C.ocean, marginBottom: 8, letterSpacing: 1 }}>{title}</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {list.map(s => {
-                    const enfants = getEnfantsPourCreneau(selectedDayId, s.time);
-                    const realSpots = getPlanningSpots(selectedDayId, s.time);
-                    return (
-                      <div key={s.id} style={{ display:"flex", alignItems:"center", gap:10, background:"#F8FBFF", borderRadius:12, padding:"8px 12px", border:`1.5px solid ${nataSpotColor(realSpots)}30` }}>
-                        {/* Heure + dispo */}
-                        <div style={{ display:"flex", alignItems:"center", gap:6, minWidth:70 }}>
-                          <div style={{ width:8, height:8, borderRadius:"50%", background:nataSpotColor(realSpots), flexShrink:0 }} />
-                          <span style={{ fontWeight:900, fontSize:13, color:C.dark }}>{s.time}</span>
-                          <span style={{ fontSize:10, color:nataSpotColor(realSpots), fontWeight:700 }}>{realSpots}/2</span>
-                        </div>
-                        {/* Enfants inscrits */}
-                        <div style={{ flex:1, display:"flex", gap:6, flexWrap:"wrap" }}>
-                          {enfants.length > 0 ? enfants.map((e, i) => (
-                            <div key={i} style={{ background:`${C.ocean}15`, color:C.ocean, borderRadius:8, padding:"3px 8px", fontSize:11, fontWeight:800 }}>
-                              👤 {e.prenom}
+            {/* Layout 2 colonnes : matin | après-midi */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, alignItems: "start" }}>
+              {[["☀️ MATIN", morning], ["🌊 APRÈS-MIDI", afternoon]].map(([title, list]) => (
+              <div key={title}>
+                <div style={{
+                  fontSize: 11, fontWeight: 900, letterSpacing: 1, marginBottom: 8,
+                  color: title.includes("MATIN") ? C.coral : C.ocean,
+                  display: "flex", alignItems: "center", gap: 6,
+                  borderBottom: `2px solid ${title.includes("MATIN") ? C.coral : C.ocean}30`,
+                  paddingBottom: 6,
+                }}>{title}</div>
+                {list.length === 0 ? (
+                  <div style={{ fontSize: 12, color: "#ccc", fontStyle: "italic", paddingTop: 4 }}>Aucun créneau</div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                    {list.map(s => {
+                      const enfants = getEnfantsPourCreneau(selectedDayId, s.time);
+                      const realSpots = getPlanningSpots(selectedDayId, s.time);
+                      return (
+                        <div key={s.id} style={{
+                          background: realSpots === 0 ? "#FFF5F5" : "#F8FBFF",
+                          borderRadius: 10, padding: "7px 10px",
+                          border: `1.5px solid ${nataSpotColor(realSpots)}35`,
+                        }}>
+                          {/* Heure + spots */}
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: enfants.length > 0 ? 5 : 0 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                              <div style={{ width: 7, height: 7, borderRadius: "50%", background: nataSpotColor(realSpots), flexShrink: 0 }} />
+                              <span style={{ fontWeight: 900, fontSize: 13, color: C.dark }}>{s.time}</span>
                             </div>
-                          )) : realSpots === 2 ? (
-                            <span style={{ fontSize:11, color:"#bbb" }}>—</span>
-                          ) : null}
+                            <span style={{ fontSize: 10, color: nataSpotColor(realSpots), fontWeight: 800, background: `${nataSpotColor(realSpots)}15`, borderRadius: 6, padding: "1px 6px" }}>
+                              {realSpots === 0 ? "Complet" : `${realSpots}/2`}
+                            </span>
+                          </div>
+                          {/* Enfants */}
+                          {enfants.length > 0 && (
+                            <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                              {enfants.map((e, i) => (
+                                <div key={i} style={{ background: `${C.ocean}15`, color: C.ocean, borderRadius: 6, padding: "2px 6px", fontSize: 10, fontWeight: 800 }}>
+                                  👤 {e.prenom}
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            ))}
+              ))}
+            </div>
           </div>
         );
       })()}
