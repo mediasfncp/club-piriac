@@ -7446,8 +7446,10 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
                             <span style={{ fontSize:10, color:C.green, fontWeight:800 }}>✓ {MODES_PAIEMENT?.find(m=>m.id===r.mode_paiement)?.label.split(" ")[0] || "Payé"}</span>
                           )}
                         </div>
-                        {r.statut === "pending" && (
                         <div style={{ display:"flex", gap:6 }}>
+                          <button onClick={() => setModifierResa({ resa: r, type:"natation" })}
+                            style={{ flex:1, background:`${C.ocean}15`, border:"none", color:C.ocean, borderRadius:8, padding:"5px 0", cursor:"pointer", fontSize:12, fontFamily:"inherit", fontWeight:700 }}>✏️ Modifier</button>
+                          {r.statut === "pending" && (<>
                           <button onClick={async () => {
                             const email = g.membre?.email; if (!email) return alert("Email introuvable");
                             const prenom = g.membre?.prenom || "";
@@ -7470,8 +7472,8 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
                           }} style={{ flex:1, background:"#FFF8E0", border:"1.5px solid #FFD93D60", color:"#b45309", borderRadius:8, padding:"5px 0", cursor:"pointer", fontSize:12, fontFamily:"inherit", fontWeight:700 }}>🔔 Relance</button>
                           <button onClick={() => { if(window.confirm("Supprimer ?")) supprimerResaNatation(r.id); }}
                             style={{ background:"#FFF0F0", border:"none", color:C.sunset, borderRadius:8, padding:"5px 8px", cursor:"pointer", fontSize:13, fontFamily:"inherit" }}>🗑</button>
+                          </>)}
                         </div>
-                        )}
                       </div>
                     ))}
                   </div>
@@ -7499,10 +7501,10 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
                               <span style={{ fontSize:10, color:C.green, fontWeight:800 }}>✓ {MODES_PAIEMENT?.find(m=>m.id===r.mode_paiement)?.label.split(" ")[0] || "Payé"}</span>
                             )}
                           </div>
-                          {r.statut === "pending" && (
                           <div style={{ display:"flex", gap:6 }}>
                             <button onClick={() => setModifierResa({ resa: r, type:"club" })}
                               style={{ flex:1, background:`${C.coral}15`, border:"none", color:C.coral, borderRadius:8, padding:"5px 0", cursor:"pointer", fontSize:12, fontFamily:"inherit", fontWeight:700 }}>✏️ Modifier</button>
+                            {r.statut === "pending" && (<>
                             <button onClick={async () => {
                               const email = g.membre?.email; if (!email) return alert("Email introuvable");
                               const prenom = g.membre?.prenom || "";
@@ -7527,8 +7529,8 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
                             }} style={{ flex:1, background:"#FFF8E0", border:"1.5px solid #FFD93D60", color:"#b45309", borderRadius:8, padding:"5px 0", cursor:"pointer", fontSize:12, fontFamily:"inherit", fontWeight:700 }}>🔔 Relance</button>
                             <button onClick={() => { if(window.confirm("Supprimer ?")) supprimerResaClub(r.id); }}
                               style={{ background:"#FFF0F0", border:"none", color:C.sunset, borderRadius:8, padding:"5px 8px", cursor:"pointer", fontSize:13, fontFamily:"inherit" }}>🗑</button>
+                            </>)}
                           </div>
-                          )}
                         </div>
                       );
                     })}
