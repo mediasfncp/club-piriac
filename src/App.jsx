@@ -5889,10 +5889,11 @@ ${afternoon.length>0?`<h2>🌊 Après-midi</h2><table><thead><tr><th>Heure</th><
               const slots = (allSeasonSessions || []).filter(s => s.day === d.id);
               const morning   = slots.filter(s => parseInt(s.time) < 13);
               const afternoon = slots.filter(s => parseInt(s.time) >= 13);
-              const taken = slots.reduce((acc,s)=>acc+(2-s.spots),0);
-              const avail = slots.reduce((acc,s)=>acc+s.spots,0);
-              const rate  = slots.length*2 > 0 ? Math.round((taken/(slots.length*2))*100) : 0;
               const dateISO = d.date ? `${d.date.getFullYear()}-${String(d.date.getMonth()+1).padStart(2,"0")}-${String(d.date.getDate()).padStart(2,"0")}` : "";
+              const resasJourSemaine = dbResasNat.filter(r => r.date_seance?.slice(0,10) === dateISO);
+              const taken = resasJourSemaine.reduce((acc, r) => acc + (Array.isArray(r.enfants) ? r.enfants.length : 1), 0);
+              const avail = Math.max(0, slots.length * 2 - taken);
+              const rate  = slots.length*2 > 0 ? Math.round((taken/(slots.length*2))*100) : 0;
               const fmt = (list) => list.map(s => {
                 const enfants = dbResasNat
                   .filter(r => r.date_seance?.slice(0,10) === dateISO && r.heure === s.time && r.statut === "confirmed")
