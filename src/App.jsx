@@ -1093,7 +1093,7 @@ function FormulesNatationScreen({ onNav, user, allSeasonSessions, setAllSeasonSe
       sb.from("enfants").select("*").eq("membre_id", user.supabaseId)
         .then(({ data }) => setEnfantsDB(data || [])).catch(() => {});
     }
-    sb.from("reservations_natation").select("date_seance, heure, statut")
+    sb.from("reservations_natation").select("date_seance, heure, statut, enfants")
       .in("statut", ["confirmed", "pending"])
       .then(({ data }) => setDbResasNat(data || [])).catch(() => {});
 
@@ -3562,7 +3562,7 @@ function SeancesTab({ sessions, setSessions }) {
 
   // Charger résas + appliquer suppressions/ajouts admin depuis Supabase
   useEffect(() => {
-    sb.from("reservations_natation").select("date_seance, heure, statut")
+    sb.from("reservations_natation").select("date_seance, heure, statut, enfants")
       .eq("statut", "confirmed")
       .then(({ data }) => setDbResasNat(data || []))
       .catch(() => {});
@@ -6632,7 +6632,7 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
   const [nbSemainesClub, setNbSemainesClub] = useState(1);
 
   useEffect(() => {
-    sb.from("reservations_natation").select("date_seance, heure, statut")
+    sb.from("reservations_natation").select("date_seance, heure, statut, enfants")
       .eq("statut","confirmed")
       .then(({ data }) => setDbResasNat(data || [])).catch(() => {});
   }, []);
