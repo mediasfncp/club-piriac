@@ -9285,7 +9285,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
     { id: "paiements",    emoji: "💳", label: "Paiements"  },
     { id: "libertes",     emoji: "🎟️", label: "Liberté"   },
     { id: "comptes",      emoji: "📒", label: "Comptes"    },
-    { id: "comptabilite", emoji: "🧮", label: "Compta"     },
+    { id: "comptabilite", emoji: "🧮", label: "Comptabilité" },
     { id: "factures",     emoji: "🧾", label: "Factures"   },
     { id: "recherche",    emoji: "🔍", label: "Recherche"  },
   ];
