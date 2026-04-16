@@ -1151,7 +1151,8 @@ function FormulesNatationScreen({ onNav, user, allSeasonSessions, setAllSeasonSe
     if (dayObj && allSeasonSessions && !allSeasonSessions.some(s => s.day === dayObj.id && s.time === time)) {
       return 0; // Supprimé par l'admin
     }
-    const taken = dbResasNat.filter(r => r.date_seance?.slice(0,10) === dayISO && r.heure === time).length;
+    const taken = dbResasNat.filter(r => r.date_seance?.slice(0,10) === dayISO && r.heure === time)
+      .reduce((acc, r) => acc + (Array.isArray(r.enfants) ? r.enfants.length : 1), 0);
     return Math.max(0, 2 - taken);
   };
 
@@ -2372,7 +2373,7 @@ function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSession
     // Charger créneaux actifs depuis Supabase (source de vérité)
     Promise.all([
       sb.from("seances_natation").select("date, heure, spots").gte("spots", 0),
-      sb.from("reservations_natation").select("date_seance, heure, statut").eq("statut", "confirmed"),
+      sb.from("reservations_natation").select("date_seance, heure, statut, enfants").eq("statut", "confirmed"),
     ]).then(([{ data: seances }, { data: resas }]) => {
       if (!seances || seances.length === 0) return;
       const newSessions = seances.map(({ date, heure, spots }) => {
@@ -2383,8 +2384,10 @@ function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSession
           return iso === date;
         });
         if (!dayObj) return null;
-        // Déduire les places prises
-        const taken = (resas||[]).filter(r => r.date_seance?.slice(0,10) === date && r.heure === heure).length;
+        // Compter le nombre total d'enfants réservés (pas le nombre de lignes)
+        const taken = (resas||[])
+          .filter(r => r.date_seance?.slice(0,10) === date && r.heure === heure)
+          .reduce((acc, r) => acc + (Array.isArray(r.enfants) ? r.enfants.length : 1), 0);
         return { id: `sb-${date}-${heure}`, day: dayObj.id, time: heure, spots: Math.max(0, 2 - taken) };
       }).filter(Boolean);
       if (setAllSeasonSessions && newSessions.length > 0) setAllSeasonSessions(newSessions);
@@ -2407,7 +2410,7 @@ function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSession
 
   const handleConfirm = async () => {
     if (!selectedEnfants.length) { alert("Veuillez sélectionner au moins un enfant."); return; }
-    if (setAllSeasonSessions) setAllSeasonSessions(prev => prev.map(s => s.id === booking.id ? { ...s, spots: Math.max(0, s.spots-1) } : s));
+    if (setAllSeasonSessions) setAllSeasonSessions(prev => prev.map(s => s.id === booking.id ? { ...s, spots: Math.max(0, s.spots - selectedEnfants.length) } : s));
     const resaDateISO = getDateISO(selectedDay);
     const rappelDate  = getRappelDate(resaDateISO);
     scheduleRappel({ titre:"🏊 Rappel séance natation demain !", corps:`Ta séance à ${booking.time} est demain !`, dateStr:rappelDate });
@@ -3597,7 +3600,8 @@ function SeancesTab({ sessions, setSessions }) {
     const dayObj = ALL_SEASON_DAYS.find(d => d.id === dayId);
     if (!dayObj?.date) return 2;
     const dateISO = `${dayObj.date.getFullYear()}-${String(dayObj.date.getMonth()+1).padStart(2,"0")}-${String(dayObj.date.getDate()).padStart(2,"0")}`;
-    const taken = dbResasNat.filter(r => r.date_seance?.slice(0,10) === dateISO && r.heure === time && r.statut === "confirmed").length;
+    const taken = dbResasNat.filter(r => r.date_seance?.slice(0,10) === dateISO && r.heure === time && r.statut === "confirmed")
+      .reduce((acc, r) => acc + (Array.isArray(r.enfants) ? r.enfants.length : 1), 0);
     return Math.max(0, 2 - taken);
   };
 
@@ -6645,7 +6649,8 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
   const nbSeancesNat = forfaitNat === "unite" ? 1 : forfaitNat === "forfait5" ? 5 : forfaitNat === "forfait6" ? 6 : 10;
 
   const getSpots = (dayISO, time) => {
-    const taken = dbResasNat.filter(r => r.date_seance?.slice(0,10) === dayISO && r.heure === time).length;
+    const taken = dbResasNat.filter(r => r.date_seance?.slice(0,10) === dayISO && r.heure === time)
+      .reduce((acc, r) => acc + (Array.isArray(r.enfants) ? r.enfants.length : 1), 0);
     return Math.max(0, 2 - taken);
   };
 
