@@ -2410,8 +2410,14 @@ function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSession
 
   const handleConfirm = async () => {
     if (!selectedEnfants.length) { alert("Veuillez sélectionner au moins un enfant."); return; }
-    if (setAllSeasonSessions) setAllSeasonSessions(prev => prev.map(s => s.id === booking.id ? { ...s, spots: Math.max(0, s.spots - selectedEnfants.length) } : s));
+    // Vérification en temps réel : nombre d'enfants ne peut pas dépasser les places restantes
     const resaDateISO = getDateISO(selectedDay);
+    const realSpots = getSpots(resaDateISO, booking.time);
+    if (selectedEnfants.length > realSpots) {
+      alert(`Il ne reste que ${realSpots} place${realSpots > 1 ? "s" : ""} sur ce créneau. Veuillez déselectionner ${selectedEnfants.length - realSpots} enfant${selectedEnfants.length - realSpots > 1 ? "s" : ""}.`);
+      return;
+    }
+    if (setAllSeasonSessions) setAllSeasonSessions(prev => prev.map(s => s.id === booking.id ? { ...s, spots: Math.max(0, s.spots - selectedEnfants.length) } : s));
     const rappelDate  = getRappelDate(resaDateISO);
     scheduleRappel({ titre:"🏊 Rappel séance natation demain !", corps:`Ta séance à ${booking.time} est demain !`, dateStr:rappelDate });
     try {
@@ -2668,7 +2674,12 @@ function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSession
           <div style={{ fontSize:12, fontWeight:700, color:s.spots===1?C.coral:C.green }}>{s.spots===1?"🟡 1 place restante":"🟢 2 places dispo"}</div>
         </div>
       </div>
-      <SunBtn small color={s.spots===1?C.coral:C.ocean} onClick={() => setBooking(s)}>Réserver</SunBtn>
+      <SunBtn small color={s.spots===1?C.coral:C.ocean} onClick={() => {
+        const resaDateISO = getDateISO(selectedDay);
+        const realSpots = getSpots(resaDateISO, s.time);
+        if (realSpots <= 0) return; // créneau plein entre-temps
+        setBooking({ ...s, spots: realSpots });
+      }}>Réserver</SunBtn>
     </div>
   );
 
