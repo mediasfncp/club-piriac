@@ -2925,89 +2925,6 @@ function MesReservationsScreen({ onNav, user }) {
 }
 
 // ── LOGIN SCREEN ──────────────────────────────────────────
-// ── RESET MOT DE PASSE ────────────────────────────────────
-function ResetPasswordScreen({ onNav }) {
-  const [password, setPassword]   = useState("");
-  const [confirm, setConfirm]     = useState("");
-  const [showPwd, setShowPwd]     = useState(false);
-  const [loading, setLoading]     = useState(false);
-  const [done, setDone]           = useState(false);
-  const [errorMsg, setErrorMsg]   = useState("");
-
-  const handleReset = async () => {
-    if (!password || password.length < 6) { setErrorMsg("Mot de passe : 6 caractères minimum."); return; }
-    if (password !== confirm) { setErrorMsg("Les mots de passe ne correspondent pas."); return; }
-    setLoading(true); setErrorMsg("");
-    try {
-      const { error } = await sb.auth.updateUser({ password });
-      if (error) throw error;
-      setDone(true);
-    } catch(e) {
-      setErrorMsg(e.message || "Erreur. Réessayez.");
-    } finally { setLoading(false); }
-  };
-
-  const inputStyle = { width:"100%", border:`2px solid #e0e8f0`, borderRadius:14, padding:"13px 16px", fontSize:15, fontFamily:"inherit", outline:"none", boxSizing:"border-box", color:"#2C3E50", background:"#fff" };
-
-  return (
-    <div style={{ background:"#FFF9F0", minHeight:"100%", display:"flex", flexDirection:"column" }}>
-      <div style={{ background:`linear-gradient(135deg, #1A8FE3, #4ECDC4)`, padding:"24px 20px 0" }}>
-        <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:16 }}>
-          <button onClick={() => onNav("login")} style={{ background:"rgba(255,255,255,0.2)", border:"none", color:"#fff", borderRadius:"50%", width:36, height:36, cursor:"pointer", fontSize:18, fontFamily:"inherit" }}>←</button>
-          <h2 style={{ color:"#fff", margin:0, fontWeight:900, fontSize:20 }}>Nouveau mot de passe</h2>
-        </div>
-        <Wave fill="#FFF9F0" />
-      </div>
-
-      <div style={{ flex:1, padding:"32px 20px", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center" }}>
-        {done ? (
-          <div style={{ textAlign:"center", maxWidth:320 }}>
-            <div style={{ fontSize:80, marginBottom:16 }}>✅</div>
-            <h2 style={{ color:"#2C3E50", fontWeight:900, margin:"0 0 10px" }}>Mot de passe mis à jour !</h2>
-            <p style={{ color:"#666", fontSize:14, marginBottom:24 }}>Tu peux maintenant te connecter avec ton nouveau mot de passe.</p>
-            <SunBtn color="#1A8FE3" full onClick={() => onNav("login")}>🔑 Se connecter</SunBtn>
-          </div>
-        ) : (
-          <div style={{ width:"100%", maxWidth:340 }}>
-            <div style={{ textAlign:"center", marginBottom:24 }}>
-              <div style={{ fontSize:56, marginBottom:10 }}>🔐</div>
-              <h2 style={{ color:"#2C3E50", fontWeight:900, margin:"0 0 6px" }}>Choisir un mot de passe</h2>
-              <p style={{ color:"#888", fontSize:14, margin:0 }}>Saisis ton nouveau mot de passe ci-dessous</p>
-            </div>
-            <div style={{ background:"#fff", borderRadius:20, padding:20, boxShadow:"0 4px 20px rgba(0,0,0,0.08)" }}>
-              <label style={{ fontSize:12, fontWeight:900, color:"#1A8FE3", display:"block", marginBottom:6, letterSpacing:0.5, textTransform:"uppercase" }}>🔑 Nouveau mot de passe</label>
-              <div style={{ position:"relative", marginBottom:14 }}>
-                <input type={showPwd ? "text" : "password"} value={password} placeholder="6 caractères minimum"
-                  onChange={e => { setPassword(e.target.value); setErrorMsg(""); }}
-                  style={{ ...inputStyle, paddingRight:44 }} />
-                <button onClick={() => setShowPwd(v => !v)} style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", cursor:"pointer", fontSize:18, color:"#aaa" }}>
-                  {showPwd ? "🙈" : "👁️"}
-                </button>
-              </div>
-
-              <label style={{ fontSize:12, fontWeight:900, color:"#1A8FE3", display:"block", marginBottom:6, letterSpacing:0.5, textTransform:"uppercase" }}>🔁 Confirmer le mot de passe</label>
-              <input type={showPwd ? "text" : "password"} value={confirm} placeholder="Répète ton mot de passe"
-                onChange={e => { setConfirm(e.target.value); setErrorMsg(""); }}
-                onKeyDown={e => e.key === "Enter" && handleReset()}
-                style={{ ...inputStyle, marginBottom: errorMsg ? 0 : 16 }} />
-
-              {errorMsg && (
-                <div style={{ background:"#fff0f0", border:"1.5px solid #FF6B6B44", borderRadius:10, padding:"8px 12px", margin:"10px 0", fontSize:13, color:"#FF6B6B", fontWeight:700 }}>
-                  ⚠️ {errorMsg}
-                </div>
-              )}
-
-              <SunBtn color="#1A8FE3" full onClick={handleReset} style={{ marginTop:16 }}>
-                {loading ? "⏳ En cours..." : "✅ Enregistrer le mot de passe"}
-              </SunBtn>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 function LoginScreen({ onNav, setUser }) {
   const [email, setEmail]       = useState("");
   const [step, setStep]         = useState("form"); // form | sent | loading | error
@@ -10854,6 +10771,11 @@ function AdminCodeAccess({ onUnlock, user }) {
 export default function App() {
   const [screen, setScreen] = useState(() => {
     try {
+      // Détecter un lien de récupération de mot de passe dans l'URL
+      const hash = window.location.hash;
+      if (hash.includes("type=recovery") || (hash.includes("access_token") && hash.includes("type=recovery"))) {
+        return "reset-password";
+      }
       const savedScreen = localStorage.getItem("fncp_screen");
       const savedUser = localStorage.getItem("fncp_user");
       return savedScreen === "admin" && savedUser ? "admin" : "home";
@@ -10995,6 +10917,7 @@ export default function App() {
       const { data: { subscription } } = sb.auth.onAuthStateChange((event, session) => {
         if (event === "PASSWORD_RECOVERY") {
           setScreen("reset-password");
+          try { window.history.replaceState(null, "", window.location.pathname); } catch {}
           return;
         }
         if (event === "SIGNED_IN" && session?.user) {
@@ -11040,7 +10963,6 @@ export default function App() {
 
   const renderScreen = () => {
     switch (screen) {
-      case "reset-password":   return <ResetPasswordScreen {...props} />;
       case "home":             return <HomeScreen {...props} />;
       case "login":            return <LoginScreen {...props} />;
       case "formules":          return <FormulesChoixScreen {...props} />;
