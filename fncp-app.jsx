@@ -15,6 +15,7 @@ import {
 
 // Helper — nom toujours en majuscules
 const NOM = (n) => (n || "").toUpperCase();
+const PRENOM = (p) => (p || "").charAt(0).toUpperCase() + (p || "").slice(1).toLowerCase();
 
 const C = {
   sun:    "#FFD93D",
@@ -946,9 +947,23 @@ function FormulesEveilScreen({ onNav, user, panier, setPanier }) {
             ))}
             <div style={{ fontSize:11, color:"#aaa", marginTop:6, fontStyle:"italic" }}>Votre accès sera activé à réception du paiement.</div>
           </div>
-          {setPanier && enfantsEveil.length === 0 || selectedEnfant ? (
-            <button onClick={() => {
-              if (enfantsEveil.length > 0 && !selectedEnfant) return;
+          {/* Bouton ajouter au panier - enfant obligatoire */}
+          {enfantsEveil.length === 0 ? (
+            <div style={{ background:`${C.sunset}10`, border:`2px solid ${C.sunset}30`, borderRadius:12, padding:"10px 14px", fontSize:13, color:"#c0392b", fontWeight:700, textAlign:"center" }}>
+              ⚠️ Aucun enfant éligible (2-5 ans). Vérifiez les dates de naissance dans votre profil.
+            </div>
+          ) : !selectedEnfant ? (
+            <div style={{ background:"#FFF9F0", border:"1.5px solid #FFD93D", borderRadius:12, padding:"10px 14px", fontSize:13, color:"#b45309", fontWeight:700, textAlign:"center" }}>
+              👆 Sélectionnez un enfant pour continuer
+            </div>
+          ) : (
+            <button onClick={async () => {
+              // Basculer l'enfant sur "les deux" si nécessaire
+              const enf = enfantsEveil.find(e => e.prenom === selectedEnfant);
+              if (enf && enf.activite === "club" && enf.id) {
+                try { await sb.from("enfants").update({ activite: "les deux" }).eq("id", enf.id); }
+                catch(e) { console.warn(e); }
+              }
               const sun = eveilSundays[booking.sundayIdx];
               const sl = sun.slots.find(s => s.id === booking.slotId);
               setPanier(prev => [...prev, {
@@ -967,9 +982,9 @@ function FormulesEveilScreen({ onNav, user, panier, setPanier }) {
               onNav("panier");
               setBooking(null);
             }} style={{ width:"100%", background:`linear-gradient(135deg,${C.sun},${C.coral})`, border:"none", color:"#fff", borderRadius:14, padding:"12px", cursor:"pointer", fontWeight:900, fontSize:14, fontFamily:"inherit", marginBottom:8 }}>
-              🛒 Ajouter au panier
+              🛒 Ajouter au panier · {selectedEnfant}
             </button>
-          ) : null}
+          )}
           <SunBtn color={!selectedEnfant ? "#bbb" : "#9B59B6"} full
             onClick={() => { if (!selectedEnfant) return; confirmBook(); }}>
             {!selectedEnfant ? (enfantsEveil.length === 0 ? "⚠️ Aucun enfant 2-5 ans" : "👆 Sélectionnez un enfant") : "📨 Envoyer la demande · 20 €"}
@@ -1063,9 +1078,9 @@ function FormulesEveilScreen({ onNav, user, panier, setPanier }) {
 }
 
 // ── FORMULES NATATION ─────────────────────────────────────
-function FormulesNatationScreen({ onNav, user, allSeasonSessions, panier, setPanier }) {
+function FormulesNatationScreen({ onNav, user, allSeasonSessions, setAllSeasonSessions, panier, setPanier }) {
   const [selected, setSelected]             = useState(null);
-  const [selectedEnfants, setSelectedEnfants] = useState([]); // enfants sélectionnés (partagés entre créneaux)
+  const [selectedEnfants, setSelectedEnfants] = useState([]);
   const [done, setDone]                     = useState(false);
   const [enfantsDB, setEnfantsDB]           = useState([]);
   const [step, setStep]                     = useState("formule");
@@ -1078,9 +1093,42 @@ function FormulesNatationScreen({ onNav, user, allSeasonSessions, panier, setPan
       sb.from("enfants").select("*").eq("membre_id", user.supabaseId)
         .then(({ data }) => setEnfantsDB(data || [])).catch(() => {});
     }
-    sb.from("reservations_natation").select("date_seance, heure, statut")
-      .eq("statut", "confirmed")
+    sb.from("reservations_natation").select("date_seance, heure, statut, enfants")
+      .in("statut", ["confirmed", "pending"])
       .then(({ data }) => setDbResasNat(data || [])).catch(() => {});
+
+    // Recharger les créneaux supprimés/ajoutés par l'admin
+    sb.from("seances_natation").select("date, heure, spots").then(({ data }) => {
+      if (!data || data.length === 0) return;
+      if (!setAllSeasonSessions) return;
+      setAllSeasonSessions(prev => {
+        let updated = [...prev];
+        data.forEach(({ date, heure, spots }) => {
+          if (spots === -1) {
+            // Supprimé par l'admin
+            updated = updated.filter(slot => {
+              const dayObj = ALL_SEASON_DAYS.find(d => d.id === slot.day);
+              if (!dayObj?.date) return true;
+              const dd = dayObj.date;
+              const dateISO = `${dd.getFullYear()}-${String(dd.getMonth()+1).padStart(2,"0")}-${String(dd.getDate()).padStart(2,"0")}`;
+              return !(dateISO === date && slot.time === heure);
+            });
+          } else if (spots >= 0) {
+            // Ajouté par l'admin
+            const dayObj = ALL_SEASON_DAYS.find(d => {
+              const dd = d.date;
+              if (!dd) return false;
+              const dateISO = `${dd.getFullYear()}-${String(dd.getMonth()+1).padStart(2,"0")}-${String(dd.getDate()).padStart(2,"0")}`;
+              return dateISO === date;
+            });
+            if (dayObj && !updated.some(s => s.day === dayObj.id && s.time === heure)) {
+              updated.push({ id: `sb-${date}-${heure}`, day: dayObj.id, time: heure, spots });
+            }
+          }
+        });
+        return updated;
+      });
+    }).catch(() => {});
   }, [user?.supabaseId]);
 
   const enfantsNat = enfantsDB.length > 0
@@ -1093,7 +1141,18 @@ function FormulesNatationScreen({ onNav, user, allSeasonSessions, panier, setPan
   const getTodayISO = () => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}-${String(t.getDate()).padStart(2,"0")}`; };
   const getSpots = (dayISO, time) => {
     if (dayISO === getTodayISO()) return 0;
-    const taken = dbResasNat.filter(r => r.date_seance?.slice(0,10) === dayISO && r.heure === time).length;
+    // Vérifier si le créneau existe encore (non supprimé par admin)
+    const dayObj = ALL_SEASON_DAYS.find(d => {
+      const dd = d.date;
+      if (!dd) return false;
+      const iso = `${dd.getFullYear()}-${String(dd.getMonth()+1).padStart(2,"0")}-${String(dd.getDate()).padStart(2,"0")}`;
+      return iso === dayISO;
+    });
+    if (dayObj && allSeasonSessions && !allSeasonSessions.some(s => s.day === dayObj.id && s.time === time)) {
+      return 0; // Supprimé par l'admin
+    }
+    const taken = dbResasNat.filter(r => r.date_seance?.slice(0,10) === dayISO && r.heure === time)
+      .reduce((acc, r) => acc + (Array.isArray(r.enfants) ? r.enfants.length : 1), 0);
     return Math.max(0, 2 - taken);
   };
 
@@ -1263,7 +1322,7 @@ function FormulesNatationScreen({ onNav, user, allSeasonSessions, panier, setPan
             {/* Créneaux par jour */}
             {currentWeek.map(d => {
               const dayISO = `${d.date.getFullYear()}-${String(d.date.getMonth()+1).padStart(2,"0")}-${String(d.date.getDate()).padStart(2,"0")}`;
-              const daySlots = ALL_SEASON_SLOTS_INIT.filter(s => s.day === d.id);
+              const daySlots = (allSeasonSessions || ALL_SEASON_SLOTS_INIT).filter(s => s.day === d.id).sort((a, b) => a.time.localeCompare(b.time));
               if (!daySlots.length) return null;
               return (
                 <div key={d.id} style={{ marginBottom:12 }}>
@@ -1317,9 +1376,17 @@ function FormulesNatationScreen({ onNav, user, allSeasonSessions, panier, setPan
             <div style={{ display:"flex", gap:8 }}>
               <button onClick={() => setStep("formule")} style={{ flex:1, background:"#f0f0f0", border:"none", color:"#888", borderRadius:14, padding:"11px", cursor:"pointer", fontWeight:800, fontFamily:"inherit" }}>← Retour</button>
               {setPanier ? (
-                <button onClick={() => {
+                <button onClick={async () => {
                   if (selectedCreneaux.length < nbLecons) return;
                   if (!selectedEnfants.length) { alert("Veuillez sélectionner au moins un enfant."); return; }
+                  // Basculer les enfants "club" sur "les deux"
+                  for (const prenom of selectedEnfants) {
+                    const enf = (enfantsDB.length > 0 ? enfantsDB : user?.enfants||[]).find(e => e.prenom === prenom);
+                    if (enf && enf.activite === "club" && enf.id) {
+                      try { await sb.from("enfants").update({ activite: "les deux" }).eq("id", enf.id); }
+                      catch(e) { console.warn("update activite nat:", e); }
+                    }
+                  }
                   const nbEnf = Math.max(1, selectedEnfants.length);
                   const prix = selected.price * nbEnf;
                   setPanier(prev => [...prev, {
@@ -1463,7 +1530,7 @@ function ReservationClubScreen({ onNav, user, setUser, clubPlaces, setClubPlaces
     if (user?.supabaseId) {
       sb.from("enfants").select("*").eq("membre_id", user.supabaseId)
         .then(({ data }) => setEnfantsDB(data || [])).catch(() => {});
-      sb.from("membres").select("liberte_balance, liberte_total").eq("id", user.supabaseId).single()
+      sb.from("membres").select("liberte_balance, liberte_total").eq("id", user.supabaseId).maybeSingle()
         .then(({ data }) => {
           setBalance(data?.liberte_balance || 0);
           setLiberteTotal(data?.liberte_total || 0);
@@ -1708,13 +1775,12 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser, pa
     }
   }, [user?.supabaseId]);
 
-  const enfantsClub = enfantsDB.length > 0
-    ? enfantsDB.filter(e => e.activite === "club" || e.activite === "les deux")
-    : (user?.enfants || []).filter(e => e.activite === "club" || e.activite === "les deux");
+  // Tous les enfants sont éligibles au club — si natation seulement, on bascule sur "les deux"
+  const enfantsClub = enfantsDB.length > 0 ? enfantsDB : (user?.enfants || []);
 
   const toggleEnfantClub = (prenom) => setSelectedEnfantsClub(prev => {
     if (prev.includes(prenom)) return prev.filter(x => x !== prenom);
-    if (prev.length >= nbEnfants) return prev; // bloquer si déjà au max
+    if (prev.length >= nbEnfants) return prev;
     return [...prev, prenom];
   });
 
@@ -1870,7 +1936,7 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser, pa
                   <div style={{ fontWeight: 800, color: C.dark, fontSize: 14 }}>👧 Nombre d'enfants</div>
                   {clubPlaces && (
                     <div style={{ fontSize: 11, marginTop: 3, fontWeight: 700, color: (clubPlaces[formulType] || 45) <= 5 ? C.sunset : C.green }}>
-                      {(clubPlaces[formulType] || 45)} place{(clubPlaces[formulType] || 45) > 1 ? "s" : ""} restante{(clubPlaces[formulType] || 45) > 1 ? "s" : ""} (max 45)
+                      Inscriptions ouvertes
                     </div>
                   )}
                 </div>
@@ -1888,12 +1954,17 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser, pa
             </Card>
 
             {/* Sélection des enfants concernés */}
-            {enfantsClub.length > 0 && (
-              <div style={{ background:"#fff", borderRadius:18, padding:16, marginBottom:14, boxShadow:"0 2px 10px rgba(0,0,0,0.05)" }}>
-                <div style={{ fontWeight:800, color:C.dark, fontSize:14, marginBottom:10 }}>
-                  👧 Enfant(s) concernés
-                  {selectedEnfantsClub.length > 0 && <span style={{ fontSize:12, color:tarifData.color, fontWeight:700 }}> · {selectedEnfantsClub.join(", ")}</span>}
+            <div style={{ background:"#fff", borderRadius:18, padding:16, marginBottom:14, boxShadow:"0 2px 10px rgba(0,0,0,0.05)" }}>
+              <div style={{ fontWeight:800, color:C.dark, fontSize:14, marginBottom:10 }}>
+                👧 Enfant(s) concernés
+                {selectedEnfantsClub.length > 0 && <span style={{ fontSize:12, color:tarifData.color, fontWeight:700 }}> · {selectedEnfantsClub.join(", ")}</span>}
+              </div>
+              {enfantsClub.length === 0 ? (
+                <div style={{ fontSize:13, color:"#aaa", fontStyle:"italic" }}>
+                  Aucun enfant inscrit pour le Club.<br/>
+                  <span style={{ color:C.ocean, fontWeight:700, cursor:"pointer" }} onClick={() => {}}>Ajoutez un enfant dans votre profil.</span>
                 </div>
+              ) : (
                 <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
                   {enfantsClub.map(e => {
                     const sel = selectedEnfantsClub.includes(e.prenom);
@@ -1910,18 +1981,18 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser, pa
                     );
                   })}
                 </div>
-                {selectedEnfantsClub.length < nbEnfants && (
-                  <div style={{ fontSize:11, color:"#aaa", marginTop:8, fontStyle:"italic" }}>
-                    Sélectionnez encore {nbEnfants - selectedEnfantsClub.length} enfant{nbEnfants - selectedEnfantsClub.length > 1 ? "s" : ""}
-                  </div>
-                )}
-                {selectedEnfantsClub.length === nbEnfants && (
-                  <div style={{ fontSize:11, color:C.green, marginTop:8, fontWeight:700 }}>
-                    ✓ Sélection complète
-                  </div>
-                )}
-              </div>
-            )}
+              )}
+              {enfantsClub.length > 0 && selectedEnfantsClub.length < nbEnfants && (
+                <div style={{ fontSize:11, color:"#aaa", marginTop:8, fontStyle:"italic" }}>
+                  Sélectionnez encore {nbEnfants - selectedEnfantsClub.length} enfant{nbEnfants - selectedEnfantsClub.length > 1 ? "s" : ""}
+                </div>
+              )}
+              {enfantsClub.length > 0 && selectedEnfantsClub.length === nbEnfants && (
+                <div style={{ fontSize:11, color:C.green, marginTop:8, fontWeight:700 }}>
+                  ✓ Sélection complète
+                </div>
+              )}
+            </div>
 
             {/* Tarif rows */}
             <div style={{ marginBottom: 16 }}>
@@ -1957,9 +2028,25 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser, pa
             </div>
 
             {selectedRow && step === "choix" && (
-              <SunBtn color={tarifData.color} full onClick={() => { setStep("dates"); setSelectedDates([]); }}>
-                Choisir mes dates →
-              </SunBtn>
+              <>
+                {enfantsClub.length === 0 && (
+                  <div style={{ background:"#FFF0EC", border:"1.5px solid #FF8E53", borderRadius:12, padding:"10px 14px", fontSize:13, color:"#c0392b", fontWeight:700, textAlign:"center" }}>
+                    ⚠️ Aucun enfant inscrit pour le Club. Ajoutez d'abord un enfant dans votre profil.
+                  </div>
+                )}
+                {enfantsClub.length > 0 && selectedEnfantsClub.length === 0 && (
+                  <div style={{ background:"#FFF9F0", border:"1.5px solid #FFD93D", borderRadius:12, padding:"10px 14px", fontSize:13, color:"#b45309", fontWeight:700, textAlign:"center" }}>
+                    👆 Sélectionnez au moins un enfant pour continuer
+                  </div>
+                )}
+                <SunBtn color={enfantsClub.length === 0 || selectedEnfantsClub.length === 0 ? "#ccc" : tarifData.color} full onClick={() => {
+                  if (enfantsClub.length === 0) { alert("Aucun enfant inscrit pour le Club. Ajoutez d'abord un enfant dans votre profil."); return; }
+                  if (selectedEnfantsClub.length === 0) { alert("Veuillez sélectionner au moins un enfant."); return; }
+                  setStep("dates"); setSelectedDates([]);
+                }}>
+                  Choisir mes dates →
+                </SunBtn>
+              </>
             )}
 
             {/* Étape 2 — Sélection des dates */}
@@ -2115,8 +2202,17 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser, pa
                   <button onClick={() => setStep("dates")} style={{ background:"#f0f0f0", border:"none", color:"#888", borderRadius:14, padding:"11px", cursor:"pointer", fontWeight:800, fontFamily:"inherit" }}>← Dates</button>
                   {setPanier && selectedDates.length > 0 ? (
                     <>
-                      <button onClick={() => {
+                      <button onClick={async () => {
                         if (!selectedEnfantsClub.length) { alert("Veuillez sélectionner au moins un enfant."); return; }
+                        // Basculer les enfants "natation" sur "les deux"
+                        for (const prenom of selectedEnfantsClub) {
+                          const enf = enfantsClub.find(e => e.prenom === prenom);
+                          if (enf && enf.activite === "natation" && enf.id) {
+                            try {
+                              await sb.from("enfants").update({ activite: "les deux" }).eq("id", enf.id);
+                            } catch(e) { console.warn("update activite:", e); }
+                          }
+                        }
                         setPanier(prev => [...prev, {
                           id: `club-${Date.now()}`,
                           type: "club",
@@ -2133,7 +2229,6 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser, pa
                       }} style={{ background:`linear-gradient(135deg,${C.coral},${C.sun})`, border:"none", color:"#fff", borderRadius:14, padding:"14px", cursor:"pointer", fontWeight:900, fontSize:14, fontFamily:"inherit", boxShadow:`0 4px 14px ${C.coral}44` }}>
                         🛒 Ajouter au panier · {selectedRow?.price} €
                       </button>
-
                     </>
                   ) : (
                     <SunBtn color={tarifData.color} onClick={async () => {
@@ -2275,33 +2370,34 @@ function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSession
   }, [weekIdx]);
 
   useEffect(() => {
-    sb.from("reservations_natation").select("date_seance, heure, statut")
-      .eq("statut", "confirmed")
-      .then(({ data }) => {
-        if (setAllSeasonSessions) {
-          setAllSeasonSessions(() => {
-            const next = ALL_SEASON_SLOTS_INIT.map(s => ({ ...s, spots: 2 }));
-            data.forEach(r => {
-              if (!r.date_seance || !r.heure) return;
-              const dateResa = r.date_seance.slice(0, 10);
-              for (let i = 0; i < next.length; i++) {
-                if (next[i].time !== r.heure || next[i].spots <= 0) continue;
-                const dayObj = ALL_SEASON_DAYS.find(d => d.id === next[i].day);
-                if (dayObj?.date) {
-                  const iso = `${dayObj.date.getFullYear()}-${String(dayObj.date.getMonth()+1).padStart(2,"0")}-${String(dayObj.date.getDate()).padStart(2,"0")}`;
-                  if (iso === dateResa) { next[i] = { ...next[i], spots: next[i].spots - 1 }; break; }
-                }
-              }
-            });
-            return next;
-          });
-        }
-      }).catch(() => {});
+    // Charger créneaux actifs depuis Supabase (source de vérité)
+    Promise.all([
+      sb.from("seances_natation").select("date, heure, spots").gte("spots", 0),
+      sb.from("reservations_natation").select("date_seance, heure, statut, enfants").in("statut", ["confirmed", "pending"]),
+    ]).then(([{ data: seances }, { data: resas }]) => {
+      if (!seances || seances.length === 0) return;
+      const newSessions = seances.map(({ date, heure, spots }) => {
+        const dayObj = ALL_SEASON_DAYS.find(d => {
+          const dd = d.date;
+          if (!dd) return false;
+          const iso = `${dd.getFullYear()}-${String(dd.getMonth()+1).padStart(2,"0")}-${String(dd.getDate()).padStart(2,"0")}`;
+          return iso === date;
+        });
+        if (!dayObj) return null;
+        // Compter le nombre total d'enfants réservés (pas le nombre de lignes)
+        const taken = (resas||[])
+          .filter(r => r.date_seance?.slice(0,10) === date && r.heure === heure)
+          .reduce((acc, r) => acc + (Array.isArray(r.enfants) ? r.enfants.length : 1), 0);
+        return { id: `sb-${date}-${heure}`, day: dayObj.id, time: heure, spots: Math.max(0, 2 - taken) };
+      }).filter(Boolean);
+      if (setAllSeasonSessions && newSessions.length > 0) setAllSeasonSessions(newSessions);
+    }).catch(() => {});
   }, []);
 
+  const sortByTime = (a, b) => a.time.localeCompare(b.time);
   const allForDay = (allSeasonSessions || []).filter(s => s.day === effectiveDayId);
-  const morning   = allForDay.filter(s => { const [h] = s.time.split(":").map(Number); return h < 13; });
-  const afternoon = allForDay.filter(s => { const [h] = s.time.split(":").map(Number); return h >= 13; });
+  const morning   = allForDay.filter(s => { const [h] = s.time.split(":").map(Number); return h < 13; }).sort(sortByTime);
+  const afternoon = allForDay.filter(s => { const [h] = s.time.split(":").map(Number); return h >= 13; }).sort(sortByTime);
 
   const getDateISO = (day) => {
     if (!day?.date) return "";
@@ -2314,8 +2410,14 @@ function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSession
 
   const handleConfirm = async () => {
     if (!selectedEnfants.length) { alert("Veuillez sélectionner au moins un enfant."); return; }
-    if (setAllSeasonSessions) setAllSeasonSessions(prev => prev.map(s => s.id === booking.id ? { ...s, spots: Math.max(0, s.spots-1) } : s));
+    // Vérification en temps réel : nombre d'enfants ne peut pas dépasser les places restantes
     const resaDateISO = getDateISO(selectedDay);
+    const realSpots = getSpots(resaDateISO, booking.time);
+    if (selectedEnfants.length > realSpots) {
+      alert(`Il ne reste que ${realSpots} place${realSpots > 1 ? "s" : ""} sur ce créneau. Veuillez déselectionner ${selectedEnfants.length - realSpots} enfant${selectedEnfants.length - realSpots > 1 ? "s" : ""}.`);
+      return;
+    }
+    if (setAllSeasonSessions) setAllSeasonSessions(prev => prev.map(s => s.id === booking.id ? { ...s, spots: Math.max(0, s.spots - selectedEnfants.length) } : s));
     const rappelDate  = getRappelDate(resaDateISO);
     scheduleRappel({ titre:"🏊 Rappel séance natation demain !", corps:`Ta séance à ${booking.time} est demain !`, dateStr:rappelDate });
     try {
@@ -2572,7 +2674,12 @@ function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSession
           <div style={{ fontSize:12, fontWeight:700, color:s.spots===1?C.coral:C.green }}>{s.spots===1?"🟡 1 place restante":"🟢 2 places dispo"}</div>
         </div>
       </div>
-      <SunBtn small color={s.spots===1?C.coral:C.ocean} onClick={() => setBooking(s)}>Réserver</SunBtn>
+      <SunBtn small color={s.spots===1?C.coral:C.ocean} onClick={() => {
+        const resaDateISO = getDateISO(selectedDay);
+        const realSpots = getSpots(resaDateISO, s.time);
+        if (realSpots <= 0) return; // créneau plein entre-temps
+        setBooking({ ...s, spots: realSpots });
+      }}>Réserver</SunBtn>
     </div>
   );
 
@@ -2594,7 +2701,7 @@ function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSession
             style={{ background:"rgba(255,255,255,0.3)", border:"none", color:"#fff", borderRadius:10, width:32, height:32, cursor:weekIdx===weeks.length-1?"default":"pointer", fontWeight:900, fontSize:16, fontFamily:"inherit", opacity:weekIdx===weeks.length-1?0.4:1 }}>›</button>
         </div>
         {/* Sélecteur jours */}
-        <div style={{ display:"flex", gap:6, overflowX:"auto", paddingBottom:4 }}>
+        <div style={{ display:"flex", gap:6, overflowX:"auto", paddingBottom:4, justifyContent:"center" }}>
           {currentWeek.map(d => {
             const sel = effectiveDayId === d.id;
             const avail = (allSeasonSessions||[]).filter(s => s.day===d.id && s.spots>0).length;
@@ -2658,7 +2765,7 @@ function MesReservationsScreen({ onNav, user }) {
     const [{ data: nat }, { data: club }, { data: membre }] = await Promise.all([
       sb.from("reservations_natation").select("*").eq("membre_id", user.supabaseId).order("date_seance"),
       sb.from("reservations_club").select("*").eq("membre_id", user.supabaseId).order("date_reservation"),
-      sb.from("membres").select("liberte_balance, liberte_total").eq("id", user.supabaseId).single(),
+      sb.from("membres").select("liberte_balance, liberte_total").eq("id", user.supabaseId).maybeSingle(),
     ]);
     setResasNat(nat || []);
     setResasClub(club || []);
@@ -2810,6 +2917,8 @@ function MesReservationsScreen({ onNav, user }) {
             </div>
           );
         })()}
+
+
       </div>
     </div>
   );
@@ -3462,12 +3571,39 @@ function SeancesTab({ sessions, setSessions }) {
   const [addError, setAddError]           = useState("");
   const [dbResasNat, setDbResasNat]       = useState([]);
 
-  // Charger résas natation depuis Supabase
+  // Charger résas + appliquer suppressions/ajouts admin depuis Supabase
   useEffect(() => {
-    sb.from("reservations_natation").select("date_seance, heure, statut")
-      .eq("statut", "confirmed")
+    sb.from("reservations_natation").select("date_seance, heure, statut, enfants")
+      .in("statut", ["confirmed", "pending"])
       .then(({ data }) => setDbResasNat(data || []))
       .catch(() => {});
+
+    // Appliquer les suppressions/ajouts enregistrés en base
+    sb.from("seances_natation").select("date, heure, spots").then(({ data }) => {
+      if (!data || data.length === 0) return;
+      setSessions(prev => {
+        let updated = [...prev];
+        data.forEach(({ date, heure, spots }) => {
+          const dayObj = ALL_SEASON_DAYS.find(d => {
+            const dd = d.date;
+            if (!dd) return false;
+            const iso = `${dd.getFullYear()}-${String(dd.getMonth()+1).padStart(2,"0")}-${String(dd.getDate()).padStart(2,"0")}`;
+            return iso === date;
+          });
+          if (!dayObj) return;
+          if (spots === -1) {
+            // Supprimé → retirer
+            updated = updated.filter(s => !(s.day === dayObj.id && s.time === heure));
+          } else {
+            // Ajouté → ajouter si absent
+            if (!updated.some(s => s.day === dayObj.id && s.time === heure)) {
+              updated.push({ id: `sb-${date}-${heure}`, day: dayObj.id, time: heure, spots });
+            }
+          }
+        });
+        return updated;
+      });
+    }).catch(() => {});
   }, []);
 
   // Calculer places réelles par créneau selon Supabase
@@ -3475,7 +3611,8 @@ function SeancesTab({ sessions, setSessions }) {
     const dayObj = ALL_SEASON_DAYS.find(d => d.id === dayId);
     if (!dayObj?.date) return 2;
     const dateISO = `${dayObj.date.getFullYear()}-${String(dayObj.date.getMonth()+1).padStart(2,"0")}-${String(dayObj.date.getDate()).padStart(2,"0")}`;
-    const taken = dbResasNat.filter(r => r.date_seance?.slice(0,10) === dateISO && r.heure === time && r.statut === "confirmed").length;
+    const taken = dbResasNat.filter(r => r.date_seance?.slice(0,10) === dateISO && r.heure === time)
+      .reduce((acc, r) => acc + (Array.isArray(r.enfants) ? r.enfants.length : 1), 0);
     return Math.max(0, 2 - taken);
   };
 
@@ -3501,7 +3638,21 @@ function SeancesTab({ sessions, setSessions }) {
   const spotColor   = n => n === 0 ? C.sunset : n === 1 ? C.coral : C.green;
   const spotDot     = n => n === 0 ? "#FF6B6B" : n === 1 ? "#FF8E53" : "#6BCB77";
 
-  const doCancel = (id) => { setSessions(prev => prev.filter(x => x.id !== id)); setConfirmCancel(null); };
+  const doCancel = (id) => {
+    const slot = sessions.find(s => s.id === id);
+    if (!slot) return;
+    const dayObj = ALL_SEASON_DAYS.find(d => d.id === slot.day);
+    if (dayObj?.date) {
+      const d = dayObj.date;
+      const dateISO = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+      // Supprimer si existe, puis insérer avec spots=-1
+      sb.from("seances_natation").delete().eq("date", dateISO).eq("heure", slot.time)
+        .then(() => sb.from("seances_natation").insert({ date: dateISO, heure: slot.time, spots: -1 }))
+        .catch(err => console.warn("Supabase seances:", err));
+    }
+    setSessions(prev => prev.filter(x => x.id !== id));
+    setConfirmCancel(null);
+  };
 
   const weekLabel = currentWeek.length > 0
     ? `${currentWeek[0].num} ${currentWeek[0].month} – ${currentWeek[currentWeek.length-1].num} ${currentWeek[currentWeek.length-1].month}`
@@ -3514,7 +3665,6 @@ function SeancesTab({ sessions, setSessions }) {
 
   const handleAddCreneau = () => {
     setAddError("");
-    // Vérifier si ce créneau existe déjà ce jour
     const exists = daySessions.some(s => s.time === newHeure);
     if (exists) { setAddError(`Un créneau à ${newHeure} existe déjà ce jour.`); return; }
     const newSlot = {
@@ -3523,6 +3673,15 @@ function SeancesTab({ sessions, setSessions }) {
       time: newHeure,
       spots: 2,
     };
+    // Sauvegarder en Supabase (spots = 2 = actif)
+    const dayObj = ALL_SEASON_DAYS.find(d => d.id === selectedDayId);
+    if (dayObj?.date) {
+      const d = dayObj.date;
+      const dateISO = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+      sb.from("seances_natation").delete().eq("date", dateISO).eq("heure", newHeure)
+        .then(() => sb.from("seances_natation").insert({ date: dateISO, heure: newHeure, spots: 2 }))
+        .catch(err => console.warn("Supabase seances add:", err));
+    }
     setSessions(prev => [...prev, newSlot].sort((a, b) => {
       if (a.day !== b.day) return 0;
       return a.time.localeCompare(b.time);
@@ -4270,7 +4429,7 @@ function MembresTab({ allResas, dbMembres, onRefresh }) {
   };
 
   const membresSupabase = (dbMembres || []).map(m => ({
-    id: m.id, name: `${m.prenom} ${m.nom}`, prenom: m.prenom, nom: m.nom,
+    id: m.id, name: `${PRENOM(m.prenom)} ${NOM(m.nom)}`, prenom: PRENOM(m.prenom), nom: NOM(m.nom),
     email: m.email, phone: m.tel, tel: m.tel, tel2: m.tel2,
     adresse: m.adresse, ville: m.ville, cp: m.cp,
     adresse_vac: m.adresse_vac, ville_vac: m.ville_vac, cp_vac: m.cp_vac,
@@ -4280,7 +4439,22 @@ function MembresTab({ allResas, dbMembres, onRefresh }) {
     compte_solde: m.compte_solde || false,
   }));
 
-  const tousLesMembres = membresSupabase.length > 0 ? membresSupabase : MEMBRES;
+  const tousLesMembres = (membresSupabase.length > 0 ? membresSupabase : MEMBRES)
+    .sort((a, b) => (a.nom||"").localeCompare(b.nom||"", "fr"));
+
+  const [searchLettre, setSearchLettre] = useState("");
+  const [searchText, setSearchText] = useState("");
+
+  const lettres = [...new Set(tousLesMembres.map(m => (m.nom||"").charAt(0).toUpperCase()))].sort();
+
+  const filteredMembres = tousLesMembres.filter(m => {
+    if (searchLettre && (m.nom||"").charAt(0).toUpperCase() !== searchLettre) return false;
+    if (searchText) {
+      const q = searchText.toLowerCase();
+      return (m.nom||"").toLowerCase().includes(q) || (m.prenom||"").toLowerCase().includes(q) || (m.email||"").toLowerCase().includes(q);
+    }
+    return true;
+  });
 
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
@@ -4289,15 +4463,28 @@ function MembresTab({ allResas, dbMembres, onRefresh }) {
       {modifierMembre && <ModifierMembreModal membre={modifierMembre} onClose={() => setModifierMembre(null)} onSaved={() => { setModifierMembre(null); onRefresh?.(); }} />}
       {showCreer && <CreerMembreModal onClose={() => setShowCreer(false)} onSaved={() => { setShowCreer(false); onRefresh?.(); }} />}
 
+      {/* Header + recherche */}
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
-        <div style={{ fontWeight:900, color:"#2C3E50", fontSize:14 }}>{tousLesMembres.length} membre{tousLesMembres.length>1?"s":""} inscrit{tousLesMembres.length>1?"s":""}</div>
+        <div style={{ fontWeight:900, color:"#2C3E50", fontSize:14 }}>{filteredMembres.length} / {tousLesMembres.length} membre{tousLesMembres.length>1?"s":""}</div>
         <button onClick={() => setShowCreer(true)} style={{ background:`linear-gradient(135deg,${C.green},#1E8449)`, color:"#fff", border:"none", borderRadius:50, padding:"6px 14px", cursor:"pointer", fontWeight:900, fontSize:12, fontFamily:"inherit" }}>
           ➕ Nouveau membre
         </button>
       </div>
 
+      {/* Recherche texte */}
+      <input value={searchText} onChange={e => setSearchText(e.target.value)} placeholder="🔍 Rechercher par nom, prénom, email..."
+        style={{ border:"1.5px solid #e0e0e0", borderRadius:10, padding:"8px 12px", fontSize:13, fontFamily:"inherit", outline:"none", width:"100%", boxSizing:"border-box" }} />
+
+      {/* Filtre alphabet */}
+      <div style={{ display:"flex", flexWrap:"wrap", gap:4 }}>
+        <button onClick={() => setSearchLettre("")} style={{ background:searchLettre===""?C.ocean:"#f0f0f0", color:searchLettre===""?"#fff":"#888", border:"none", borderRadius:8, padding:"4px 10px", cursor:"pointer", fontWeight:800, fontSize:12, fontFamily:"inherit" }}>Tous</button>
+        {lettres.map(l => (
+          <button key={l} onClick={() => setSearchLettre(searchLettre===l?"":l)} style={{ background:searchLettre===l?C.ocean:"#f0f0f0", color:searchLettre===l?"#fff":"#555", border:"none", borderRadius:8, padding:"4px 10px", cursor:"pointer", fontWeight:800, fontSize:12, fontFamily:"inherit" }}>{l}</button>
+        ))}
+      </div>
+
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(280px, 1fr))", gap:10 }}>
-      {tousLesMembres.map((u, i) => (
+      {filteredMembres.map((u, i) => (
         <div key={u.id || i} style={{ background:"#fff", borderRadius:20, padding:"14px 16px", boxShadow:"0 4px 16px rgba(0,0,0,0.06)" }}>
           <div style={{ display:"flex", alignItems:"center", gap:14, cursor:"pointer" }} onClick={() => setSelectedMembre(u)}>
             <div style={{ width:50, height:50, borderRadius:18, background:`linear-gradient(135deg,${u.color},${u.color}bb)`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:24, flexShrink:0 }}>{u.av}</div>
@@ -4594,14 +4781,18 @@ function PaiementsTab({ onValidate }) {
   const [dateFilter, setDateFilter] = useState("");
   const [subTab, setSubTab]   = useState("liste"); // "liste" | "suivi"
 
+  const [commandesClub, setCommandesClub] = useState([]);
+
   const loadAll = async () => {
-    const [{ data: nat }, { data: club }] = await Promise.all([
+    const [{ data: nat }, { data: club }, { data: commandes }] = await Promise.all([
       sb.from("reservations_natation").select("*, membres(prenom, nom, email)").order("created_at"),
       sb.from("reservations_club").select("*, membres(prenom, nom, email)").order("created_at"),
+      sb.from("commandes_club").select("*, membres(prenom, nom, email)").order("created_at"),
     ]);
     const natFmt  = (nat  || []).map(r => ({ ...r, _type:"natation", _date:r.date_seance,      _label:`🏊 ${r.heure}` }));
     const clubFmt = (club || []).map(r => ({ ...r, _type:"club",     _date:r.date_reservation, _label: (!isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6) ? "🎟️ Carte Liberté" : `🏖️ ${r.session==="matin"?"Matin":"Après-midi"}` }));
     setResas([...natFmt, ...clubFmt].sort((a,b) => (a.created_at||"").localeCompare(b.created_at||"")));
+    setCommandesClub(commandes || []);
     setLoading(false);
   };
 
@@ -4617,7 +4808,7 @@ function PaiementsTab({ onValidate }) {
       const r = groupe.resas[0];
       const credit = Number(r.enfants?.[0]) || 0;
       if (credit > 0 && r.membre_id) {
-        const { data: m } = await sb.from("membres").select("liberte_balance, liberte_total").eq("id", r.membre_id).single();
+        const { data: m } = await sb.from("membres").select("liberte_balance, liberte_total").eq("id", r.membre_id).maybeSingle();
         if (m) {
           const delta = newStatut === "confirmed" ? credit : -credit;
           await sb.from("membres").update({
@@ -4633,7 +4824,7 @@ function PaiementsTab({ onValidate }) {
       const membreId = groupe.resas[0]?.membre_id;
       const nbUtil = groupe.resas.filter(r => (r.label_jour||"").startsWith("[LIBERTE]")).length;
       if (membreId && nbUtil > 0) {
-        const { data: m } = await sb.from("membres").select("liberte_balance").eq("id", membreId).single();
+        const { data: m } = await sb.from("membres").select("liberte_balance").eq("id", membreId).maybeSingle();
         if (m) {
           const delta = newStatut === "confirmed" ? -nbUtil : nbUtil; // confirmer = décrémenter
           await sb.from("membres").update({ liberte_balance: Math.max(0, (m.liberte_balance||0) + delta) }).eq("id", membreId);
@@ -4654,7 +4845,7 @@ function PaiementsTab({ onValidate }) {
       // Club: grouper par session + enfants (trié) + minute → chaque combinaison enfant/session = 1 groupe
       const enfantsKey = Array.isArray(r.enfants) ? [...r.enfants].sort().join(",") : "";
       const keyClub = r._type === "club"
-        ? `${r.membre_id}-club-${r.session}-${enfantsKey}-${minuteCreation}`
+        ? `${r.membre_id}-club-${enfantsKey}-${minuteCreation}` // matin+apmidi même groupe si même minute+enfants
         : null;
       const key = keyClub || `${r.membre_id}-${r._type}-${enfantsKey}-${minuteCreation}`;
       if (!groups[key]) groups[key] = {
@@ -4663,7 +4854,12 @@ function PaiementsTab({ onValidate }) {
       };
       groups[key].resas.push(r);
     });
-    return Object.values(groups).sort((a,b) => (b.created_at||"").localeCompare(a.created_at||""));
+    return Object.values(groups).sort((a, b) => {
+      // Trier par date de la première séance (chronologique)
+      const dateA = a.resas.map(r => `${r.date_seance||r.date_reservation||r.created_at||""} ${r.heure||""}`).sort()[0] || a.created_at || "";
+      const dateB = b.resas.map(r => `${r.date_seance||r.date_reservation||r.created_at||""} ${r.heure||""}`).sort()[0] || b.created_at || "";
+      return dateA.localeCompare(dateB);
+    });
   };
 
   const allGroups    = grouper(resas);
@@ -4706,43 +4902,43 @@ function PaiementsTab({ onValidate }) {
       const nb = Number(g.resas[0]?.enfants?.[0]) || 0;
       return LIBERTE_PRIX[nb] ? `${LIBERTE_PRIX[nb]} €` : "—";
     }
-    // Lire montant stocké dans label_jour [MONTANT:xx]
-    const label = g.resas[0]?.label_jour || "";
-    const montantMatch = label.match(/\[MONTANT:(\d+)\]/);
-    if (montantMatch) return `${montantMatch[1]} €`;
 
-    // Calculer automatiquement depuis les tarifs
+    const membreId = g.resas[0]?.membre_id;
+    // Dates de toutes les résas du groupe
+    const datesGroupe = new Set(g.resas.map(r => r.date_reservation?.slice(0,10)).filter(Boolean));
+
+    // Trouver toutes les commandes_club dont AU MOINS UNE date est dans le groupe
+    const commandesTrouvees = commandesClub.filter(c =>
+      c.membre_id === membreId &&
+      Array.isArray(c.dates) &&
+      c.dates.some(d => datesGroupe.has(d))
+    );
+    if (commandesTrouvees.length > 0) {
+      const total = commandesTrouvees.reduce((s, c) => s + Number(c.montant_total || 0), 0);
+      return `${total} €`;
+    }
+
+    // Fallback pour anciennes résas sans commandes_club : calculer par session séparément
     const resas = g.resas.filter(r => !(Array.isArray(r.enfants) && Number(r.enfants[0]) >= 6));
     if (resas.length === 0) return "—";
+    const nbEnfants = (resas[0]?.enfants||[]).length || 1;
 
-    // Détecter session dominante
-    const nbMatin  = resas.filter(r => r.session === "matin").length;
-    const nbApmidi = resas.filter(r => r.session === "apmidi").length;
-    const isJournee = nbMatin > 0 && nbApmidi > 0 && Math.abs(nbMatin - nbApmidi) <= 1;
-    const session = isJournee ? "journee" : nbMatin >= nbApmidi ? "matin" : "apmidi";
+    const calcSession = (resasSess, tarif) => {
+      const nbJ = resasSess.length;
+      if (nbJ === 0) return 0;
+      // Toujours tarif unitaire × nbJours (impossible de savoir si c'est un forfait semaine sans commandes_club)
+      const row = tarif.rows[0];
+      if (!row) return 0;
+      const pu = nbEnfants === 1 ? row.e1 : nbEnfants === 2 ? row.e2 : nbEnfants === 3 ? row.e3 : row.e3 + (nbEnfants-3)*row.sup;
+      return pu * nbJ;
+    };
 
-    // Nb de jours réels (journée = 1 jour = 2 résas)
-    const nbJours = isJournee ? Math.round(resas.length / 2) : resas.length;
-    const nbSemaines = Math.round(nbJours / 6);
-
-    // Nb enfants
-    const nbEnfants = (resas[0]?.enfants || []).length || 1;
-
-    const tarif = session === "matin" ? TARIFS_MATIN : session === "apmidi" ? TARIFS_APMIDI : TARIFS_JOURNEE;
-
-    // Trouver la bonne ligne selon nb semaines/jours
-    let rowIdx = 0;
-    if (nbSemaines >= 4) rowIdx = 4;
-    else if (nbSemaines === 3) rowIdx = 3;
-    else if (nbSemaines === 2) rowIdx = 2;
-    else if (nbSemaines === 1) rowIdx = 1;
-    else rowIdx = 0; // 1 demi-journée
-
-    const row = tarif.rows[rowIdx];
-    if (!row) return "—";
-
-    let prix = nbEnfants === 1 ? row.e1 : nbEnfants === 2 ? row.e2 : nbEnfants === 3 ? row.e3 : row.e3 + (nbEnfants - 3) * row.sup;
-    return `${prix} €`;
+    const resasMatin  = resas.filter(r => r.session === "matin");
+    const resasApmidi = resas.filter(r => r.session === "apmidi");
+    const totalMatin  = calcSession(resasMatin,  TARIFS_MATIN);
+    const totalApmidi = calcSession(resasApmidi, TARIFS_APMIDI);
+    const total = totalMatin + totalApmidi;
+    return total > 0 ? `${total} €` : "—";
   };
 
   const getMontant = (g) => {
@@ -4784,7 +4980,6 @@ function PaiementsTab({ onValidate }) {
 
       {/* ── CAHIER DE SUIVI ── */}
       {subTab === "suivi" && (() => {
-        // Grouper les résas confirmées par jour de validation
         const confirmedAll = allGroups.filter(g => g.statut === "confirmed");
         const parJour = {};
         confirmedAll.forEach(g => {
@@ -4795,16 +4990,60 @@ function PaiementsTab({ onValidate }) {
         });
         const jours = Object.keys(parJour).sort((a,b) => b.localeCompare(a));
 
+        // Calcul totaux par semaine et total saison
+        const getTotal = (groupes) => groupes.reduce((s,g) => {
+          const mode = g.resas.find(r=>r.mode_paiement)?.mode_paiement;
+          if (mode === "offert" || mode === "compte_fin_saison") return s;
+          return s + (Number(getMontant(g).replace(" €","").replace("—","0"))||0);
+        }, 0);
+
+        const parSemaine = {};
+        Object.entries(parJour).forEach(([date, groupes]) => {
+          const d = new Date(date+"T12:00:00");
+          const lundi = new Date(d);
+          lundi.setDate(d.getDate() - ((d.getDay()+6)%7));
+          const key = lundi.toISOString().slice(0,10);
+          if (!parSemaine[key]) parSemaine[key] = [];
+          parSemaine[key].push(...groupes);
+        });
+        const semaines = Object.entries(parSemaine).sort(([a],[b]) => a.localeCompare(b));
+        const totalSaison = semaines.reduce((s,[,g]) => s + getTotal(g), 0);
+        const maxSemaine = Math.max(...semaines.map(([,g]) => getTotal(g)), 1);
+
         if (jours.length === 0) return (
           <div style={{ textAlign:"center", padding:"32px 0", color:"#bbb", fontSize:14 }}>Aucun encaissement enregistré</div>
         );
 
         return (
           <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+
+            {/* Graphique par semaine */}
+            <div style={{ background:"#fff", borderRadius:16, padding:"16px 18px", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
+                <div style={{ fontWeight:800, color:C.dark, fontSize:13 }}>📊 Encaissements par semaine</div>
+                <div style={{ fontWeight:900, color:C.green, fontSize:16 }}>Total : {totalSaison} €</div>
+              </div>
+              <div style={{ display:"flex", gap:6, alignItems:"flex-end", height:80 }}>
+                {semaines.map(([lundi, groupes]) => {
+                  const total = getTotal(groupes);
+                  const pct = Math.round((total / maxSemaine) * 100);
+                  const d = new Date(lundi+"T12:00:00");
+                  const label = `${d.getDate()}/${d.getMonth()+1}`;
+                  return (
+                    <div key={lundi} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:3 }}>
+                      <div style={{ fontSize:9, color:C.green, fontWeight:800 }}>{total > 0 ? total+"€" : ""}</div>
+                      <div style={{ width:"100%", background:`linear-gradient(180deg,${C.green},#27AE60)`, borderRadius:"4px 4px 0 0", height:`${Math.max(pct,2)}%`, minHeight:total>0?4:0, transition:"height .3s" }} />
+                      <div style={{ fontSize:8, color:"#aaa", fontWeight:700, whiteSpace:"nowrap" }}>{label}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
             {jours.map(jour => {
               const groupes = parJour[jour];
               const totalJour = groupes.reduce((s,g) => {
-                if (g.resas.find(r=>r.mode_paiement)?.mode_paiement === "offert") return s; // Offerts exclus
+                const mode = g.resas.find(r=>r.mode_paiement)?.mode_paiement;
+                if (mode === "offert" || mode === "compte_fin_saison") return s; // exclus
                 const m = getMontant(g).replace(" €","").replace("—","0");
                 return s + (Number(m)||0);
               }, 0);
@@ -4812,9 +5051,11 @@ function PaiementsTab({ onValidate }) {
               // Répartition par mode
               const modesJour = {};
               let nbOfferts = 0;
+              let nbComptesSaison = 0;
               groupes.forEach(g => {
                 const mode = g.resas.find(r=>r.mode_paiement)?.mode_paiement || "non_renseigne";
-                if (mode === "offert") { nbOfferts++; return; } // Offerts : compter mais pas additionner
+                if (mode === "offert") { nbOfferts++; return; }
+                if (mode === "compte_fin_saison") { nbComptesSaison++; return; }
                 if (!modesJour[mode]) modesJour[mode] = 0;
                 const m = getMontant(g).replace(" €","").replace("—","0");
                 modesJour[mode] += Number(m)||0;
@@ -4853,18 +5094,25 @@ function PaiementsTab({ onValidate }) {
                     {groupes.map((g, gi) => {
                       const mp = MODES_PAIEMENT.find(m => m.id === g.resas.find(r=>r.mode_paiement)?.mode_paiement);
                       const isOffert = mp?.id === "offert";
+                      const isCompte = mp?.id === "compte_fin_saison";
                       const montant = getMontant(g);
                       const membre = g.membre ? `${g.membre.prenom} ${(g.membre.nom||"").toUpperCase()}` : "—";
                       const label = g.type === "natation" ? getForfaitLabel(g) : isLiberte(g) ? "🎟️ Carte Liberté" : getForfaitLabel(g);
+                      // Enfants
+                      // Enrichir les prénoms avec le nom de famille du membre
+      const prenoms = [...new Set(g.resas.flatMap(r => Array.isArray(r.enfants) ? r.enfants.filter(e => isNaN(Number(e))) : []))];
+      const nomFamille = (g.membre?.nom || "").toUpperCase();
+      const enfantsNoms = prenoms.map(p => nomFamille ? `${p} ${nomFamille}` : p).join(", ");
                       return (
-                        <div key={gi} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"6px 8px", background: isOffert ? "#FDF2F8" : "#f8fbff", borderRadius:8, opacity: isOffert ? 0.85 : 1 }}>
+                        <div key={gi} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"6px 8px", background: isOffert ? "#FDF2F8" : isCompte ? "#EEF2FF" : "#f8fbff", borderRadius:8, opacity: isOffert||isCompte ? 0.85 : 1 }}>
                           <div style={{ flex:1 }}>
                             <span style={{ fontWeight:700, fontSize:12, color:C.dark }}>{membre}</span>
                             <span style={{ fontSize:11, color:"#aaa", marginLeft:8 }}>{label}</span>
+                            {enfantsNoms && <span style={{ fontSize:11, color:C.ocean, marginLeft:8, fontWeight:700 }}>· {enfantsNoms}</span>}
                           </div>
                           <div style={{ display:"flex", alignItems:"center", gap:8 }}>
                             {mp && <span style={{ background:`${mp.color}20`, color:mp.color, borderRadius:50, padding:"2px 8px", fontSize:10, fontWeight:800 }}>{mp.label.split(" ").slice(1).join(" ")}</span>}
-                            <span style={{ fontWeight:800, color: isOffert ? "#EC4899" : C.dark, fontSize:13, textDecoration: isOffert ? "line-through" : "none" }}>{montant}</span>
+                            <span style={{ fontWeight:800, color: isOffert||isCompte ? mp?.color : C.dark, fontSize:13, textDecoration: isOffert||isCompte ? "line-through" : "none" }}>{montant}</span>
                           </div>
                         </div>
                       );
@@ -4873,12 +5121,15 @@ function PaiementsTab({ onValidate }) {
 
                   {/* Sous-total par mode */}
                   <div style={{ marginTop:8, paddingTop:8, borderTop:"1px solid #f0f0f0", display:"flex", gap:8, flexWrap:"wrap", alignItems:"center" }}>
-                    {MODES_PAIEMENT.filter(m => m.id !== "offert").map(m => {
+                    {MODES_PAIEMENT.filter(m => m.id !== "offert" && m.id !== "compte_fin_saison").map(m => {
                       const v = modesJour[m.id];
                       return v ? <span key={m.id} style={{ fontSize:11, color:m.color, fontWeight:800 }}>{m.label.split(" ")[0]} {v} €</span> : null;
                     })}
                     {nbOfferts > 0 && (
                       <span style={{ fontSize:11, color:"#EC4899", fontWeight:800 }}>🎁 {nbOfferts} offert{nbOfferts>1?"s":""} <span style={{ fontWeight:400, color:"#aaa" }}>(non comptabilisé{nbOfferts>1?"s":""})</span></span>
+                    )}
+                    {nbComptesSaison > 0 && (
+                      <span style={{ fontSize:11, color:"#6366F1", fontWeight:800 }}>📒 {nbComptesSaison} compte{nbComptesSaison>1?"s":""} fin de saison <span style={{ fontWeight:400, color:"#aaa" }}>(non comptabilisé{nbComptesSaison>1?"s":""})</span></span>
                     )}
                   </div>
                 </div>
@@ -5011,7 +5262,7 @@ function PaiementsTab({ onValidate }) {
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:6 }}>
                   <div>
                     <div style={{ fontWeight:900, color:C.dark, fontSize:14 }}>
-                      {g.membre ? `${g.membre.prenom} ${NOM(g.membre.nom)}` : "—"}
+                      {g.membre ? `${PRENOM(g.membre.prenom)} ${NOM(g.membre.nom)}` : "—"}
                     </div>
                     {enfants.length > 0 && (
                       <div style={{ fontSize:12, color:"#888", marginTop:1 }}>{enfants.join(", ")}</div>
@@ -5380,7 +5631,7 @@ function PlanningTab({ allSeasonSessions, clubPlaces, reservations = [] }) {
   // Charger résas natation + club + enfants depuis Supabase
   useEffect(() => {
     sb.from("reservations_natation").select("*, membres(id, prenom, nom, tel, adresse, ville, cp, adresse_vac, ville_vac, cp_vac)")
-      .eq("statut", "confirmed")
+      .in("statut", ["confirmed", "pending"])
       .then(async ({ data: resasData }) => {
         if (!resasData?.length) { setDbResasNat([]); return; }
         const membreIds = [...new Set(resasData.map(r => r.membre_id).filter(Boolean))];
@@ -5399,7 +5650,7 @@ function PlanningTab({ allSeasonSessions, clubPlaces, reservations = [] }) {
       .catch(() => {});
     // Charger résas club + enfants séparément
     sb.from("reservations_club").select("*, membres(id, prenom, nom, tel, adresse, ville, cp, adresse_vac, ville_vac, cp_vac)")
-      .eq("statut", "confirmed")
+      .in("statut", ["confirmed", "pending"])
       .then(async ({ data: resasData }) => {
         if (!resasData?.length) { setDbResasClub([]); return; }
         // Charger enfants pour chaque membre
@@ -5426,8 +5677,8 @@ function PlanningTab({ allSeasonSessions, clubPlaces, reservations = [] }) {
     if (!dayObj?.date) return [];
     const dateISO = `${dayObj.date.getFullYear()}-${String(dayObj.date.getMonth()+1).padStart(2,"0")}-${String(dayObj.date.getDate()).padStart(2,"0")}`;
     return dbResasNat
-      .filter(r => r.date_seance?.slice(0,10) === dateISO && r.heure === time && r.statut === "confirmed")
-      .flatMap(r => (r.enfants || []).map(e => ({ prenom: e, parent: r.membres ? `${r.membres.prenom} ${r.membres.nom}` : "—", tel: r.membres?.tel || "" })));
+      .filter(r => r.date_seance?.slice(0,10) === dateISO && r.heure === time)
+      .flatMap(r => (r.enfants || []).map(e => ({ prenom: e, parent: r.membres ? `${r.membres.prenom} ${r.membres.nom}` : "—", tel: r.membres?.tel || "", statut: r.statut })));
   };
 
   // Places club par date et session depuis Supabase
@@ -5473,6 +5724,17 @@ function PlanningTab({ allSeasonSessions, clubPlaces, reservations = [] }) {
   // NATATION : slots from allSeasonSessions
   const getNataSlots = (dayId) => (allSeasonSessions || []).filter(s => s.day === dayId);
   const nataSpotColor = n => n === 0 ? C.sunset : n === 1 ? C.coral : C.green;
+
+  // Calcul des spots réels depuis Supabase (compte les enfants, pas les lignes)
+  const getPlanningSpots = (dayId, time) => {
+    const dayObj = ALL_SEASON_DAYS.find(d => d.id === dayId);
+    if (!dayObj?.date) return 2;
+    const dateISO = `${dayObj.date.getFullYear()}-${String(dayObj.date.getMonth()+1).padStart(2,"0")}-${String(dayObj.date.getDate()).padStart(2,"0")}`;
+    const taken = dbResasNat
+      .filter(r => r.date_seance?.slice(0,10) === dateISO && r.heure === time)
+      .reduce((acc, r) => acc + (Array.isArray(r.enfants) ? r.enfants.length : 1), 0);
+    return Math.max(0, 2 - taken);
+  };
 
   // CLUB : 2 demi-journées par jour avec places globales
   const CLUB_SESSIONS = [
@@ -5612,36 +5874,58 @@ ${afternoon.length>0?`<h2>🌊 Après-midi</h2><table><thead><tr><th>Heure</th><
                 <button onClick={handlePrintJour} style={{ background: `linear-gradient(135deg,${C.ocean},${C.sea})`, color: "#fff", border: "none", borderRadius: 50, padding: "5px 12px", cursor: "pointer", fontWeight: 900, fontSize: 11, fontFamily: "inherit", boxShadow: `0 3px 10px ${C.ocean}44` }}>🖨️ Imprimer</button>
               </div>
             </div>
-            {[["☀️ MATIN", morning], ["🌊 APRÈS-MIDI", afternoon]].map(([title, list]) => list.length > 0 && (
-              <div key={title} style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 11, fontWeight: 900, color: title.includes("MATIN") ? C.coral : C.ocean, marginBottom: 8, letterSpacing: 1 }}>{title}</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {list.map(s => {
-                    const enfants = getEnfantsPourCreneau(selectedDayId, s.time);
-                    return (
-                      <div key={s.id} style={{ display:"flex", alignItems:"center", gap:10, background:"#F8FBFF", borderRadius:12, padding:"8px 12px", border:`1.5px solid ${nataSpotColor(s.spots)}30` }}>
-                        {/* Heure + dispo */}
-                        <div style={{ display:"flex", alignItems:"center", gap:6, minWidth:70 }}>
-                          <div style={{ width:8, height:8, borderRadius:"50%", background:nataSpotColor(s.spots), flexShrink:0 }} />
-                          <span style={{ fontWeight:900, fontSize:13, color:C.dark }}>{s.time}</span>
-                          <span style={{ fontSize:10, color:nataSpotColor(s.spots), fontWeight:700 }}>{s.spots}/2</span>
-                        </div>
-                        {/* Enfants inscrits */}
-                        <div style={{ flex:1, display:"flex", gap:6, flexWrap:"wrap" }}>
-                          {enfants.length > 0 ? enfants.map((e, i) => (
-                            <div key={i} style={{ background:`${C.ocean}15`, color:C.ocean, borderRadius:8, padding:"3px 8px", fontSize:11, fontWeight:800 }}>
-                              👤 {e.prenom}
+            {/* Layout 2 colonnes : matin | après-midi */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, alignItems: "start" }}>
+              {[["☀️ MATIN", morning], ["🌊 APRÈS-MIDI", afternoon]].map(([title, list]) => (
+              <div key={title}>
+                <div style={{
+                  fontSize: 11, fontWeight: 900, letterSpacing: 1, marginBottom: 8,
+                  color: title.includes("MATIN") ? C.coral : C.ocean,
+                  display: "flex", alignItems: "center", gap: 6,
+                  borderBottom: `2px solid ${title.includes("MATIN") ? C.coral : C.ocean}30`,
+                  paddingBottom: 6,
+                }}>{title}</div>
+                {list.length === 0 ? (
+                  <div style={{ fontSize: 12, color: "#ccc", fontStyle: "italic", paddingTop: 4 }}>Aucun créneau</div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                    {list.map(s => {
+                      const enfants = getEnfantsPourCreneau(selectedDayId, s.time);
+                      const realSpots = getPlanningSpots(selectedDayId, s.time);
+                      return (
+                        <div key={s.id} style={{
+                          background: realSpots === 0 ? "#FFF5F5" : "#F8FBFF",
+                          borderRadius: 10, padding: "7px 10px",
+                          border: `1.5px solid ${nataSpotColor(realSpots)}35`,
+                        }}>
+                          {/* Heure + spots */}
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: enfants.length > 0 ? 5 : 0 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                              <div style={{ width: 7, height: 7, borderRadius: "50%", background: nataSpotColor(realSpots), flexShrink: 0 }} />
+                              <span style={{ fontWeight: 900, fontSize: 13, color: C.dark }}>{s.time}</span>
                             </div>
-                          )) : s.spots === 2 ? (
-                            <span style={{ fontSize:11, color:"#bbb" }}>—</span>
-                          ) : null}
+                            <span style={{ fontSize: 10, color: nataSpotColor(realSpots), fontWeight: 800, background: `${nataSpotColor(realSpots)}15`, borderRadius: 6, padding: "1px 6px" }}>
+                              {realSpots === 0 ? "Complet" : `${realSpots}/2`}
+                            </span>
+                          </div>
+                          {/* Enfants */}
+                          {enfants.length > 0 && (
+                            <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                              {enfants.map((e, i) => (
+                                <div key={i} style={{ background: e.statut === "pending" ? `${C.sun}30` : `${C.ocean}15`, color: e.statut === "pending" ? "#b45309" : C.ocean, borderRadius: 6, padding: "2px 6px", fontSize: 10, fontWeight: 800 }}>
+                                  {e.statut === "pending" ? "⏳" : "👤"} {e.prenom}
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            ))}
+              ))}
+            </div>
           </div>
         );
       })()}
@@ -5654,10 +5938,11 @@ ${afternoon.length>0?`<h2>🌊 Après-midi</h2><table><thead><tr><th>Heure</th><
               const slots = (allSeasonSessions || []).filter(s => s.day === d.id);
               const morning   = slots.filter(s => parseInt(s.time) < 13);
               const afternoon = slots.filter(s => parseInt(s.time) >= 13);
-              const taken = slots.reduce((acc,s)=>acc+(2-s.spots),0);
-              const avail = slots.reduce((acc,s)=>acc+s.spots,0);
-              const rate  = slots.length*2 > 0 ? Math.round((taken/(slots.length*2))*100) : 0;
               const dateISO = d.date ? `${d.date.getFullYear()}-${String(d.date.getMonth()+1).padStart(2,"0")}-${String(d.date.getDate()).padStart(2,"0")}` : "";
+              const resasJourSemaine = dbResasNat.filter(r => r.date_seance?.slice(0,10) === dateISO);
+              const taken = resasJourSemaine.reduce((acc, r) => acc + (Array.isArray(r.enfants) ? r.enfants.length : 1), 0);
+              const avail = Math.max(0, slots.length * 2 - taken);
+              const rate  = slots.length*2 > 0 ? Math.round((taken/(slots.length*2))*100) : 0;
               const fmt = (list) => list.map(s => {
                 const enfants = dbResasNat
                   .filter(r => r.date_seance?.slice(0,10) === dateISO && r.heure === s.time && r.statut === "confirmed")
@@ -5879,10 +6164,10 @@ function AgeGroupCard({ dbMembres = [] }) {
 
   useEffect(() => {
     sb.from("reservations_natation").select("membre_id, date_seance, enfants, statut")
-      .eq("statut", "confirmed")
+      .in("statut", ["confirmed", "pending"])
       .then(({ data }) => setDbResasNat(data || [])).catch(() => {});
     sb.from("reservations_club").select("membre_id, date_reservation, enfants, statut")
-      .eq("statut", "confirmed")
+      .in("statut", ["confirmed", "pending"])
       .then(({ data }) => setDbResasClub(data || [])).catch(() => {});
     sb.from("membres").select("id, prenom, nom, enfants(*)")
       .then(({ data }) => setMembresLocaux(data || [])).catch(() => {});
@@ -5911,7 +6196,7 @@ function AgeGroupCard({ dbMembres = [] }) {
       const key = `${e.prenom}-${e.nom}-${e.naissance}`;
       if (!seenEnfants.has(key)) {
         seenEnfants.add(key);
-        allEnfants.push({ ...e, age: calcAge(e.naissance), parent: `${m.prenom} ${NOM(m.nom)}`, parentColor: C.ocean, phone: m.tel,
+        allEnfants.push({ ...e, age: calcAge(e.naissance), parent: `${PRENOM(m.prenom)} ${NOM(m.nom)}`, parentColor: C.ocean, phone: m.tel,
           adresse: m.adresse, ville: m.ville, cp: m.cp,
           adresse_vac: m.adresse_vac, ville_vac: m.ville_vac, cp_vac: m.cp_vac,
         });
@@ -6199,36 +6484,54 @@ th{background:#1A8FE3;color:#fff;padding:9px 12px;text-align:left}
         ))}
       </div>
 
-      {/* List */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 0, borderRadius: 12, overflow: "hidden", border: "1px solid #F0F4F8" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "24px 1fr 1fr 44px", background: "#F8FBFF", padding: "7px 10px" }}>
-          <div style={{ fontSize: 9, fontWeight: 900, color: "#aaa" }}>#</div>
-          <div style={{ fontSize: 9, fontWeight: 900, color: "#aaa" }}>NOM · PRÉNOM</div>
-          <div style={{ fontSize: 9, fontWeight: 900, color: "#aaa" }}>ACTIVITÉ</div>
-          <div style={{ fontSize: 9, fontWeight: 900, color: "#aaa", textAlign: "center" }}>ÂGE</div>
-        </div>
-        {filteredEnfants.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "20px 0", color: "#bbb", fontSize: 13 }}>Aucun enfant</div>
-        ) : filteredEnfants.map((e, i) => {
-          const grp = AGE_GROUPS.find(g => e.age >= g.min && e.age <= g.max);
-          return (
-            <div key={i} onClick={() => setSelectedEnfant(e)} style={{ display: "grid", gridTemplateColumns: "24px 1fr 1fr 44px", background: i%2===0?"#fff":"#F8FBFF", padding: "8px 10px", alignItems: "center", borderTop: "1px solid #F0F4F8", cursor:"pointer" }}>
-              <div style={{ fontSize: 10, color: "#ccc" }}>{i+1}</div>
-              <div>
-                <div style={{ fontWeight: 900, color: "#2C3E50", fontSize: 12 }}>{e.nom.toUpperCase()} <span style={{ fontWeight: 600 }}>{e.prenom}</span></div>
-                {e.allergies && <div style={{ fontSize: 9, color: C.sunset }}>⚠️ {e.allergies}</div>}
+      {/* List repliable */}
+      {(() => {
+        const [listOpen, setListOpen] = React.useState(false);
+        return (
+          <>
+            <div
+              onClick={() => setListOpen(v => !v)}
+              style={{ display:"flex", alignItems:"center", justifyContent:"space-between", background: listOpen ? C.ocean : "#F0F4F8", borderRadius: listOpen ? "12px 12px 0 0" : 12, padding:"10px 14px", cursor:"pointer", transition:"all .2s" }}
+            >
+              <div style={{ fontWeight:900, color: listOpen ? "#fff" : C.dark, fontSize:13 }}>
+                👧 Liste des enfants ({filteredEnfants.length})
               </div>
-              <div style={{ fontSize: 11, color: e.activite==="natation"?C.ocean:e.activite==="club"?C.coral:"#9B59B6", fontWeight: 700 }}>
-                {e.activite==="natation"?"🏊":e.activite==="club"?"🏖️":"🏖️🏊"}
-              </div>
-              <div style={{ textAlign: "center" }}>
-                <div style={{ fontWeight: 900, fontSize: 14, color: grp?.color||C.ocean }}>{e.age}</div>
-                <div style={{ fontSize: 8, color: "#ccc" }}>ans</div>
-              </div>
+              <div style={{ fontSize:16, color: listOpen ? "#fff" : "#aaa", transition:"transform .2s", transform: listOpen ? "rotate(180deg)" : "rotate(0deg)" }}>▾</div>
             </div>
-          );
-        })}
-      </div>
+            {listOpen && (
+              <div style={{ borderRadius:"0 0 12px 12px", overflow:"hidden", border:"1px solid #F0F4F8", borderTop:"none" }}>
+                <div style={{ display:"grid", gridTemplateColumns:"24px 1fr 1fr 44px", background:"#F8FBFF", padding:"7px 10px" }}>
+                  <div style={{ fontSize:9, fontWeight:900, color:"#aaa" }}>#</div>
+                  <div style={{ fontSize:9, fontWeight:900, color:"#aaa" }}>NOM · PRÉNOM</div>
+                  <div style={{ fontSize:9, fontWeight:900, color:"#aaa" }}>ACTIVITÉ</div>
+                  <div style={{ fontSize:9, fontWeight:900, color:"#aaa", textAlign:"center" }}>ÂGE</div>
+                </div>
+                {filteredEnfants.length === 0 ? (
+                  <div style={{ textAlign:"center", padding:"20px 0", color:"#bbb", fontSize:13 }}>Aucun enfant</div>
+                ) : filteredEnfants.map((e, i) => {
+                  const grp = AGE_GROUPS.find(g => e.age >= g.min && e.age <= g.max);
+                  return (
+                    <div key={i} onClick={() => setSelectedEnfant(e)} style={{ display:"grid", gridTemplateColumns:"24px 1fr 1fr 44px", background:i%2===0?"#fff":"#F8FBFF", padding:"8px 10px", alignItems:"center", borderTop:"1px solid #F0F4F8", cursor:"pointer" }}>
+                      <div style={{ fontSize:10, color:"#ccc" }}>{i+1}</div>
+                      <div>
+                        <div style={{ fontWeight:900, color:"#2C3E50", fontSize:12 }}>{e.nom.toUpperCase()} <span style={{ fontWeight:600 }}>{e.prenom}</span></div>
+                        {e.allergies && <div style={{ fontSize:9, color:C.sunset }}>⚠️ {e.allergies}</div>}
+                      </div>
+                      <div style={{ fontSize:11, color:e.activite==="natation"?C.ocean:e.activite==="club"?C.coral:"#9B59B6", fontWeight:700 }}>
+                        {e.activite==="natation"?"🏊":e.activite==="club"?"🏖️":"🏖️🏊"}
+                      </div>
+                      <div style={{ textAlign:"center" }}>
+                        <div style={{ fontWeight:900, fontSize:14, color:grp?.color||C.ocean }}>{e.age}</div>
+                        <div style={{ fontSize:8, color:"#ccc" }}>ans</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        );
+      })()}
       <div style={{ marginTop: 8, fontSize: 10, color: "#bbb", textAlign: "center" }}>
         {filteredEnfants.length} enfant{filteredEnfants.length>1?"s":""} · {periodLabel}
       </div>
@@ -6292,7 +6595,7 @@ function ModifierResaModal({ resa, type, onClose, onSaved, dbMembres }) {
             <select value={membreId} onChange={e => { setMembreId(e.target.value); setEnfants([]); }}
               style={{ width:"100%", border:"2px solid #e0e8f0", borderRadius:12, padding:"11px 12px", fontSize:14, fontFamily:"inherit", outline:"none", background:"#fff" }}>
               <option value="">— Sélectionner —</option>
-              {dbMembres.map(m => <option key={m.id} value={m.id}>{m.prenom} {NOM(m.nom)}</option>)}
+              {dbMembres.map(m => <option key={m.id} value={m.id}>{PRENOM(m.prenom)} {NOM(m.nom)}</option>)}
             </select>
           </Field>
 
@@ -6379,8 +6682,8 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
   const [nbSemainesClub, setNbSemainesClub] = useState(1);
 
   useEffect(() => {
-    sb.from("reservations_natation").select("date_seance, heure, statut")
-      .eq("statut","confirmed")
+    sb.from("reservations_natation").select("date_seance, heure, statut, enfants")
+      .in("statut", ["confirmed", "pending"])
       .then(({ data }) => setDbResasNat(data || [])).catch(() => {});
   }, []);
 
@@ -6396,7 +6699,8 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
   const nbSeancesNat = forfaitNat === "unite" ? 1 : forfaitNat === "forfait5" ? 5 : forfaitNat === "forfait6" ? 6 : 10;
 
   const getSpots = (dayISO, time) => {
-    const taken = dbResasNat.filter(r => r.date_seance?.slice(0,10) === dayISO && r.heure === time).length;
+    const taken = dbResasNat.filter(r => r.date_seance?.slice(0,10) === dayISO && r.heure === time)
+      .reduce((acc, r) => acc + (Array.isArray(r.enfants) ? r.enfants.length : 1), 0);
     return Math.max(0, 2 - taken);
   };
 
@@ -6536,7 +6840,7 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
             <select value={membreId} onChange={e => handleMembreChange(e.target.value)}
               style={{ width:"100%", border:"2px solid #e0e8f0", borderRadius:12, padding:"10px 12px", fontSize:14, fontFamily:"inherit", outline:"none", background:"#fff" }}>
               <option value="">— Sélectionner —</option>
-              {dbMembres.map(m => <option key={m.id} value={m.id}>{m.prenom} {NOM(m.nom)}</option>)}
+              {dbMembres.map(m => <option key={m.id} value={m.id}>{PRENOM(m.prenom)} {NOM(m.nom)}</option>)}
             </select>
           </div>
 
@@ -6972,6 +7276,27 @@ const enrichEnfants = (enfants, membres) => {
   return enfants.filter(e => isNaN(Number(e))).map(prenom => prenom + nom);
 };
 
+function genMailConfirmNat(prenom, heure, dateStr, enfants) {
+  const enfantsLine = enfants?.length > 0 ? `<tr><td style="font-size:12px;color:#888">Enfants : ${enfants.join(", ")}</td></tr>` : "";
+  const blocReglement = `<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:20px"><tr><td style="background:#FFF9F0;border:2px solid #FFD93D;border-radius:12px;padding:18px 20px"><p style="margin:0 0 10px;color:#b45309;font-size:14px;font-weight:700">💳 Comment régler votre inscription ?</p><p style="margin:0 0 12px;font-size:13px;color:#555;line-height:1.7">Vous pouvez régler selon les modes suivants :</p><table cellpadding="0" cellspacing="3" border="0" style="width:100%;margin-bottom:10px"><tr><td style="background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:4px 8px;font-size:10px;font-weight:700;color:#555;text-align:center">🏦 Virement</td><td width="3"></td><td style="background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:4px 8px;font-size:10px;font-weight:700;color:#555;text-align:center">✉️ Chèque</td><td width="3"></td><td style="background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:4px 8px;font-size:10px;font-weight:700;color:#555;text-align:center">💶 Espèces</td><td width="3"></td><td style="background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:4px 8px;font-size:10px;font-weight:700;color:#555;text-align:center">🎫 Chèques vacances</td></tr></table><p style="margin:4px 0;font-size:11px;color:#e67e22;font-weight:700;font-style:italic">⚠️ Virement bancaire accepté jusqu'au 15 juin.</p><p style="margin:4px 0;font-size:12px;color:#888;line-height:1.8">Pour le virement ou chèque, merci de préciser le nom de votre enfant en référence. Le chèque est à libeller à l'ordre de : SAUZEAU Charlène. En avant saison, à envoyer à : Mme SAUZEAU Charlène, 4 allée des Roitelets, 44500 LA BAULE.</p><table width="100%" style="margin-top:14px"><tr><td style="background:#EFF6FF;border:1.5px solid #1A8FE3;border-radius:10px;padding:14px 16px"><p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#1A8FE3">🏦 Coordonnées bancaires pour virement</p><table style="font-size:12px;color:#2C3E50;line-height:2"><tr><td style="font-weight:700;padding-right:12px">Titulaire</td><td>SAUZEAU CHARLENE</td></tr><tr><td style="font-weight:700;padding-right:12px">IBAN</td><td>FR76 1027 8360 6600 0130 5200 228</td></tr><tr><td style="font-weight:700;padding-right:12px">BIC</td><td>CMCIFR2A</td></tr></table></td></tr></table></td></tr></table>`;
+  return `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#f5f7fa;padding:20px"><table width="100%" style="background:#fff;border-radius:16px;overflow:hidden"><tr><td style="background:linear-gradient(135deg,#1A8FE3,#4ECDC4);padding:28px;text-align:center"><h1 style="color:#fff;margin:0;font-size:22px">Confirmation de réservation natation</h1><p style="color:rgba(255,255,255,0.85);margin:6px 0 0;font-size:13px">Eole Beach Club · Piriac-sur-Mer</p></td></tr><tr><td style="padding:24px 28px"><p style="font-size:14px;color:#2C3E50;line-height:1.7;margin:0 0 16px">Bonjour ${prenom},<br/>Votre réservation de natation est bien enregistrée :</p><table width="100%" style="background:#EFF6FF;border-radius:10px;padding:14px;margin-bottom:20px"><tr><td style="font-size:15px;font-weight:700;color:#1A8FE3">🏊 ${heure}</td></tr><tr><td style="font-size:13px;color:#555">${dateStr}</td></tr>${enfantsLine}</table>${blocReglement}<p style="font-size:13px;color:#888;text-align:center">A bientot sur la plage !<br/>L'equipe Eole Beach Club</p></td></tr><tr><td style="background:#F0F4F8;padding:14px;text-align:center;font-size:11px;color:#888;line-height:1.8">Eole Beach Club - Club de Plage / Ecole de Natation - Plage Saint-Michel - 44420 Piriac-sur-Mer - 07 67 78 69 22</td></tr></table></body></html>`;
+}
+
+function genMailRelanceNat(prenom, heure, dateStr) {
+  const blocReglement = `<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:20px"><tr><td style="background:#FFF9F0;border:2px solid #FFD93D;border-radius:12px;padding:18px 20px"><p style="margin:0 0 10px;color:#b45309;font-size:14px;font-weight:700">💳 Comment régler votre inscription ?</p><p style="margin:0 0 12px;font-size:13px;color:#555;line-height:1.7">Si ce n'est pas encore fait, voici les modes de paiement :</p><table cellpadding="0" cellspacing="3" border="0" style="width:100%;margin-bottom:10px"><tr><td style="background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:4px 8px;font-size:10px;font-weight:700;color:#555;text-align:center">🏦 Virement</td><td width="3"></td><td style="background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:4px 8px;font-size:10px;font-weight:700;color:#555;text-align:center">✉️ Chèque</td><td width="3"></td><td style="background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:4px 8px;font-size:10px;font-weight:700;color:#555;text-align:center">💶 Espèces</td><td width="3"></td><td style="background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:4px 8px;font-size:10px;font-weight:700;color:#555;text-align:center">🎫 Chèques vacances</td></tr></table><p style="margin:4px 0;font-size:11px;color:#e67e22;font-weight:700;font-style:italic">⚠️ Virement bancaire accepté jusqu'au 15 juin.</p><p style="margin:4px 0;font-size:12px;color:#888;line-height:1.8">Pour le virement ou chèque, merci de préciser le nom de votre enfant en référence. Le chèque est à libeller à l'ordre de : SAUZEAU Charlène. En avant saison, à envoyer à : Mme SAUZEAU Charlène, 4 allée des Roitelets, 44500 LA BAULE.</p><table width="100%" style="margin-top:14px"><tr><td style="background:#EFF6FF;border:1.5px solid #1A8FE3;border-radius:10px;padding:14px 16px"><p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#1A8FE3">🏦 Coordonnées bancaires pour virement</p><table style="font-size:12px;color:#2C3E50;line-height:2"><tr><td style="font-weight:700;padding-right:12px">Titulaire</td><td>SAUZEAU CHARLENE</td></tr><tr><td style="font-weight:700;padding-right:12px">IBAN</td><td>FR76 1027 8360 6600 0130 5200 228</td></tr><tr><td style="font-weight:700;padding-right:12px">BIC</td><td>CMCIFR2A</td></tr></table></td></tr></table></td></tr></table>`;
+  return `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#f5f7fa;padding:20px"><table width="100%" style="background:#fff;border-radius:16px;overflow:hidden"><tr><td style="background:linear-gradient(135deg,#FF6B6B,#FF8E53);padding:28px;text-align:center"><h1 style="color:#fff;margin:0;font-size:22px">🔔 Rappel de séance natation</h1><p style="color:rgba(255,255,255,0.85);margin:6px 0 0;font-size:13px">Eole Beach Club · Piriac-sur-Mer</p></td></tr><tr><td style="padding:24px 28px"><p style="font-size:14px;color:#2C3E50;line-height:1.7;margin:0 0 16px">Bonjour ${prenom},<br/>Rappel de votre séance de natation :</p><table width="100%" style="background:#EFF6FF;border-radius:10px;padding:14px;margin-bottom:20px"><tr><td style="font-size:15px;font-weight:700;color:#1A8FE3">🏊 ${heure}</td></tr><tr><td style="font-size:13px;color:#555">${dateStr}</td></tr></table>${blocReglement}<p style="font-size:13px;color:#888;text-align:center">N'oubliez pas le matériel de bain !<br/>L'equipe Eole Beach Club</p></td></tr><tr><td style="background:#F0F4F8;padding:14px;text-align:center;font-size:11px;color:#888;line-height:1.8">Eole Beach Club - Plage Saint-Michel - 44420 Piriac-sur-Mer - 07 67 78 69 22</td></tr></table></body></html>`;
+}
+
+function genMailConfirmClub(prenom, session, dateStr) {
+  const blocReglement = `<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:20px"><tr><td style="background:#FFF9F0;border:2px solid #FFD93D;border-radius:12px;padding:18px 20px"><p style="margin:0 0 10px;color:#b45309;font-size:14px;font-weight:700">💳 Comment régler votre inscription ?</p><p style="margin:0 0 12px;font-size:13px;color:#555;line-height:1.7">Vous pouvez régler selon les modes suivants :</p><table cellpadding="0" cellspacing="3" border="0" style="width:100%;margin-bottom:10px"><tr><td style="background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:4px 8px;font-size:10px;font-weight:700;color:#555;text-align:center">🏦 Virement</td><td width="3"></td><td style="background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:4px 8px;font-size:10px;font-weight:700;color:#555;text-align:center">✉️ Chèque</td><td width="3"></td><td style="background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:4px 8px;font-size:10px;font-weight:700;color:#555;text-align:center">💶 Espèces</td><td width="3"></td><td style="background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:4px 8px;font-size:10px;font-weight:700;color:#555;text-align:center">🎫 Chèques vacances</td></tr></table><p style="margin:4px 0;font-size:11px;color:#e67e22;font-weight:700;font-style:italic">⚠️ Virement bancaire accepté jusqu'au 15 juin.</p><p style="margin:4px 0;font-size:12px;color:#888;line-height:1.8">Pour le virement ou chèque, merci de préciser le nom de votre enfant en référence. Le chèque est à libeller à l'ordre de : SAUZEAU Charlène. En avant saison, à envoyer à : Mme SAUZEAU Charlène, 4 allée des Roitelets, 44500 LA BAULE.</p><table width="100%" style="margin-top:14px"><tr><td style="background:#EFF6FF;border:1.5px solid #1A8FE3;border-radius:10px;padding:14px 16px"><p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#1A8FE3">🏦 Coordonnées bancaires pour virement</p><table style="font-size:12px;color:#2C3E50;line-height:2"><tr><td style="font-weight:700;padding-right:12px">Titulaire</td><td>SAUZEAU CHARLENE</td></tr><tr><td style="font-weight:700;padding-right:12px">IBAN</td><td>FR76 1027 8360 6600 0130 5200 228</td></tr><tr><td style="font-weight:700;padding-right:12px">BIC</td><td>CMCIFR2A</td></tr></table></td></tr></table></td></tr></table>`;
+  return `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#f5f7fa;padding:20px"><table width="100%" style="background:#fff;border-radius:16px;overflow:hidden"><tr><td style="background:linear-gradient(135deg,#FF8E53,#FF6B6B);padding:28px;text-align:center"><h1 style="color:#fff;margin:0;font-size:22px">Confirmation Club de Plage</h1><p style="color:rgba(255,255,255,0.85);margin:6px 0 0;font-size:13px">Eole Beach Club · Piriac-sur-Mer</p></td></tr><tr><td style="padding:24px 28px"><p style="font-size:14px;color:#2C3E50;line-height:1.7;margin:0 0 16px">Bonjour ${prenom},<br/>Votre réservation au Club de Plage est bien enregistrée :</p><table width="100%" style="background:#FFF3EE;border-radius:10px;padding:14px;margin-bottom:20px"><tr><td style="font-size:15px;font-weight:700;color:#FF8E53">🏖️ ${session}</td></tr><tr><td style="font-size:13px;color:#555">${dateStr}</td></tr></table>${blocReglement}<p style="font-size:13px;color:#888;text-align:center">A bientot sur la plage !<br/>L'equipe Eole Beach Club</p></td></tr><tr><td style="background:#F0F4F8;padding:14px;text-align:center;font-size:11px;color:#888;line-height:1.8">Eole Beach Club - Plage Saint-Michel - 44420 Piriac-sur-Mer - 07 67 78 69 22</td></tr></table></body></html>`;
+}
+
+function genMailRelanceClub(prenom, session, dateStr) {
+  const blocReglement = `<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:20px"><tr><td style="background:#FFF9F0;border:2px solid #FFD93D;border-radius:12px;padding:18px 20px"><p style="margin:0 0 10px;color:#b45309;font-size:14px;font-weight:700">💳 Comment régler votre inscription ?</p><p style="margin:0 0 12px;font-size:13px;color:#555;line-height:1.7">Si ce n'est pas encore fait, voici les modes de paiement :</p><table cellpadding="0" cellspacing="3" border="0" style="width:100%;margin-bottom:10px"><tr><td style="background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:4px 8px;font-size:10px;font-weight:700;color:#555;text-align:center">🏦 Virement</td><td width="3"></td><td style="background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:4px 8px;font-size:10px;font-weight:700;color:#555;text-align:center">✉️ Chèque</td><td width="3"></td><td style="background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:4px 8px;font-size:10px;font-weight:700;color:#555;text-align:center">💶 Espèces</td><td width="3"></td><td style="background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:4px 8px;font-size:10px;font-weight:700;color:#555;text-align:center">🎫 Chèques vacances</td></tr></table><p style="margin:4px 0;font-size:11px;color:#e67e22;font-weight:700;font-style:italic">⚠️ Virement bancaire accepté jusqu'au 15 juin.</p><p style="margin:4px 0;font-size:12px;color:#888;line-height:1.8">Pour le virement ou chèque, merci de préciser le nom de votre enfant en référence. Le chèque est à libeller à l'ordre de : SAUZEAU Charlène. En avant saison, à envoyer à : Mme SAUZEAU Charlène, 4 allée des Roitelets, 44500 LA BAULE.</p><table width="100%" style="margin-top:14px"><tr><td style="background:#EFF6FF;border:1.5px solid #1A8FE3;border-radius:10px;padding:14px 16px"><p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#1A8FE3">🏦 Coordonnées bancaires pour virement</p><table style="font-size:12px;color:#2C3E50;line-height:2"><tr><td style="font-weight:700;padding-right:12px">Titulaire</td><td>SAUZEAU CHARLENE</td></tr><tr><td style="font-weight:700;padding-right:12px">IBAN</td><td>FR76 1027 8360 6600 0130 5200 228</td></tr><tr><td style="font-weight:700;padding-right:12px">BIC</td><td>CMCIFR2A</td></tr></table></td></tr></table></td></tr></table>`;
+  return `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#f5f7fa;padding:20px"><table width="100%" style="background:#fff;border-radius:16px;overflow:hidden"><tr><td style="background:linear-gradient(135deg,#FF8E53,#FF6B6B);padding:28px;text-align:center"><h1 style="color:#fff;margin:0;font-size:22px">🔔 Rappel Club de Plage</h1><p style="color:rgba(255,255,255,0.85);margin:6px 0 0;font-size:13px">Eole Beach Club · Piriac-sur-Mer</p></td></tr><tr><td style="padding:24px 28px"><p style="font-size:14px;color:#2C3E50;line-height:1.7;margin:0 0 16px">Bonjour ${prenom},<br/>Rappel de votre réservation au Club de Plage :</p><table width="100%" style="background:#FFF3EE;border-radius:10px;padding:14px;margin-bottom:20px"><tr><td style="font-size:15px;font-weight:700;color:#FF8E53">🏖️ ${session}</td></tr><tr><td style="font-size:13px;color:#555">${dateStr}</td></tr></table>${blocReglement}<p style="font-size:13px;color:#888;text-align:center">A bientot !<br/>L'equipe Eole Beach Club</p></td></tr><tr><td style="background:#F0F4F8;padding:14px;text-align:center;font-size:11px;color:#888;line-height:1.8">Eole Beach Club - Plage Saint-Michel - 44420 Piriac-sur-Mer - 07 67 78 69 22</td></tr></table></body></html>`;
+}
+
 function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, supprimerResaNatation, supprimerResaClub }) {
   const [modePaiementConfirm, setModePaiementConfirm] = useState(null); // { resa, type }
   const allWeeks = (() => {
@@ -7072,6 +7397,10 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
               else { const m2=(resa.label_jour||"").match(/\[MONTANT:(\d+)\]/); montant=m2?Number(m2[1]):0; }
               await sb.from("reservations_club").update({ statut:"confirmed", validated_at:new Date().toISOString(), montant, mode_paiement:mode }).eq("id", resa.id);
             }
+            // Compte fin de saison → activer sur le membre
+            if (mode === "compte_fin_saison" && resa.membre_id) {
+              await sb.from("membres").update({ compte_fin_saison: true }).eq("id", resa.membre_id);
+            }
             setModePaiementConfirm(null);
             refreshResas();
           }}
@@ -7107,7 +7436,7 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
         const isOpen = openMembreIds[mid];
         const allR = [...g.nat, ...g.club];
         const hasPending = allR.some(r => r.statut === "pending");
-        const nomMembre = g.membre ? `${g.membre.prenom} ${NOM(g.membre.nom)}` : "—";
+        const nomMembre = g.membre ? `${PRENOM(g.membre.prenom)} ${NOM(g.membre.nom)}` : "—";
         return (
           <div key={mid} style={{ background:"#fff", borderRadius:18, boxShadow:"0 3px 12px rgba(0,0,0,0.07)", overflow:"hidden", border: hasPending ? `2px solid ${C.sun}60` : "2px solid transparent" }}>
             <div onClick={() => toggleMembre(mid)} style={{ padding:"14px 16px", display:"flex", alignItems:"center", gap:12, cursor:"pointer" }}>
@@ -7129,26 +7458,47 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
                   <div>
                     <div style={{ fontSize:10, fontWeight:900, color:C.ocean, textTransform:"uppercase", marginBottom:6 }}>🏊 Natation</div>
                     {g.nat.map(r => (
-                      <div key={r.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", background:`${C.ocean}08`, borderRadius:10, padding:"7px 10px", marginBottom:4, borderLeft:`3px solid ${r.statut==="pending"?C.sun:C.ocean}` }}>
-                        <div>
-                          <span style={{ fontWeight:800, color:C.dark, fontSize:12 }}>{r.heure}</span>
-                          <span style={{ color:"#aaa", fontSize:11, marginLeft:6 }}>{r.date_seance ? parseLocalDate(r.date_seance).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}) : "—"}</span>
-                          {r.enfants?.length > 0 && <span style={{ color:C.ocean, fontSize:10, marginLeft:6, fontWeight:700 }}>{enrichEnfants(r.enfants, r.membres).join(", ")}</span>}
-                          {r.created_at && <div style={{ fontSize:9, color:"#bbb", marginTop:2 }}>Envoyé le {new Date(r.created_at).toLocaleDateString("fr-FR",{day:"numeric",month:"short",year:"numeric"})}</div>}
-                        </div>
-                        <div style={{ display:"flex", gap:4, alignItems:"center" }}>
+                      <div key={r.id} style={{ background:`${C.ocean}08`, borderRadius:10, padding:"8px 10px", marginBottom:4, borderLeft:`3px solid ${r.statut==="pending"?C.sun:C.ocean}` }}>
+                        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:6 }}>
+                          <div>
+                            <span style={{ fontWeight:800, color:C.dark, fontSize:12 }}>{r.heure}</span>
+                            <span style={{ color:"#aaa", fontSize:11, marginLeft:6 }}>{r.date_seance ? parseLocalDate(r.date_seance).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}) : "—"}</span>
+                            {r.enfants?.length > 0 && <span style={{ color:C.ocean, fontSize:10, marginLeft:6, fontWeight:700 }}>{enrichEnfants(r.enfants, r.membres).join(", ")}</span>}
+                          </div>
                           {r.statut === "pending" ? (
                             <button onClick={() => setModePaiementConfirm({ resa:r, type:"natation" })}
-                              style={{ background:C.green, border:"none", color:"#fff", borderRadius:8, padding:"3px 8px", cursor:"pointer", fontWeight:900, fontSize:10, fontFamily:"inherit" }}>✅</button>
+                              style={{ background:C.green, border:"none", color:"#fff", borderRadius:8, padding:"3px 8px", cursor:"pointer", fontWeight:900, fontSize:10, fontFamily:"inherit", flexShrink:0 }}>✅ Valider</button>
                           ) : (
-                            <span style={{ fontSize:10, color:C.green, fontWeight:800, display:"flex", alignItems:"center", gap:3 }}>
-                              ✓{r.mode_paiement && <span style={{ fontSize:9, color:"#aaa" }}>{MODES_PAIEMENT.find(m=>m.id===r.mode_paiement)?.label.split(" ")[0]}</span>}
-                            </span>
+                            <span style={{ fontSize:10, color:C.green, fontWeight:800 }}>✓ {MODES_PAIEMENT?.find(m=>m.id===r.mode_paiement)?.label.split(" ")[0] || "Payé"}</span>
                           )}
+                        </div>
+                        <div style={{ display:"flex", gap:6 }}>
                           <button onClick={() => setModifierResa({ resa: r, type:"natation" })}
-                            style={{ background:`${C.ocean}15`, border:"none", color:C.ocean, borderRadius:8, width:24, height:24, cursor:"pointer", fontSize:11, fontFamily:"inherit" }}>✏️</button>
+                            style={{ flex:1, background:`${C.ocean}15`, border:"none", color:C.ocean, borderRadius:8, padding:"5px 0", cursor:"pointer", fontSize:12, fontFamily:"inherit", fontWeight:700 }}>✏️ Modifier</button>
+                          {r.statut === "pending" && (<>
+                          <button onClick={async () => {
+                            const email = g.membre?.email; if (!email) return alert("Email introuvable");
+                            const prenom = g.membre?.prenom || "";
+                            const dateStr = r.date_seance ? new Date(r.date_seance).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"}) : "—";
+                            const html = genMailConfirmNat(prenom, r.heure, dateStr, r.enfants);
+                            try {
+                              await fetch("https://api.resend.com/emails", { method:"POST", headers:{"Authorization":"Bearer re_fncp_placeholder","Content-Type":"application/json"}, body: JSON.stringify({ from:"FNCP Club de Plage <noreply@fncp-club.fr>", to:email, subject:"✅ Confirmation de votre réservation natation", html }) });
+                              alert(`📧 Mail de confirmation envoyé à ${email}`);
+                            } catch(e) { alert("Simulation : mail de confirmation envoyé à " + email); }
+                          }} style={{ flex:1, background:"#EEF8FF", border:"1.5px solid #1A8FE360", color:C.ocean, borderRadius:8, padding:"5px 0", cursor:"pointer", fontSize:12, fontFamily:"inherit", fontWeight:700 }}>📧 Confirmation</button>
+                          <button onClick={async () => {
+                            const email = g.membre?.email; if (!email) return alert("Email introuvable");
+                            const prenom = g.membre?.prenom || "";
+                            const dateStr = r.date_seance ? new Date(r.date_seance).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"}) : "—";
+                            const html = genMailRelanceNat(prenom, r.heure, dateStr);
+                            try {
+                              await fetch("https://api.resend.com/emails", { method:"POST", headers:{"Authorization":"Bearer re_fncp_placeholder","Content-Type":"application/json"}, body: JSON.stringify({ from:"FNCP Club de Plage <noreply@fncp-club.fr>", to:email, subject:"🔔 Rappel : votre séance de natation", html }) });
+                              alert(`🔔 Relance envoyée à ${email}`);
+                            } catch(e) { alert("Simulation : relance envoyée à " + email); }
+                          }} style={{ flex:1, background:"#FFF8E0", border:"1.5px solid #FFD93D60", color:"#b45309", borderRadius:8, padding:"5px 0", cursor:"pointer", fontSize:12, fontFamily:"inherit", fontWeight:700 }}>🔔 Relance</button>
                           <button onClick={() => { if(window.confirm("Supprimer ?")) supprimerResaNatation(r.id); }}
-                            style={{ background:"#FFF0F0", border:"none", color:C.sunset, borderRadius:8, width:24, height:24, cursor:"pointer", fontSize:11, fontFamily:"inherit" }}>🗑</button>
+                            style={{ background:"#FFF0F0", border:"none", color:C.sunset, borderRadius:8, padding:"5px 8px", cursor:"pointer", fontSize:13, fontFamily:"inherit" }}>🗑</button>
+                          </>)}
                         </div>
                       </div>
                     ))}
@@ -7161,28 +7511,51 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
                       const isLiberte = !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6;
                       const isLib = (r.label_jour||"").startsWith("[LIBERTE]");
                       return (
-                        <div key={r.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", background:`${C.coral}08`, borderRadius:10, padding:"7px 10px", marginBottom:4, borderLeft:`3px solid ${r.statut==="pending"?C.sun:C.coral}` }}>
-                          <div>
-                            <span style={{ fontWeight:800, color:C.dark, fontSize:12 }}>
-                              {isLiberte ? `🎟️ Carte ${r.enfants[0]} demi-j.` : isLib ? "🎟️ Liberté" : r.session==="matin"?"☀️ Matin":"🌊 Après-midi"}
-                            </span>
-                            <span style={{ color:"#aaa", fontSize:11, marginLeft:6 }}>{r.date_reservation ? new Date(r.date_reservation).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}) : "—"}</span>
-                            {r.enfants?.length > 0 && !isLiberte && <span style={{ color:C.coral, fontSize:10, marginLeft:6, fontWeight:700 }}>{enrichEnfants(r.enfants, r.membres).join(", ")}</span>}
-                            {r.created_at && <div style={{ fontSize:9, color:"#bbb", marginTop:2 }}>Envoyé le {new Date(r.created_at).toLocaleDateString("fr-FR",{day:"numeric",month:"short",year:"numeric"})}</div>}
-                          </div>
-                          <div style={{ display:"flex", gap:4, alignItems:"center" }}>
+                        <div key={r.id} style={{ background:`${C.coral}08`, borderRadius:10, padding:"8px 10px", marginBottom:4, borderLeft:`3px solid ${r.statut==="pending"?C.sun:C.coral}` }}>
+                          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:6 }}>
+                            <div>
+                              <span style={{ fontWeight:800, color:C.dark, fontSize:12 }}>
+                                {isLiberte ? `🎟️ Carte ${r.enfants[0]} demi-j.` : isLib ? "🎟️ Liberté" : r.session==="matin"?"☀️ Matin":"🌊 Après-midi"}
+                              </span>
+                              <span style={{ color:"#aaa", fontSize:11, marginLeft:6 }}>{r.date_reservation ? new Date(r.date_reservation).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}) : "—"}</span>
+                              {r.enfants?.length > 0 && !isLiberte && <span style={{ color:C.coral, fontSize:10, marginLeft:6, fontWeight:700 }}>{enrichEnfants(r.enfants, r.membres).join(", ")}</span>}
+                            </div>
                             {r.statut === "pending" ? (
                               <button onClick={() => setModePaiementConfirm({ resa:r, type:"club" })}
-                                style={{ background:C.green, border:"none", color:"#fff", borderRadius:8, padding:"3px 8px", cursor:"pointer", fontWeight:900, fontSize:10, fontFamily:"inherit" }}>✅</button>
+                                style={{ background:C.green, border:"none", color:"#fff", borderRadius:8, padding:"3px 8px", cursor:"pointer", fontWeight:900, fontSize:10, fontFamily:"inherit", flexShrink:0 }}>✅ Valider</button>
                             ) : (
-                              <span style={{ fontSize:10, color:C.green, fontWeight:800, display:"flex", alignItems:"center", gap:3 }}>
-                                ✓{r.mode_paiement && <span style={{ fontSize:9, color:"#aaa" }}>{MODES_PAIEMENT.find(m=>m.id===r.mode_paiement)?.label.split(" ")[0]}</span>}
-                              </span>
+                              <span style={{ fontSize:10, color:C.green, fontWeight:800 }}>✓ {MODES_PAIEMENT?.find(m=>m.id===r.mode_paiement)?.label.split(" ")[0] || "Payé"}</span>
                             )}
+                          </div>
+                          <div style={{ display:"flex", gap:6 }}>
                             <button onClick={() => setModifierResa({ resa: r, type:"club" })}
-                              style={{ background:`${C.coral}15`, border:"none", color:C.coral, borderRadius:8, width:24, height:24, cursor:"pointer", fontSize:11, fontFamily:"inherit" }}>✏️</button>
+                              style={{ flex:1, background:`${C.coral}15`, border:"none", color:C.coral, borderRadius:8, padding:"5px 0", cursor:"pointer", fontSize:12, fontFamily:"inherit", fontWeight:700 }}>✏️ Modifier</button>
+                            {r.statut === "pending" && (<>
+                            <button onClick={async () => {
+                              const email = g.membre?.email; if (!email) return alert("Email introuvable");
+                              const prenom = g.membre?.prenom || "";
+                              const dateStr = r.date_reservation ? new Date(r.date_reservation).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"}) : "—";
+                              const session = r.session==="matin" ? "☀️ Matin" : "🌊 Après-midi";
+                              const html = genMailConfirmClub(prenom, session, dateStr);
+                              try {
+                                await fetch("https://api.resend.com/emails", { method:"POST", headers:{"Authorization":"Bearer re_fncp_placeholder","Content-Type":"application/json"}, body: JSON.stringify({ from:"FNCP Club de Plage <noreply@fncp-club.fr>", to:email, subject:"✅ Confirmation de votre réservation Club de Plage", html }) });
+                                alert(`📧 Mail de confirmation envoyé à ${email}`);
+                              } catch(e) { alert("Simulation : mail de confirmation envoyé à " + email); }
+                            }} style={{ flex:1, background:"#EEF8FF", border:"1.5px solid #1A8FE360", color:C.ocean, borderRadius:8, padding:"5px 0", cursor:"pointer", fontSize:12, fontFamily:"inherit", fontWeight:700 }}>📧 Confirmation</button>
+                            <button onClick={async () => {
+                              const email = g.membre?.email; if (!email) return alert("Email introuvable");
+                              const prenom = g.membre?.prenom || "";
+                              const dateStr = r.date_reservation ? new Date(r.date_reservation).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"}) : "—";
+                              const session = r.session==="matin" ? "☀️ Matin" : "🌊 Après-midi";
+                              const html = genMailRelanceClub(prenom, session, dateStr);
+                              try {
+                                await fetch("https://api.resend.com/emails", { method:"POST", headers:{"Authorization":"Bearer re_fncp_placeholder","Content-Type":"application/json"}, body: JSON.stringify({ from:"FNCP Club de Plage <noreply@fncp-club.fr>", to:email, subject:"🔔 Rappel : votre journée au Club de Plage", html }) });
+                                alert(`🔔 Relance envoyée à ${email}`);
+                              } catch(e) { alert("Simulation : relance envoyée à " + email); }
+                            }} style={{ flex:1, background:"#FFF8E0", border:"1.5px solid #FFD93D60", color:"#b45309", borderRadius:8, padding:"5px 0", cursor:"pointer", fontSize:12, fontFamily:"inherit", fontWeight:700 }}>🔔 Relance</button>
                             <button onClick={() => { if(window.confirm("Supprimer ?")) supprimerResaClub(r.id); }}
-                              style={{ background:"#FFF0F0", border:"none", color:C.sunset, borderRadius:8, width:24, height:24, cursor:"pointer", fontSize:11, fontFamily:"inherit" }}>🗑</button>
+                              style={{ background:"#FFF0F0", border:"none", color:C.sunset, borderRadius:8, padding:"5px 8px", cursor:"pointer", fontSize:13, fontFamily:"inherit" }}>🗑</button>
+                            </>)}
                           </div>
                         </div>
                       );
@@ -7202,11 +7575,12 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
 // ── ONGLET COMPTES FIN DE SAISON ─────────────────────────
 // ── MODAL MODE DE PAIEMENT ───────────────────────────────
 const MODES_PAIEMENT = [
-  { id:"especes",          label:"💶 Espèces",           color:"#F59E0B" },
-  { id:"cheque",           label:"✉️ Chèque",            color:"#3B82F6" },
-  { id:"cheques_vacances", label:"🎫 Chèques vacances",  color:"#8B5CF6" },
-  { id:"virement",         label:"🏦 Virement",          color:"#10B981" },
-  { id:"offert",           label:"🎁 Offert",            color:"#EC4899" },
+  { id:"especes",            label:"💶 Espèces",             color:"#F59E0B" },
+  { id:"cheque",             label:"✉️ Chèque",              color:"#3B82F6" },
+  { id:"cheques_vacances",   label:"🎫 Chèques vacances",    color:"#8B5CF6" },
+  { id:"virement",           label:"🏦 Virement",            color:"#10B981" },
+  { id:"offert",             label:"🎁 Offert",              color:"#EC4899" },
+  { id:"compte_fin_saison",  label:"📒 Compte fin de saison", color:"#6366F1" },
 ];
 
 function ModePaiementModal({ onConfirm, onClose, titre }) {
@@ -7238,7 +7612,211 @@ function ModePaiementModal({ onConfirm, onClose, titre }) {
   );
 }
 
-function ComptesTab({ dbMembres, dbResas, dbResasClub, onRefresh }) {
+// ── COMPTABILITE TAB ──────────────────────────────────────
+function ComptabiliteTab({ dbMembres, dbResas, dbResasClub, dbCommandesClub = [] }) {
+  const [loading, setLoading] = useState(true);
+  const [acomptes, setAcomptes] = useState({});
+  const [remises, setRemises]   = useState({});
+  const [exclusions, setExclusions] = useState({});
+
+  useEffect(() => {
+    Promise.all([
+      sb.from("comptes_acomptes").select("*"),
+      sb.from("comptes_exclusions").select("*"),
+    ]).then(([{ data: ac }, { data: ex }]) => {
+      const acMap = {};
+      (ac || []).forEach(a => { if (!acMap[a.membre_id]) acMap[a.membre_id] = []; acMap[a.membre_id].push(a); });
+      setAcomptes(acMap);
+      const exMap = {};
+      (ex || []).forEach(e => { exMap[e.resa_id] = e.resa_type; });
+      setExclusions(exMap);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
+
+  const PRIX_NAT = { 1:20,2:40,3:60,4:80,5:95,6:113,7:131,8:147,9:162,10:170 };
+  const LP = { 6:96,12:180,18:252,24:288,30:330 };
+
+  // Calcule le montant des prestations par membre (identique à getCompte dans ComptesTab)
+  const getMontantMembre = (m) => {
+    const resasNat  = dbResas.filter(r => r.membre_id === m.id && r.statut === "confirmed" && !exclusions[r.id]);
+    const resasClub = dbResasClub.filter(r => r.membre_id === m.id && r.statut === "confirmed" && !exclusions[r.id]);
+    const natGroups = {};
+    resasNat.forEach(r => {
+      const k = `${(Array.isArray(r.enfants)?[...r.enfants].sort().join(","):"")}-(${(r.created_at||"").slice(0,16)})`;
+      if (!natGroups[k]) natGroups[k] = [];
+      natGroups[k].push(r);
+    });
+    const totalNat = Object.values(natGroups).reduce((s, g) => {
+      const n = g.length;
+      return s + (n <= 10 ? (PRIX_NAT[n] || n*20) : 170+(n-10)*17);
+    }, 0);
+    const resasLiberte  = resasClub.filter(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6);
+    const totalLiberte  = resasLiberte.reduce((s, r) => s + (LP[Number(r.enfants?.[0])] || 0), 0);
+    const resasNormales = resasClub.filter(r => isNaN(Number(r.enfants?.[0])) || Number(r.enfants?.[0]) < 6);
+    const datesResasNormales = new Set(resasNormales.map(r => r.date_reservation?.slice(0,10)).filter(Boolean));
+    const commandesMembre = (dbCommandesClub || []).filter(c => c.membre_id === m.id && Array.isArray(c.dates) && c.dates.some(d => datesResasNormales.has(d)));
+    const totalClubNormal = commandesMembre.length > 0
+      ? commandesMembre.reduce((s, c) => s + Number(c.montant_total || 0), 0)
+      : resasNormales.reduce((s, r) => { const match = (r.label_jour||"").match(/\[MONTANT:(\d+)\]/); return s + (r.montant ? Number(r.montant) : match ? Number(match[1]) : 0); }, 0);
+    const totalPrestations = totalNat + totalLiberte + totalClubNormal;
+    const totalAcomptes    = (acomptes[m.id] || []).reduce((s, a) => s + a.montant, 0);
+    const remise           = remises[m.id] || 0;
+    const solde            = Math.max(0, totalPrestations - totalAcomptes - remise);
+    return { totalNat, totalClub: totalLiberte + totalClubNormal, totalPrestations, totalAcomptes, remise, solde, nbNat: resasNat.length, nbClub: resasClub.length };
+  };
+
+  // Tous les membres (pas uniquement ceux en compte fin de saison)
+  const tousMembres = dbMembres || [];
+  const MODES_LABEL = { especes:"💵 Espèces", cheque:"📝 Chèque", virement:"🏦 Virement", cb:"💳 CB", paypal:"🅿️ PayPal", offert:"🎁 Offert", compte_fin_saison:"📒 Fin de saison" };
+
+  // Calcul global à partir des réservations confirmées
+  const PRIX_NAT_G = { 1:20,2:40,3:60,4:80,5:95,6:113,7:131,8:147,9:162,10:170 };
+  const LP_G = { 6:96,12:180,18:252,24:288,30:330 };
+
+  const confirmedNat  = (dbResas || []).filter(r => r.statut === "confirmed");
+  const confirmedClub = (dbResasClub || []).filter(r => r.statut === "confirmed");
+
+  // Total encaissé paiements directs (hors fin saison et offerts)
+  const confirmedNatPaie  = confirmedNat.filter(r => r.mode_paiement && r.mode_paiement !== "compte_fin_saison" && r.mode_paiement !== "offert");
+  const confirmedClubPaie = confirmedClub.filter(r => r.mode_paiement && r.mode_paiement !== "compte_fin_saison" && r.mode_paiement !== "offert");
+
+  const totalEncNat = (() => {
+    const g = {};
+    confirmedNatPaie.forEach(r => { const k = `${r.membre_id}|${(Array.isArray(r.enfants)?[...r.enfants].sort().join(","):"")}|${(r.created_at||"").slice(0,16)}`; if (!g[k]) g[k]=[]; g[k].push(r); });
+    return Object.values(g).reduce((s, gr) => { const n = gr.length; return s + (n<=10?(PRIX_NAT_G[n]||n*20):170+(n-10)*17); }, 0);
+  })();
+  const totalEncClub = (() => {
+    const g = {};
+    confirmedClubPaie.forEach(r => { const k = `${r.membre_id}|${r.session}|${(Array.isArray(r.enfants)?[...r.enfants].sort().join(","):"")}|${(r.created_at||"").slice(0,16)}`; if (!g[k]) g[k]=[]; g[k].push(r); });
+    return Object.values(g).reduce((s, gr) => {
+      const r0 = gr[0]; const nb = Number(Array.isArray(r0.enfants)?r0.enfants[0]:0);
+      if (nb>=6 && LP_G[nb]) return s+LP_G[nb];
+      if (r0.montant) return s+Number(r0.montant);
+      return s+gr.reduce((a,r)=>{ const m=(r.label_jour||"").match(/\[MONTANT:(\d+)\]/); return a+(m?Number(m[1]):0); },0);
+    }, 0);
+  })();
+
+  // Comptes fin de saison — totaux
+  const membresCompte = tousMembres.filter(m => m.compte_fin_saison && !m.compte_solde);
+  const bilanComptes  = loading ? [] : membresCompte.map(m => ({ m, ...getMontantMembre(m) }));
+  const totalPrestationsComptes = bilanComptes.reduce((s, c) => s + c.totalPrestations, 0);
+  const totalAcomptesComptes    = bilanComptes.reduce((s, c) => s + c.totalAcomptes, 0);
+  const totalRemisesComptes     = bilanComptes.reduce((s, c) => s + c.remise, 0);
+  const totalSoldesComptes      = bilanComptes.reduce((s, c) => s + c.solde, 0);
+
+  // Totaux globaux saison
+  // CA = uniquement ce qui est encaissé (paiements directs + acomptes) — les soldes restants N'entrent PAS dans le CA
+  const totalCA         = totalEncNat + totalEncClub + totalAcomptesComptes;
+  const resteAEncaisser = Math.max(0, totalSoldesComptes - totalRemisesComptes);
+  const pctEncaisse     = (totalCA + resteAEncaisser) > 0 ? Math.min(100, Math.round((totalCA / (totalCA + resteAEncaisser)) * 100)) : 100;
+
+  if (loading) return <div style={{ textAlign:"center", padding:40, color:"#bbb" }}>Chargement…</div>;
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+
+      {/* ── Bilan global sombre — 5 encadrés sur une ligne ── */}
+      <div style={{ background:"linear-gradient(135deg,#0F2027,#203A43,#2C5364)", borderRadius:20, padding:20, boxShadow:"0 8px 28px rgba(0,0,0,0.2)" }}>
+        <div style={{ color:"rgba(255,255,255,0.6)", fontSize:11, fontWeight:800, letterSpacing:1, textTransform:"uppercase", marginBottom:14 }}>🧮 Comptabilité saison 2026</div>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:8, marginBottom:16 }}>
+          {[
+            { label:"CA",                 val:`${totalCA} €`,           color:"#fff",    emoji:"💶" },
+            { label:"Natation encaissé",  val:`${totalEncNat} €`,       color:"#87CEEB", emoji:"🏊" },
+            { label:"Club encaissé",      val:`${totalEncClub + totalAcomptesComptes} €`, color:"#FF8E53", emoji:"🏖️" },
+            { label:"Reste à encaisser",  val:`${resteAEncaisser} €`,   color: resteAEncaisser===0?"#6BCB77":"#FF6B6B", emoji:"⏳" },
+            { label:"Comptes fin saison", val:`${membresCompte.length}`, color:"#FFD93D", emoji:"📒" },
+          ].map(k => (
+            <div key={k.label} style={{ background:"rgba(255,255,255,0.08)", borderRadius:12, padding:"12px 8px", textAlign:"center" }}>
+              <div style={{ fontSize:18 }}>{k.emoji}</div>
+              <div style={{ fontWeight:900, fontSize:15, color:k.color, marginTop:4, lineHeight:1.2 }}>{k.val}</div>
+              <div style={{ fontSize:9, color:"rgba(255,255,255,0.5)", marginTop:3, lineHeight:1.3 }}>{k.label}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ background:"rgba(255,255,255,0.12)", borderRadius:50, height:10, overflow:"hidden", marginBottom:6 }}>
+          <div style={{ height:"100%", width:`${pctEncaisse}%`, background:"linear-gradient(90deg,#6BCB77,#4ECDC4)", borderRadius:50, transition:"width .5s" }} />
+        </div>
+        <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, color:"rgba(255,255,255,0.55)" }}>
+          <span>Progression encaissement</span><span>{pctEncaisse}%</span>
+        </div>
+      </div>
+
+      {/* ── Ventilation par catégorie ── */}
+      <div style={{ background:"#fff", borderRadius:18, padding:16, boxShadow:"0 2px 10px rgba(0,0,0,0.05)" }}>
+        <div style={{ fontWeight:900, color:C.dark, fontSize:14, marginBottom:12 }}>📂 Ventilation des recettes</div>
+        {[
+          { label:"🏊 Natation (paiements directs)",  val:totalEncNat,  color:C.ocean },
+          { label:"🏖️ Club de Plage (paiements directs)", val:totalEncClub, color:C.coral },
+          { label:"📒 Acomptes comptes fin saison",   val:totalAcomptesComptes, color:"#6366F1" },
+          { label:"⏳ Soldes restants fin saison",    val:totalSoldesComptes,   color:"#FF9500" },
+          { label:"🎁 Remises accordées",             val:totalRemisesComptes,  color:C.green },
+        ].map(row => (
+          <div key={row.label} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 0", borderBottom:"1px solid #f5f5f5" }}>
+            <span style={{ fontSize:13, color:"#555" }}>{row.label}</span>
+            <span style={{ fontWeight:900, color:row.color, fontSize:14 }}>{row.val} €</span>
+          </div>
+        ))}
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 0 0", marginTop:4 }}>
+          <span style={{ fontWeight:900, color:C.dark, fontSize:14 }}>TOTAL CA SAISON</span>
+          <span style={{ fontWeight:900, color:C.dark, fontSize:18 }}>{totalCA} €</span>
+        </div>
+      </div>
+
+      {/* ── Comptes fin de saison : tableau actualisé ── */}
+      <div style={{ background:"#fff", borderRadius:18, overflow:"hidden", boxShadow:"0 2px 10px rgba(0,0,0,0.05)" }}>
+        <div style={{ padding:"12px 16px", background:"#F0F4F8" }}>
+          <div style={{ fontWeight:900, color:C.dark, fontSize:14 }}>📒 Comptes fin de saison — Soldes</div>
+          <div style={{ fontSize:11, color:"#aaa", marginTop:2 }}>Calculé en temps réel depuis les réservations confirmées</div>
+        </div>
+        {bilanComptes.length === 0 ? (
+          <div style={{ textAlign:"center", padding:"24px 0", color:"#bbb", fontSize:13 }}>Aucun compte fin de saison actif</div>
+        ) : (
+          <>
+            {/* Header */}
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 72px 72px 72px 72px", padding:"8px 16px", background:"#F8FBFF", fontSize:10, fontWeight:900 }}>
+              <div style={{ color:"#aaa" }}>MEMBRE</div>
+              <div style={{ color:C.ocean, textAlign:"center" }}>NAT.</div>
+              <div style={{ color:C.coral, textAlign:"center" }}>CLUB</div>
+              <div style={{ color:C.green, textAlign:"center" }}>VERSÉ</div>
+              <div style={{ color:"#FF9500", textAlign:"center" }}>SOLDE</div>
+            </div>
+            {bilanComptes.map(({ m, totalNat, totalClub, totalAcomptes, remise, solde, nbNat, nbClub }, i) => (
+              <div key={m.id} style={{ display:"grid", gridTemplateColumns:"1fr 72px 72px 72px 72px", padding:"10px 16px", borderTop:"1px solid #F0F4F8", alignItems:"center", background: solde===0 ? `${C.green}06` : "#fff" }}>
+                <div>
+                  <div style={{ fontWeight:800, color:C.dark, fontSize:13 }}>{PRENOM(m.prenom)} {NOM(m.nom)}</div>
+                  <div style={{ fontSize:10, color:"#bbb" }}>{nbNat} séance{nbNat>1?"s":""} nat. · {nbClub} club</div>
+                </div>
+                <div style={{ textAlign:"center", fontWeight:800, color:totalNat>0?C.ocean:"#ccc", fontSize:13 }}>{totalNat>0?`${totalNat} €`:"—"}</div>
+                <div style={{ textAlign:"center", fontWeight:800, color:totalClub>0?C.coral:"#ccc", fontSize:13 }}>{totalClub>0?`${totalClub} €`:"—"}</div>
+                <div style={{ textAlign:"center", fontWeight:800, color:totalAcomptes>0?C.green:"#ccc", fontSize:13 }}>{totalAcomptes>0?`${totalAcomptes} €`:"—"}</div>
+                <div style={{ textAlign:"center" }}>
+                  {solde === 0
+                    ? <span style={{ color:C.green, fontSize:16 }}>✅</span>
+                    : <span style={{ fontWeight:900, color:"#FF9500", fontSize:14 }}>{solde} €</span>}
+                  {remise > 0 && <div style={{ fontSize:9, color:C.green }}>-{remise} € remise</div>}
+                </div>
+              </div>
+            ))}
+            {/* Ligne totaux */}
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 72px 72px 72px 72px", padding:"12px 16px", background:"#F0F4F8", borderTop:"2px solid #E0E8F0" }}>
+              <div style={{ fontWeight:900, color:C.dark, fontSize:12 }}>TOTAL</div>
+              <div style={{ textAlign:"center", fontWeight:900, color:C.ocean }}>{bilanComptes.reduce((s,c)=>s+c.totalNat,0)} €</div>
+              <div style={{ textAlign:"center", fontWeight:900, color:C.coral }}>{bilanComptes.reduce((s,c)=>s+c.totalClub,0)} €</div>
+              <div style={{ textAlign:"center", fontWeight:900, color:C.green }}>{totalAcomptesComptes} €</div>
+              <div style={{ textAlign:"center", fontWeight:900, color: totalSoldesComptes===0?C.green:"#FF9500" }}>
+                {totalSoldesComptes===0 ? "✅" : `${totalSoldesComptes} €`}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+    </div>
+  );
+}
+
+function ComptesTab({ dbMembres, dbResas, dbResasClub, dbCommandesClub = [], onRefresh }) {
   const [acomptes, setAcomptes]       = useState({});
   const [exclusions, setExclusions]   = useState({});
   const [showAcompte, setShowAcompte] = useState(null);
@@ -7303,24 +7881,39 @@ function ComptesTab({ dbMembres, dbResas, dbResasClub, onRefresh }) {
       return s + (n <= 10 ? (PRIX_NAT[n] || n*20) : 170+(n-10)*17);
     }, 0);
 
-    // Club : r.montant une seule fois par groupe session+enfants+minute
-    const clubGroups = {};
-    resasClub.forEach(r => {
-      const enfantsKey = Array.isArray(r.enfants) ? [...r.enfants].sort().join(",") : "";
-      const minute = (r.created_at||"").slice(0,16);
-      const k = `${r.session}-${enfantsKey}-${minute}`;
-      if (!clubGroups[k]) clubGroups[k] = [];
-      clubGroups[k].push(r);
-    });
+    // Club : utiliser commandes_club pour le montant exact (même logique que PaiementsTab)
     const LP = {6:96,12:180,18:252,24:288,30:330};
-    const totalClub = Object.values(clubGroups).reduce((s, g) => {
-      const r0 = g[0];
-      const nb = Number(r0.enfants?.[0]);
-      if (nb >= 6 && LP[nb]) return s + LP[nb];
-      if (r0.montant) return s + Number(r0.montant);
-      const match = (r0.label_jour||"").match(/\[MONTANT:(\d+)\]/);
-      return s + (match ? Number(match[1]) : 0);
+    const TARIFS_MATIN_rows  = [{e1:15,e2:28,e3:39,sup:11},{e1:78,e2:144,e3:198,sup:54},{e1:144,e2:264,e3:360,sup:96},{e1:189,e2:342,e3:459,sup:126},{e1:216,e2:384,e3:504,sup:144}];
+    const TARIFS_APMIDI_rows = [{e1:17,e2:32,e3:45,sup:13},{e1:90,e2:168,e3:234,sup:66},{e1:168,e2:312,e3:432,sup:120},{e1:225,e2:414,e3:567,sup:162},{e1:264,e2:480,e3:648,sup:192}];
+
+    // Liberté
+    const resasLiberte = resasClub.filter(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6);
+    const totalLiberte = resasLiberte.reduce((s, r) => {
+      const nb = Number(r.enfants?.[0]);
+      return s + (LP[nb] || 0);
     }, 0);
+
+    // Club normal : lire depuis commandes_club
+    const resasNormales = resasClub.filter(r => isNaN(Number(r.enfants?.[0])) || Number(r.enfants?.[0]) < 6);
+    const datesResasNormales = new Set(resasNormales.map(r => r.date_reservation?.slice(0,10)).filter(Boolean));
+    const commandesMembre = dbCommandesClub.filter(c =>
+      c.membre_id === membre.id &&
+      Array.isArray(c.dates) &&
+      c.dates.some(d => datesResasNormales.has(d))
+    );
+    let totalClubNormal = 0;
+    if (commandesMembre.length > 0) {
+      totalClubNormal = commandesMembre.reduce((s, c) => s + Number(c.montant_total || 0), 0);
+    } else {
+      // Fallback tarif unitaire
+      const nbMatin  = resasNormales.filter(r => r.session === "matin").length;
+      const nbApmidi = resasNormales.filter(r => r.session === "apmidi").length;
+      const nbEnfants = (resasNormales[0]?.enfants||[]).length || 1;
+      const puM = nbEnfants===1?15:nbEnfants===2?28:nbEnfants===3?39:39+(nbEnfants-3)*11;
+      const puA = nbEnfants===1?17:nbEnfants===2?32:nbEnfants===3?45:45+(nbEnfants-3)*13;
+      totalClubNormal = nbMatin * puM + nbApmidi * puA;
+    }
+    const totalClub = totalLiberte + totalClubNormal;
 
     const totalPrestations = totalNat + totalClub;
     const totalAcomptes = (acomptes[membre.id] || []).reduce((s, a) => s + a.montant, 0);
@@ -7367,7 +7960,7 @@ function ComptesTab({ dbMembres, dbResas, dbResasClub, onRefresh }) {
 
   const genererFacture = (membre, compte) => {
     const remise = compte.remise || 0;
-    const nomMembre = `${membre.prenom} ${(membre.nom||"").toUpperCase()}`;
+    const nomMembre = `${PRENOM(membre.prenom)} ${NOM(membre.nom)}`;
     const lignesNat = compte.resasNat.map(r => `<tr><td>🏊 Natation · ${r.heure}</td><td>${r.date_seance ? parseLocalDate(r.date_seance).toLocaleDateString("fr-FR",{day:"numeric",month:"short"}) : "—"}</td><td style="text-align:right;font-weight:700">${getMontantResa(r,"natation")} €</td></tr>`).join("");
     const lignesClub = compte.resasClub.map(r => {
       const isLib = (r.label_jour||"").startsWith("[LIBERTE]");
@@ -7416,6 +8009,7 @@ Document généré le ${new Date().toLocaleDateString("fr-FR")}
 
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+
       {/* En-tête */}
       <div style={{ background:"#fff", borderRadius:16, padding:"14px 18px", boxShadow:"0 2px 10px rgba(0,0,0,0.05)" }}>
         <div style={{ fontWeight:900, color:C.dark, fontSize:15, marginBottom:4 }}>📒 Comptes fin de saison</div>
@@ -7431,7 +8025,7 @@ Document généré le ${new Date().toLocaleDateString("fr-FR")}
               <div style={{ width:18, height:18, borderRadius:4, background: m.compte_fin_saison ? C.ocean : "#ddd", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
                 {m.compte_fin_saison && <span style={{ color:"#fff", fontSize:12, fontWeight:900 }}>✓</span>}
               </div>
-              <span style={{ fontSize:12, fontWeight:700, color: m.compte_fin_saison ? C.ocean : "#555" }}>{m.prenom} {NOM(m.nom)}</span>
+              <span style={{ fontSize:12, fontWeight:700, color: m.compte_fin_saison ? C.ocean : "#555" }}>{PRENOM(m.prenom)} {NOM(m.nom)}</span>
             </div>
           ))}
         </div>
@@ -7452,7 +8046,7 @@ Document généré le ${new Date().toLocaleDateString("fr-FR")}
               <div style={{ display:"flex", alignItems:"center", gap:12 }}>
                 <div style={{ width:46, height:46, borderRadius:14, background:`linear-gradient(135deg,${C.ocean},${C.sea})`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22 }}>👤</div>
                 <div>
-                  <div style={{ fontWeight:900, color:C.dark, fontSize:15 }}>{m.prenom} {NOM(m.nom)}</div>
+                  <div style={{ fontWeight:900, color:C.dark, fontSize:15 }}>{PRENOM(m.prenom)} {NOM(m.nom)}</div>
                   <div style={{ fontSize:11, color:"#aaa" }}>{m.email}</div>
                   <div style={{ display:"flex", gap:8, marginTop:4 }}>
                     <span style={{ background:`${C.ocean}15`, color:C.ocean, borderRadius:50, padding:"2px 10px", fontSize:11, fontWeight:800 }}>{compte.resasNat.length + compte.resasClub.length} préstation{compte.resasNat.length+compte.resasClub.length>1?"s":""}</span>
@@ -7499,12 +8093,12 @@ Document généré le ${new Date().toLocaleDateString("fr-FR")}
                   <div style={{ marginBottom:16 }}>
                     <div style={{ fontWeight:800, color:C.coral, fontSize:12, textTransform:"uppercase", marginBottom:8 }}>🏖️ Club de Plage</div>
                     {(() => {
-                      // Grouper par session+enfants+minute pour montant correct
+                      // Grouper par enfants+montant pour merger matin+apmidi journée
                       const groups = {};
                       compte.resasClub.forEach(r => {
                         const enfantsKey = Array.isArray(r.enfants) ? [...r.enfants].sort().join(",") : "";
-                        const minute = (r.created_at||"").slice(0,16);
-                        const k = `${r.session}-${enfantsKey}-${minute}`;
+                        const montantR = r.montant || ((r.label_jour||"").match(/\[MONTANT:(\d+)\]/)||[])[1] || "0";
+                        const k = `${enfantsKey}-${montantR}`;
                         if (!groups[k]) groups[k] = [];
                         groups[k].push(r);
                       });
@@ -7512,18 +8106,19 @@ Document généré le ${new Date().toLocaleDateString("fr-FR")}
                       return Object.values(groups).map((g, gi) => {
                         const r0 = g[0];
                         const isLib = (r0.label_jour||"").startsWith("[LIBERTE]");
-                        const label = isLib ? "🎟️ Liberté" : r0.session==="matin" ? "☀️ Matin" : "🌊 Après-midi";
-                        // Montant du groupe
+                        const nbMatin = g.filter(r=>r.session==="matin").length;
+                        const nbApmidi = g.filter(r=>r.session==="apmidi").length;
+                        const isJournee = nbMatin > 0 && nbApmidi > 0;
+                        const label = isLib ? "🎟️ Liberté" : isJournee ? "☀️🌊 Journée" : r0.session==="matin" ? "☀️ Matin" : "🌊 Après-midi";
+                        const nbJours = isJournee ? Math.round(g.length/2) : g.length;
+                        // Montant : une seule fois (r0.montant = total du groupe)
                         const nb = Number(r0.enfants?.[0]);
                         let montant = 0;
                         if (nb >= 6 && LP[nb]) montant = LP[nb];
                         else if (r0.montant) montant = Number(r0.montant);
                         else { const m2=(r0.label_jour||"").match(/\[MONTANT:(\d+)\]/); montant=m2?Number(m2[1]):0; }
                         const allExcluded = g.every(r => exclusions[r.id]);
-                        const someExcluded = g.some(r => exclusions[r.id]);
-                        const dateLabel = g.length > 1
-                          ? `${g.length} jour${g.length>1?"s":""}`
-                          : (r0.date_reservation ? new Date(r0.date_reservation).toLocaleDateString("fr-FR",{day:"numeric",month:"short"}) : "—");
+                        const dateLabel = `${nbJours} jour${nbJours>1?"s":""}`;
                         return (
                           <div key={gi} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"7px 10px", background: allExcluded ? "#f8f8f8" : `${C.coral}06`, borderRadius:10, marginBottom:4, opacity: allExcluded ? 0.5 : 1 }}>
                             <div>
@@ -7767,36 +8362,32 @@ function FacturesTab({ dbMembres, dbResas, dbResasClub }) {
   const grouperClub = (resasClub, enfantsFilter = null) => {
     if (resasClub.length === 0) return [];
 
-    // Grouper par enfant + session
-    const parEnfantSession = {};
+    // Grouper par enfants + montant stocké → 1 ligne par formule achetée
+    const parEnfantsMontant = {};
     resasClub.forEach(r => {
-      const enfs = Array.isArray(r.enfants) && r.enfants.length > 0 ? r.enfants : ["—"];
-      const session = r.session || "matin";
-      enfs.forEach(prenom => {
-        const k = `${prenom}__${session}`;
-        if (!parEnfantSession[k]) parEnfantSession[k] = { prenom, session, resas: [] };
-        parEnfantSession[k].resas.push(r);
-      });
+      const enfantsStr = Array.isArray(r.enfants) ? [...r.enfants].sort().join(",") : "";
+      const montantR = r.montant || ((r.label_jour||"").match(/\[MONTANT:(\d+)\]/)||[])[1] || "0";
+      const k = `${enfantsStr}__${montantR}`;
+      if (!parEnfantsMontant[k]) parEnfantsMontant[k] = { enfantsStr, montantR, resas: [] };
+      parEnfantsMontant[k].resas.push(r);
     });
 
     const groupes = [];
-    Object.values(parEnfantSession).forEach(({ prenom, session, resas }) => {
-      // Prendre r.montant de la première résa (= total du groupe stocké à la validation)
-      // Si pas de montant stocké, lire [MONTANT:XX] sur la première résa seulement
-      let montant = 0;
+    Object.values(parEnfantsMontant).forEach(({ enfantsStr, montantR, resas }) => {
+      const prenom = enfantsStr || "—";
       const r0 = resas[0];
-      if (r0.montant) {
-        montant = Number(r0.montant);
-      } else {
-        const match = (r0.label_jour||"").match(/\[MONTANT:(\d+)\]/);
-        montant = match ? Number(match[1]) : 0;
-      }
-      const sessionLabel = session === "matin" ? "☀️ Club de Plage — Matin" : "🌊 Club de Plage — Après-midi";
-      const enfantLabel = prenom !== "—" ? ` (${prenom})` : "";
+      const nbMatin = resas.filter(r=>r.session==="matin").length;
+      const nbApmidi = resas.filter(r=>r.session==="apmidi").length;
+      const isJournee = nbMatin > 0 && nbApmidi > 0;
+      const nbJours = isJournee ? Math.max(nbMatin, nbApmidi) : resas.length;
+      const montant = Number(montantR) || 0;
+      const enfants = enfantsStr ? enfantsStr.split(",") : [];
+      const sessionLabel = isJournee ? "☀️🌊 Club de Plage — Journée" : nbMatin > 0 ? "☀️ Club de Plage — Matin" : "🌊 Club de Plage — Après-midi";
+      const enfantLabel = enfants.length > 0 ? ` (${enfants.join(", ")})` : "";
       groupes.push({
         label: `${sessionLabel}${enfantLabel}`,
         montant,
-        detail: `${resas.length} jour${resas.length>1?"s":""}${prenom!=="—"?" · "+prenom:""}`
+        detail: `${nbJours} jour${nbJours>1?"s":""}${enfants.length>0?" · "+enfants.join(", "):""}`
       });
     });
     return groupes;
@@ -8136,7 +8727,7 @@ ${mpHtml}
                     <div style={{ width:22, height:22, borderRadius:6, background:sel?C.ocean:"#e0e0e0", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
                       {sel && <span style={{ color:"#fff", fontSize:13, fontWeight:900 }}>✓</span>}
                     </div>
-                    <div style={{ fontWeight:900, color:C.dark, fontSize:14 }}>{m.prenom} {(m.nom||"").toUpperCase()}</div>
+                    <div style={{ fontWeight:900, color:C.dark, fontSize:14 }}>{PRENOM(m.prenom)} {NOM(m.nom)}</div>
                   </div>
                   <div style={{ fontSize:11, color:"#aaa", marginBottom:4 }}>{m.email}</div>
                   {enfantsListe.length > 0 && (
@@ -8200,12 +8791,375 @@ ${mpHtml}
   );
 }
 
+// ── EQUIPE TAB ────────────────────────────────────────────
+const POSTES = [
+  { id: "maitre_nageur", label: "Maître-nageur",  emoji: "🏊", color: "#1A8FE3" },
+  { id: "animateur",     label: "Animateur",       emoji: "🏖️", color: "#FF8E53" },
+  { id: "admin",         label: "Administration",  emoji: "📋", color: "#6366F1" },
+];
+const JOURS_SEMAINE = ["Lun","Mar","Mer","Jeu","Ven","Sam"];
+const JOURS_IDS     = ["lun","mar","mer","jeu","ven","sam"];
+
+const POSTE_INFO = Object.fromEntries(POSTES.map(p => [p.id, p]));
+
+const STATUTS = [
+  { id: "actif",  label: "Actif",  color: "#6BCB77", dot: "🟢" },
+  { id: "conge",  label: "Congé",  color: "#FF9500", dot: "🟡" },
+  { id: "absent", label: "Absent", color: "#FF6B6B", dot: "🔴" },
+];
+const STATUT_INFO = Object.fromEntries(STATUTS.map(s => [s.id, s]));
+
+const CONTRATS = ["CDI","CDD","Saisonnier","Vacataire","Stagiaire"];
+
+function EquipeTab() {
+  const [employes, setEmployes]   = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [selected, setSelected]   = useState(null); // fiche ouverte
+  const [showForm, setShowForm]   = useState(false);
+  const [editEmp, setEditEmp]     = useState(null);
+  const [filterPoste, setFilterPoste] = useState("tous");
+  const [saving, setSaving]       = useState(false);
+  const [error, setError]         = useState("");
+
+  const emptyForm = { prenom:"", nom:"", poste:"maitre_nageur", email:"", telephone:"", num_social:"", date_debut:"2026-07-06", date_fin:"2026-08-22", horaires_matin:false, horaires_apmidi:false, jours:[], notes:"", carte_pro:"", diplome:"", date_recyclage_pse1:"" };
+  const [form, setForm]           = useState(emptyForm);
+
+  const load = async () => {
+    setLoading(true);
+    const { data } = await sb.from("employes").select("*").order("nom");
+    setEmployes(data || []);
+    setLoading(false);
+  };
+
+  useEffect(() => { load().catch(() => setLoading(false)); }, []);
+
+  const openNew = () => { setForm(emptyForm); setEditEmp(null); setShowForm(true); };
+  const openEdit = (e) => { setForm({ ...emptyForm, ...e, jours: e.jours || [] }); setEditEmp(e); setShowForm(true); setSelected(null); };
+
+  const saveEmploye = async (overrides = {}) => {
+    const finalForm = { ...form, ...overrides };
+    if (!finalForm.prenom.trim() || !finalForm.nom.trim()) { setError("Prénom et nom requis"); return; }
+    setSaving(true); setError("");
+
+    // Colonnes connues de la table employes — on n'envoie que celles-là
+    const payload = {
+      prenom:              finalForm.prenom.trim(),
+      nom:                 finalForm.nom.trim(),
+      poste:               finalForm.poste || "maitre_nageur",
+      email:               finalForm.email || "",
+      telephone:           finalForm.telephone || "",
+      num_social:          finalForm.num_social || "",
+      date_debut:          finalForm.date_debut || null,
+      date_fin:            finalForm.date_fin || null,
+      horaires_matin:      finalForm.horaires_matin || false,
+      horaires_apmidi:     finalForm.horaires_apmidi || false,
+      jours:               finalForm.jours || [],
+      notes:               finalForm.notes || "",
+      carte_pro:           finalForm.carte_pro || "",
+      diplome:             finalForm.diplome || "",
+      date_recyclage_pse1: finalForm.date_recyclage_pse1 || null,
+      statut:              finalForm.statut || "actif",
+    };
+
+    let sbError;
+    if (editEmp) {
+      const { error } = await sb.from("employes").update(payload).eq("id", editEmp.id);
+      sbError = error;
+    } else {
+      const { error } = await sb.from("employes").insert([payload]);
+      sbError = error;
+    }
+
+    if (sbError) {
+      console.error("Supabase error:", sbError);
+      setError(`Erreur Supabase : ${sbError.message}`);
+      setSaving(false);
+      return;
+    }
+
+    await load();
+    setSaving(false); setShowForm(false);
+  };
+
+  const deleteEmploye = async (id) => {
+    if (!window.confirm("Supprimer cet employé ?")) return;
+    await sb.from("employes").delete().eq("id", id);
+    setSelected(null); await load();
+  };
+
+  const toggleStatut = async (emp) => {
+    const next = emp.statut === "actif" ? "absent" : emp.statut === "absent" ? "conge" : "actif";
+    await sb.from("employes").update({ statut: next }).eq("id", emp.id);
+    setEmployes(prev => prev.map(e => e.id === emp.id ? { ...e, statut: next } : e));
+  };
+
+  const filtered = filterPoste === "tous" ? employes : employes.filter(e => e.poste === filterPoste);
+  const actifs   = employes.filter(e => e.statut === "actif").length;
+
+  // ── Fiche détail
+  const FicheModal = ({ emp }) => {
+    const poste  = POSTE_INFO[emp.poste] || POSTES[0];
+    const statut = STATUT_INFO[emp.statut] || STATUTS[0];
+    return (
+      <div style={{ position:"fixed", inset:0, zIndex:1000, display:"flex", flexDirection:"column" }}>
+        <div onClick={() => setSelected(null)} style={{ position:"absolute", inset:0, background:"rgba(0,20,50,0.65)", backdropFilter:"blur(5px)" }} />
+        <div style={{ position:"relative", marginTop:"auto", background:"#F0F4F8", borderRadius:"28px 28px 0 0", maxHeight:"90vh", display:"flex", flexDirection:"column", boxShadow:"0 -12px 48px rgba(0,0,0,0.3)" }}>
+          <div style={{ display:"flex", justifyContent:"center", padding:"12px 0 4px" }}>
+            <div style={{ width:40, height:5, borderRadius:10, background:"#ddd" }} />
+          </div>
+          {/* Header */}
+          <div style={{ background:`linear-gradient(135deg,${poste.color},${poste.color}cc)`, margin:"0 16px", borderRadius:20, padding:"16px 18px", position:"relative" }}>
+            <button onClick={() => setSelected(null)} style={{ position:"absolute", top:10, right:12, background:"rgba(255,255,255,0.25)", border:"none", color:"#fff", borderRadius:"50%", width:30, height:30, cursor:"pointer", fontWeight:900, fontSize:16, fontFamily:"inherit" }}>✕</button>
+            <div style={{ display:"flex", alignItems:"center", gap:14 }}>
+              <div style={{ width:60, height:60, borderRadius:18, background:"rgba(255,255,255,0.25)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:28, flexShrink:0 }}>{poste.emoji}</div>
+              <div>
+                <div style={{ color:"#fff", fontWeight:900, fontSize:20 }}>{PRENOM(emp.prenom)} {NOM(emp.nom)}</div>
+                <div style={{ color:"rgba(255,255,255,0.85)", fontSize:13 }}>{poste.label}</div>
+              </div>
+            </div>
+          </div>
+          {/* Body */}
+          <div style={{ overflowY:"auto", padding:"14px 18px 32px", display:"flex", flexDirection:"column", gap:12 }}>
+            {/* Contact */}
+            <div style={{ background:"#fff", borderRadius:16, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
+              <div style={{ fontWeight:800, color:"#2C3E50", fontSize:13, marginBottom:10 }}>📞 Contact</div>
+              {emp.email && <div style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:"1px solid #f5f5f5", fontSize:13 }}><span style={{ color:"#aaa" }}>Email</span><span style={{ fontWeight:700 }}>{emp.email}</span></div>}
+              {emp.telephone && <div style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", fontSize:13 }}><span style={{ color:"#aaa" }}>Tél.</span><span style={{ fontWeight:700 }}>{emp.telephone}</span></div>}
+            </div>
+            {/* Numéro de sécurité sociale */}
+            {emp.num_social && (
+            <div style={{ background:"#fff", borderRadius:16, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
+              <div style={{ fontWeight:800, color:"#2C3E50", fontSize:13, marginBottom:10 }}>🪪 Sécurité sociale</div>
+              <div style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", fontSize:13 }}><span style={{ color:"#aaa" }}>N° SS</span><span style={{ fontWeight:700, letterSpacing:1 }}>{emp.num_social}</span></div>
+            </div>
+            )}
+            {/* Qualifications */}
+            <div style={{ background:"#fff", borderRadius:16, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
+              <div style={{ fontWeight:800, color:"#2C3E50", fontSize:13, marginBottom:10 }}>🎓 Qualifications</div>
+              {emp.carte_pro && <div style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:"1px solid #f5f5f5", fontSize:13 }}><span style={{ color:"#aaa" }}>🪪 Carte pro</span><span style={{ fontWeight:700 }}>{emp.carte_pro}</span></div>}
+              {emp.diplome && <div style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:"1px solid #f5f5f5", fontSize:13 }}><span style={{ color:"#aaa" }}>📜 Diplôme</span><span style={{ fontWeight:700 }}>{emp.diplome}</span></div>}
+              {(emp.poste === "maitre_nageur" || emp.poste === "bsaan") && emp.date_recyclage_pse1 && (
+                <div style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", fontSize:13 }}><span style={{ color:"#aaa" }}>♻️ Recyclage PSE1</span><span style={{ fontWeight:700, color: new Date(emp.date_recyclage_pse1) < new Date() ? C.sunset : C.green }}>{new Date(emp.date_recyclage_pse1).toLocaleDateString("fr-FR")}</span></div>
+              )}
+            </div>
+            {emp.notes && (
+              <div style={{ background:"#FFFBEA", borderRadius:16, padding:"12px 16px", border:"1.5px solid #FFD93D40" }}>
+                <div style={{ fontWeight:800, color:"#2C3E50", fontSize:12, marginBottom:6 }}>📝 Notes</div>
+                <div style={{ fontSize:13, color:"#555" }}>{emp.notes}</div>
+              </div>
+            )}
+            {/* Actions */}
+            <div style={{ display:"flex", gap:10 }}>
+              <button onClick={() => openEdit(emp)} style={{ flex:1, background:`${poste.color}15`, border:`2px solid ${poste.color}40`, color:poste.color, borderRadius:14, padding:"12px", fontWeight:900, fontSize:14, cursor:"pointer", fontFamily:"inherit" }}>✏️ Modifier</button>
+              <button onClick={() => deleteEmploye(emp.id)} style={{ background:"#FFF0F0", border:"2px solid #FF6B6B40", color:"#FF6B6B", borderRadius:14, padding:"12px 16px", fontWeight:900, fontSize:14, cursor:"pointer", fontFamily:"inherit" }}>🗑️</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+// ── Formulaire employé (composant externe pour éviter recréation à chaque frappe)
+function EmployeFormModal({ form, setForm, editEmp, saving, error, onClose, onSave }) {
+  const poste = POSTE_INFO[form.poste] || POSTES[0];
+
+  // Champs texte libres avec état local pour éviter la perte de focus à chaque lettre
+  const [prenomLocal, setPrenomLocal]       = React.useState(form.prenom);
+  const [nomLocal, setNomLocal]             = React.useState(form.nom);
+  const [emailLocal, setEmailLocal]         = React.useState(form.email);
+  const [telLocal, setTelLocal]             = React.useState(form.telephone);
+  const [numSocialLocal, setNumSocialLocal] = React.useState(form.num_social || "");
+
+  // Synchronise vers le form parent au blur (perte de focus)
+  const syncPrenom   = () => setForm(f => ({...f, prenom:    prenomLocal}));
+  const syncNom      = () => setForm(f => ({...f, nom:       nomLocal}));
+  const syncEmail    = () => setForm(f => ({...f, email:     emailLocal}));
+  const syncTel      = () => setForm(f => ({...f, telephone: telLocal}));
+  const syncSocial   = () => setForm(f => ({...f, num_social:numSocialLocal}));
+
+  // Si le parent réinitialise le form (nouveau / modification), on resynchronise
+  React.useEffect(() => {
+    setPrenomLocal(form.prenom);
+    setNomLocal(form.nom);
+    setEmailLocal(form.email);
+    setTelLocal(form.telephone);
+    setNumSocialLocal(form.num_social || "");
+  }, [editEmp]);
+
+  const inputStyle = { width:"100%", border:"2px solid #ddd", borderRadius:10, padding:"9px 12px", fontSize:14, fontFamily:"inherit", outline:"none", boxSizing:"border-box" };
+
+  return (
+      <div style={{ position:"fixed", inset:0, zIndex:1000, display:"flex", flexDirection:"column" }}>
+        <div onClick={onClose} style={{ position:"absolute", inset:0, background:"rgba(0,20,50,0.65)", backdropFilter:"blur(5px)" }} />
+        <div style={{ position:"relative", marginTop:"auto", background:"#F0F4F8", borderRadius:"28px 28px 0 0", maxHeight:"92vh", display:"flex", flexDirection:"column", boxShadow:"0 -12px 48px rgba(0,0,0,0.3)" }}>
+          <div style={{ display:"flex", justifyContent:"center", padding:"12px 0 4px" }}>
+            <div style={{ width:40, height:5, borderRadius:10, background:"#ddd" }} />
+          </div>
+          <div style={{ background:`linear-gradient(135deg,${poste.color},${poste.color}cc)`, margin:"0 16px", borderRadius:20, padding:"14px 18px", position:"relative" }}>
+            <button onClick={onClose} style={{ position:"absolute", top:10, right:12, background:"rgba(255,255,255,0.25)", border:"none", color:"#fff", borderRadius:"50%", width:30, height:30, cursor:"pointer", fontWeight:900, fontSize:16, fontFamily:"inherit" }}>✕</button>
+            <div style={{ color:"#fff", fontWeight:900, fontSize:18 }}>{editEmp ? "✏️ Modifier" : "➕ Nouvel employé"}</div>
+          </div>
+          <div style={{ overflowY:"auto", padding:"14px 18px 32px", display:"flex", flexDirection:"column", gap:12 }}>
+            {error && <div style={{ background:"#FFF0F0", color:"#e74c3c", borderRadius:12, padding:"10px 14px", fontSize:13, fontWeight:700 }}>⚠️ {error}</div>}
+
+            {/* Identité */}
+            <div style={{ background:"#fff", borderRadius:16, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
+              <div style={{ fontWeight:800, color:"#2C3E50", fontSize:13, marginBottom:10 }}>👤 Identité</div>
+              <div style={{ display:"flex", gap:10, marginBottom:10 }}>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:11, color:"#aaa", marginBottom:4 }}>Prénom *</div>
+                  <input type="text" value={prenomLocal} onChange={e => setPrenomLocal(e.target.value)} onBlur={syncPrenom} placeholder="Prénom" style={inputStyle} />
+                </div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:11, color:"#aaa", marginBottom:4 }}>Nom *</div>
+                  <input type="text" value={nomLocal} onChange={e => setNomLocal(e.target.value)} onBlur={syncNom} placeholder="Nom" style={inputStyle} />
+                </div>
+              </div>
+              <div style={{ fontSize:11, color:"#aaa", marginBottom:6 }}>Poste</div>
+              <div style={{ display:"flex", gap:6 }}>
+                {POSTES.map(p => (
+                  <button key={p.id} onClick={() => setForm(f => ({...f, poste:p.id}))} style={{ flex:1, background: form.poste===p.id ? `${p.color}18` : "#f5f5f5", border:`2px solid ${form.poste===p.id ? p.color : "#eee"}`, color: form.poste===p.id ? p.color : "#aaa", borderRadius:12, padding:"8px 4px", cursor:"pointer", fontWeight:900, fontSize:11, fontFamily:"inherit" }}>{p.emoji} {p.label.split(" ")[0]}</button>
+                ))}
+              </div>
+            </div>
+
+            {/* Contact */}
+            <div style={{ background:"#fff", borderRadius:16, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
+              <div style={{ fontWeight:800, color:"#2C3E50", fontSize:13, marginBottom:10 }}>📞 Contact</div>
+              <div style={{ marginBottom:10 }}>
+                <div style={{ fontSize:11, color:"#aaa", marginBottom:4 }}>Email</div>
+                <input type="email" value={emailLocal} onChange={e => setEmailLocal(e.target.value)} onBlur={syncEmail} placeholder="email@exemple.fr" style={inputStyle} />
+              </div>
+              <div>
+                <div style={{ fontSize:11, color:"#aaa", marginBottom:4 }}>Téléphone</div>
+                <input type="tel" value={telLocal} onChange={e => setTelLocal(e.target.value)} onBlur={syncTel} placeholder="06 00 00 00 00" style={inputStyle} />
+              </div>
+            </div>
+
+            {/* Numéro de sécurité sociale */}
+            <div style={{ background:"#fff", borderRadius:16, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
+              <div style={{ fontWeight:800, color:"#2C3E50", fontSize:13, marginBottom:10 }}>🪪 Numéro de sécurité sociale</div>
+              <input type="text" value={numSocialLocal} onChange={e => setNumSocialLocal(e.target.value)} onBlur={syncSocial} placeholder="1 85 05 75 XXX XXX XX" maxLength={21} style={inputStyle} />
+              <div style={{ fontSize:11, color:"#bbb", marginTop:4 }}>15 chiffres — confidentiel</div>
+            </div>
+            {/* Qualifications */}
+            <div style={{ background:"#fff", borderRadius:16, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
+              <div style={{ fontWeight:800, color:"#2C3E50", fontSize:13, marginBottom:10 }}>🎓 Qualifications</div>
+              <div style={{ marginBottom:10 }}>
+                <div style={{ fontSize:11, color:"#aaa", marginBottom:4 }}>🪪 N° Carte professionnelle</div>
+                <input type="text" value={form.carte_pro} onChange={e => setForm(f => ({...f, carte_pro:e.target.value}))} placeholder="Ex : BEESAN 12345" style={{ width:"100%", border:"2px solid #ddd", borderRadius:10, padding:"9px 12px", fontSize:14, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+              </div>
+              <div style={{ marginBottom:10 }}>
+                <div style={{ fontSize:11, color:"#aaa", marginBottom:4 }}>📜 Diplôme</div>
+                <input type="text" value={form.diplome} onChange={e => setForm(f => ({...f, diplome:e.target.value}))} placeholder="Ex : BEESAN, BPJEPS AAN…" style={{ width:"100%", border:"2px solid #ddd", borderRadius:10, padding:"9px 12px", fontSize:14, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+              </div>
+              {(form.poste === "maitre_nageur" || form.poste === "bsaan") && (
+                <div>
+                  <div style={{ fontSize:11, color:"#aaa", marginBottom:4 }}>♻️ Date recyclage PSE1 (MNS)</div>
+                  <input type="date" value={form.date_recyclage_pse1} onChange={e => setForm(f => ({...f, date_recyclage_pse1:e.target.value}))} style={{ width:"100%", border:"2px solid #ddd", borderRadius:10, padding:"9px 12px", fontSize:14, fontFamily:"inherit", outline:"none", boxSizing:"border-box" }} />
+                </div>
+              )}
+            </div>
+            {/* Notes */}
+            <div style={{ background:"#fff", borderRadius:16, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
+              <div style={{ fontWeight:800, color:"#2C3E50", fontSize:13, marginBottom:8 }}>📝 Notes</div>
+              <textarea value={form.notes} onChange={e => setForm(f => ({...f, notes:e.target.value}))} placeholder="Informations complémentaires…" style={{ width:"100%", minHeight:70, border:"2px solid #eee", borderRadius:12, padding:"10px 12px", fontSize:13, fontFamily:"inherit", resize:"vertical", outline:"none", boxSizing:"border-box" }} />
+            </div>
+            <SunBtn color={poste.color} full onClick={() => {
+              // Synchronise les champs locaux avant sauvegarde (sans attendre onBlur)
+              onSave({ prenom: prenomLocal, nom: nomLocal, email: emailLocal, telephone: telLocal, num_social: numSocialLocal });
+            }} disabled={saving}>
+              {saving ? "Enregistrement…" : editEmp ? "✅ Mettre à jour" : "✅ Ajouter l'employé"}
+            </SunBtn>
+          </div>
+        </div>
+      </div>
+    );
+}
+
+  // ── Render principal
+  const aujourd = new Date().toLocaleDateString("fr-FR",{weekday:"long"}).slice(0,3).toLowerCase();
+  const presentAujourd = employes.filter(e => e.statut==="actif" && (e.jours||[]).includes(aujourd));
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+      {selected && <FicheModal emp={selected} />}
+      {showForm && (
+        <EmployeFormModal
+          form={form}
+          setForm={setForm}
+          editEmp={editEmp}
+          saving={saving}
+          error={error}
+          onClose={() => setShowForm(false)}
+          onSave={saveEmploye}
+        />
+      )}
+
+      {/* KPIs */}
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10 }}>
+        {[
+          { label:"Total équipe",   val:employes.length,        color:"#6366F1", emoji:"👨‍💼" },
+          { label:"Actifs saison",  val:actifs,                  color:C.green,   emoji:"🟢" },
+          { label:"Présents auj.", val:presentAujourd.length,   color:C.ocean,   emoji:"📍" },
+        ].map(k => (
+          <div key={k.label} style={{ background:"#fff", borderRadius:18, padding:"14px 12px", boxShadow:"0 2px 10px rgba(0,0,0,0.06)", textAlign:"center" }}>
+            <div style={{ fontSize:22 }}>{k.emoji}</div>
+            <div style={{ fontWeight:900, fontSize:24, color:k.color, lineHeight:1.1, marginTop:4 }}>{k.val}</div>
+            <div style={{ fontSize:10, color:"#aaa", marginTop:4, fontWeight:700 }}>{k.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Filtre poste + bouton ajout */}
+      <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+        <div style={{ display:"flex", gap:5, flex:1, background:"#fff", borderRadius:14, padding:5, boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
+          {[{ id:"tous", label:"Tous", emoji:"👥" }, ...POSTES].map(p => (
+            <button key={p.id} onClick={() => setFilterPoste(p.id)} style={{ flex:1, background: filterPoste===p.id ? (p.color ? `${p.color}18` : "#F0F4F8") : "transparent", border:`2px solid ${filterPoste===p.id ? (p.color||"#ddd") : "transparent"}`, color: filterPoste===p.id ? (p.color||C.dark) : "#aaa", borderRadius:10, padding:"6px 2px", cursor:"pointer", fontWeight:900, fontSize:10, fontFamily:"inherit" }}>{p.emoji} {p.label?.split(" ")[0] || p.label}</button>
+          ))}
+        </div>
+        <button onClick={openNew} style={{ background:`linear-gradient(135deg,${C.ocean},${C.sea})`, border:"none", color:"#fff", borderRadius:14, padding:"10px 14px", cursor:"pointer", fontWeight:900, fontSize:13, fontFamily:"inherit", whiteSpace:"nowrap", boxShadow:`0 4px 14px ${C.ocean}44` }}>➕ Ajouter</button>
+      </div>
+
+      {/* Liste employés */}
+      {loading ? (
+        <div style={{ textAlign:"center", padding:"32px 0", color:"#bbb" }}>Chargement…</div>
+      ) : filtered.length === 0 ? (
+        <div style={{ textAlign:"center", padding:"32px 0", color:"#bbb", background:"#fff", borderRadius:18, boxShadow:"0 2px 10px rgba(0,0,0,0.05)" }}>
+          <div style={{ fontSize:48, marginBottom:8 }}>👨‍💼</div>
+          <div style={{ fontSize:14 }}>Aucun employé{filterPoste!=="tous"?" pour ce poste":""}</div>
+          <div style={{ fontSize:12, color:"#ccc", marginTop:4 }}>Cliquez sur ➕ pour ajouter</div>
+        </div>
+      ) : (
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10 }}>
+          {filtered.map(emp => {
+            const poste = POSTE_INFO[emp.poste] || POSTES[0];
+            return (
+              <div key={emp.id} onClick={() => setSelected(emp)} style={{ background:"#fff", borderRadius:18, padding:"12px 10px", boxShadow:"0 2px 10px rgba(0,0,0,0.05)", cursor:"pointer", textAlign:"center", transition:"transform .15s" }}
+                onMouseEnter={e => e.currentTarget.style.transform="translateY(-2px)"}
+                onMouseLeave={e => e.currentTarget.style.transform=""}>
+                <div style={{ width:44, height:44, borderRadius:14, background:`linear-gradient(135deg,${poste.color},${poste.color}aa)`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, margin:"0 auto 8px" }}>{poste.emoji}</div>
+                <div style={{ fontWeight:900, color:"#2C3E50", fontSize:12, lineHeight:1.3 }}>{PRENOM(emp.prenom)}</div>
+                <div style={{ fontWeight:700, color:"#2C3E50", fontSize:12 }}>{NOM(emp.nom)}</div>
+                <div style={{ fontSize:10, color:"#aaa", marginTop:3 }}>{poste.label.split(" ")[0]}</div>
+                {emp.carte_pro && <div style={{ fontSize:9, color:poste.color, fontWeight:700, marginTop:2 }}>🪪 {emp.carte_pro}</div>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+    </div>
+  );
+}
+
 function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSessions, setAllSeasonSessions, clubPlaces, setClubPlaces }) {
   const [tab, setTab] = useState("dashboard");
-  const [dbResas, setDbResas]         = useState([]);
-  const [dbResasClub, setDbResasClub] = useState([]);
-  const [dbMembres, setDbMembres]     = useState([]);
-  const [dbPaiements, setDbPaiements] = useState([]);
+  const [dbResas, setDbResas]               = useState([]);
+  const [dbResasClub, setDbResasClub]       = useState([]);
+  const [dbMembres, setDbMembres]           = useState([]);
+  const [dbPaiements, setDbPaiements]       = useState([]);
+  const [dbCommandesClub, setDbCommandesClub] = useState([]);
   const [showNouvelleResa, setShowNouvelleResa] = useState(false);
   const [modifierResa, setModifierResa]         = useState(null);
   const [pendingModalConfirm, setPendingModalConfirm] = useState(null); // { groupe } pour dashboard
@@ -8261,6 +9215,10 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
   useEffect(() => {
     refreshResas();
     getAllMembres().then(d => setDbMembres(d)).catch(() => {});
+    sb.from("commandes_club").select("*").order("created_at")
+      .then(({ data }) => setDbCommandesClub(data || [])).catch(() => {});
+    sb.from("paiements").select("*").eq("statut", "completed").order("created_at", { ascending: false })
+      .then(({ data }) => setDbPaiements(data || [])).catch(() => {});
   }, []);
 
   // Uniquement les vraies données Supabase
@@ -8281,56 +9239,11 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
   const confirmedNatToday  = dbResas.filter(r => r.statut === "confirmed" && toLocalDate(r.validated_at || r.created_at) === todayISO);
   const confirmedClubToday = dbResasClub.filter(r => r.statut === "confirmed" && toLocalDate(r.validated_at || r.created_at) === todayISO);
 
-  // Montant natation selon forfait (groupé par membre+date_creation)
-  const montantNat = (resas) => {
-    // Grouper par membre + enfants (triés) + minute de création = même logique que le reste
-    const groups = {};
-    resas.forEach(r => {
-      const enfantsKey = Array.isArray(r.enfants) ? [...r.enfants].sort().join(",") : "";
-      const minute = (r.created_at||"").slice(0,16);
-      const key = `${r.membre_id}-${enfantsKey}-${minute}`;
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(r);
-    });
-    const PRIX_NAT = { 1:20, 2:40, 3:60, 4:80, 5:95, 6:113, 7:131, 8:147, 9:162, 10:170 };
-    return Object.values(groups).reduce((total, g) => {
-      if (g[0].mode_paiement === "offert") return total; // Offerts → exclus
-      const n = g.length;
-      const prix = n <= 10 ? (PRIX_NAT[n] || n*20) : 170 + (n-10)*17;
-      return total + prix;
-    }, 0);
-  };
-
-  const LIBERTE_PRIX = { 6:96, 12:180, 18:252, 24:288, 30:330 };
-  const montantClub = (resas) => {
-    // Grouper par membre + session + enfants + minute
-    const groups = {};
-    resas.forEach(r => {
-      const enfantsKey = Array.isArray(r.enfants) ? [...r.enfants].sort().join(",") : "";
-      const minute = (r.created_at||"").slice(0,16);
-      const key = `${r.membre_id}-${r.session}-${enfantsKey}-${minute}`;
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(r);
-    });
-    return Object.values(groups).reduce((total, g) => {
-      const r0 = g[0];
-      // Offerts → exclus du total
-      if (r0.mode_paiement === "offert") return total;
-      // Carte liberté : prix fixe unique
-      const nb = Number(Array.isArray(r0.enfants) ? r0.enfants[0] : 0);
-      if (nb >= 6 && LIBERTE_PRIX[nb]) return total + LIBERTE_PRIX[nb];
-      // Montant stocké sur la première résa = total du groupe
-      if (r0.montant) return total + Number(r0.montant);
-      // Fallback : lire [MONTANT:XX] × nb résas
-      const parLabelJour = g.reduce((s, r) => {
-        const match = (r.label_jour||"").match(/\[MONTANT:(\d+)\]/);
-        return s + (match ? Number(match[1]) : 0);
-      }, 0);
-      return total + parLabelJour;
-    }, 0);
-  };
-
-  const realTotal = montantNat(confirmedNatToday) + montantClub(confirmedClubToday);
+  // Paiements du jour depuis table paiements (montants corrects, multi-enfants inclus)
+  const paiementsAujourdhui = (dbPaiements||[]).filter(p =>
+    p.statut === "completed" && p.type !== "offert" && toLocalDate(p.created_at) === todayISO
+  );
+  const realTotal = paiementsAujourdhui.reduce((s, p) => s + Number(p.montant||0), 0);
   const pendingCount = dbResas.filter(r => r.statut === "pending").length + dbResasClub.filter(r => r.statut === "pending").length;
 
   // Taux de remplissage natation — toute la saison
@@ -8352,6 +9265,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
 
   const tabs = [
     { id: "dashboard",    emoji: "📊", label: "Dashboard"  },
+    { id: "equipe",       emoji: "👨‍💼", label: "Équipe"     },
     { id: "seances",      emoji: "🏊", label: "Séances"    },
     { id: "reservations", emoji: "📋", label: "Réservations" },
     { id: "membres",      emoji: "👥", label: "Membres"    },
@@ -8359,6 +9273,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
     { id: "paiements",    emoji: "💳", label: "Paiements"  },
     { id: "libertes",     emoji: "🎟️", label: "Liberté"   },
     { id: "comptes",      emoji: "📒", label: "Comptes"    },
+    { id: "comptabilite", emoji: "🧮", label: "Comptabilité" },
     { id: "factures",     emoji: "🧾", label: "Factures"   },
     { id: "recherche",    emoji: "🔍", label: "Recherche"  },
   ];
@@ -8374,24 +9289,82 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
           onConfirm={async (mode) => {
             const g = pendingModalConfirm;
             const table = g.type === "natation" ? "reservations_natation" : "reservations_club";
+
+            // Si compte fin de saison → confirmer mais activer compte_fin_saison sur le membre
+            if (mode === "compte_fin_saison") {
+              if (g.type === "club") {
+                const LIBERTE_PRIX_V = {6:96,12:180,18:252,24:288,30:330};
+                for (const r of g.resas) {
+                  let montant = 0;
+                  const isLib = !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6;
+                  if (isLib) { montant = LIBERTE_PRIX_V[Number(r.enfants[0])]||0; }
+                  else { const m2=(r.label_jour||"").match(/\[MONTANT:(\d+)\]/); montant=m2?Number(m2[1]):0; }
+                  await sb.from(table).update({ statut:"confirmed", validated_at:new Date().toISOString(), montant, mode_paiement:mode }).eq("id", r.id);
+                }
+              } else {
+                await Promise.all(g.resas.map(r => sb.from(table).update({ statut:"confirmed", validated_at:new Date().toISOString(), mode_paiement:mode }).eq("id", r.id)));
+              }
+              // Activer compte_fin_saison sur le membre
+              const membreId = g.resas[0]?.membre_id;
+              if (membreId) {
+                await sb.from("membres").update({ compte_fin_saison: true }).eq("id", membreId);
+              }
+              setPendingModalConfirm(null);
+              refreshResas();
+              onRefresh && onRefresh();
+              return;
+            }
+
             if (g.type === "club") {
               const LIBERTE_PRIX_V = {6:96,12:180,18:252,24:288,30:330};
+              let totalMontantClub = 0;
               for (const r of g.resas) {
                 let montant = 0;
                 const isLib = !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6;
                 if (isLib) { montant = LIBERTE_PRIX_V[Number(r.enfants[0])]||0; }
                 else { const m2=(r.label_jour||"").match(/\[MONTANT:(\d+)\]/); montant=m2?Number(m2[1]):0; }
                 await sb.from(table).update({ statut:"confirmed", validated_at:new Date().toISOString(), montant, mode_paiement:mode }).eq("id", r.id);
+                totalMontantClub += montant;
+              }
+              // Si montant 0 (forfait semaine via commandes_club), chercher dans commandes_club
+              if (totalMontantClub === 0) {
+                const membreIdClub = g.resas[0]?.membre_id;
+                const datesResas = new Set(g.resas.map(r => r.date_reservation?.slice(0,10)).filter(Boolean));
+                const { data: cmds } = await sb.from("commandes_club").select("montant_total, dates").eq("membre_id", membreIdClub);
+                const cmdMatching = (cmds||[]).filter(c => Array.isArray(c.dates) && c.dates.some(d => datesResas.has(d)));
+                totalMontantClub = cmdMatching.reduce((s, c) => s + Number(c.montant_total||0), 0);
+              }
+              // ── Insert paiement club ──
+              if (totalMontantClub > 0) {
+                const membreId = g.resas[0]?.membre_id;
+                await sb.from("paiements").insert([{ membre_id:membreId, montant:totalMontantClub, type:"club", label:`Club · ${g.resas.length} réservation${g.resas.length>1?"s":""}`, statut:"completed" }]);
               }
             } else {
+              // Natation : calculer montant forfait × nombre d'enfants
+              const PRIX_NAT_V = {1:20,2:40,3:60,4:80,5:95,6:113,7:131,8:147,9:162,10:170};
+              const membreId = g.resas[0]?.membre_id;
+              const r0 = g.resas[0];
+              const nbEnfants = Math.max(1, Array.isArray(r0?.enfants) ? r0.enfants.length : 1);
+              const enfKey = Array.isArray(r0?.enfants)?[...r0.enfants].sort().join(","):"";
+              const minute = (r0?.created_at||"").slice(0,16);
+              const { data: allNat } = await sb.from("reservations_natation").select("id,enfants,created_at").eq("membre_id", membreId);
+              const sameGroup = (allNat||[]).filter(r => {
+                const k2 = Array.isArray(r.enfants)?[...r.enfants].sort().join(","):"";
+                return k2 === enfKey && (r.created_at||"").slice(0,16) === minute;
+              });
+              const n = sameGroup.length;
+              const prixParEnfant = n <= 10 ? (PRIX_NAT_V[n]||n*20) : 170+(n-10)*17;
+              const montantNat = prixParEnfant * nbEnfants;
               await Promise.all(g.resas.map(r => sb.from(table).update({ statut:"confirmed", validated_at:new Date().toISOString(), mode_paiement:mode }).eq("id", r.id)));
+              // ── Insert paiement natation ──
+              await sb.from("paiements").insert([{ membre_id:membreId, montant:montantNat, type:"natation", label:`Natation · ${n} leçon${n>1?"s":""} · ${nbEnfants} enfant${nbEnfants>1?"s":""}`, statut:"completed" }]);
             }
             // Carte liberté → créditer
             if (g.type === "club" && g.resas.some(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6)) {
               const r0 = g.resas[0];
               const credit = Number(r0.enfants?.[0])||0;
               if (credit > 0 && r0.membre_id) {
-                const { data: m } = await sb.from("membres").select("liberte_balance, liberte_total").eq("id", r0.membre_id).single();
+                const { data: m } = await sb.from("membres").select("liberte_balance, liberte_total").eq("id", r0.membre_id).maybeSingle();
                 if (m) await sb.from("membres").update({ liberte_balance:(m.liberte_balance||0)+credit, liberte_total:(m.liberte_total||0)+credit }).eq("id", r0.membre_id);
               }
             }
@@ -8400,12 +9373,13 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
               const membreId = g.resas[0]?.membre_id;
               const nbUtil = g.resas.filter(r => (r.label_jour||"").startsWith("[LIBERTE]")).length;
               if (membreId && nbUtil > 0) {
-                const { data: m } = await sb.from("membres").select("liberte_balance").eq("id", membreId).single();
+                const { data: m } = await sb.from("membres").select("liberte_balance").eq("id", membreId).maybeSingle();
                 if (m) await sb.from("membres").update({ liberte_balance:Math.max(0,(m.liberte_balance||0)-nbUtil) }).eq("id", membreId);
               }
             }
             setPendingModalConfirm(null);
             refreshResas();
+            sb.from("paiements").select("*").eq("statut","completed").order("created_at",{ascending:false}).then(({data})=>setDbPaiements(data||[])).catch(()=>{});
           }}
         />
       )}
@@ -8458,7 +9432,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
               const minuteCreation = (r.created_at||"").slice(0,16);
               const enfantsKey = Array.isArray(r.enfants) ? [...r.enfants].sort().join(",") : "";
               const keyClub = r._type === "club"
-                ? `${r.membre_id}-club-${r.session}-${enfantsKey}-${minuteCreation}`
+                ? `${r.membre_id}-club-${enfantsKey}-${minuteCreation}`
                 : null;
               const key = keyClub || `${r.membre_id}-${r._type}-${enfantsKey}-${minuteCreation}`;
               if (!groups[key]) groups[key] = { membre: r.membres, type: r._type, resas: [] };
@@ -8524,30 +9498,42 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                   <div style={{ fontWeight:800, color:"#2C3E50", fontSize:14 }}>💳 Paiements du jour</div>
                   <div style={{ background:`${C.green}18`, color:C.green, borderRadius:50, padding:"4px 14px", fontWeight:900, fontSize:13 }}>{realTotal} €</div>
                 </div>
-                {confirmedNatToday.length + confirmedClubToday.length === 0 ? (
+                {paiementsAujourdhui.length === 0 ? (
                   <div style={{ textAlign:"center", padding:"16px 0", color:"#bbb", fontSize:13 }}>Aucun paiement aujourd'hui</div>
                 ) : (
                   <div style={{ display:"flex", flexDirection:"column", gap:0 }}>
-                    {[...confirmedNatToday, ...confirmedClubToday]
-                      .sort((a,b) => (b.updated_at||b.created_at||"").localeCompare(a.updated_at||a.created_at||""))
-                      .map((r, i, arr) => {
-                        const isNat = !!r.date_seance;
-                        const isLib = !isNat && Array.isArray(r.enfants) && Number(r.enfants[0]) >= 6;
-                        const color = isNat ? C.ocean : C.coral;
-                        const label = isNat ? `🏊 ${r.heure}` : isLib ? `🎟️ Carte Liberté · ${r.enfants[0]} demi-j.` : `🏖️ ${r.session==="matin"?"Matin":"Après-midi"}`;
-                        const LIBP = {6:96,12:180,18:252,24:288,30:330};
-                        const montant = isNat ? `${r.montant||20} €` : isLib ? `${LIBP[Number(r.enfants[0])]||"—"} €` : "";
+                    {(() => {
+                      // Grouper par membre_id — un seul affichage par client
+                      const byMembre = {};
+                      paiementsAujourdhui.forEach(p => {
+                        const mid = p.membre_id || "inconnu";
+                        if (!byMembre[mid]) byMembre[mid] = { membreId: mid, paiements: [] };
+                        byMembre[mid].paiements.push(p);
+                      });
+                      // Récupérer le nom depuis dbMembres
+                      return Object.entries(byMembre).map(([mid, g], i, arr) => {
+                        const membre = dbMembres.find(m => m.id === mid);
+                        const hasNat  = g.paiements.some(p => p.type === "natation");
+                        const hasClub = g.paiements.some(p => p.type === "club");
+                        const color   = hasNat && hasClub ? "#9B59B6" : hasNat ? C.ocean : C.coral;
+                        const total   = g.paiements.reduce((s, p) => s + Number(p.montant||0), 0);
+                        const label   = hasNat && hasClub ? "🏊🏖️ Natation & Club"
+                          : hasNat ? "🏊 Natation"
+                          : "🏖️ Club";
                         return (
-                          <div key={`${isNat?"n":"c"}-${r.id}`} style={{ display:"flex", alignItems:"center", gap:10, padding:"9px 0", borderBottom:i<arr.length-1?"1px solid #F0F4F8":"none" }}>
+                          <div key={mid} style={{ display:"flex", alignItems:"center", gap:10, padding:"9px 0", borderBottom:i<arr.length-1?"1px solid #F0F4F8":"none" }}>
                             <div style={{ width:32, height:32, borderRadius:10, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, background:`${color}18`, color, fontWeight:900 }}>✓</div>
                             <div style={{ flex:1, minWidth:0 }}>
-                              <div style={{ fontWeight:800, fontSize:13, color:"#2C3E50", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{r.membres ? `${r.membres.prenom} ${NOM(r.membres.nom)}` : "—"}</div>
+                              <div style={{ fontWeight:800, fontSize:13, color:"#2C3E50", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                                {membre ? `${PRENOM(membre.prenom)} ${NOM(membre.nom)}` : "—"}
+                              </div>
                               <div style={{ fontSize:11, color:"#aaa" }}>{label}</div>
                             </div>
-                            <div style={{ fontWeight:900, fontSize:13, color:C.green, flexShrink:0 }}>{montant}</div>
+                            <div style={{ fontWeight:900, fontSize:13, color:C.green, flexShrink:0 }}>{total} €</div>
                           </div>
                         );
-                      })}
+                      });
+                    })()}
                   </div>
                 )}
               </div>
@@ -8561,7 +9547,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                   <div key={m.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"9px 0", borderBottom:i<Math.min(dbMembres.length,5)-1?"1px solid #F0F4F8":"none" }}>
                     <div style={{ width:36, height:36, borderRadius:12, background:`linear-gradient(135deg,${C.ocean},${C.sea})`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, flexShrink:0 }}>👤</div>
                     <div style={{ flex:1 }}>
-                      <div style={{ fontWeight:800, color:"#2C3E50", fontSize:13 }}>{m.prenom} {NOM(m.nom)}</div>
+                      <div style={{ fontWeight:800, color:"#2C3E50", fontSize:13 }}>{PRENOM(m.prenom)} {NOM(m.nom)}</div>
                       <div style={{ fontSize:11, color:"#aaa" }}>{m.email}</div>
                     </div>
                     <Pill color={C.green}>✓</Pill>
@@ -8587,10 +9573,10 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                       const color = g.type === "natation" ? C.ocean : C.coral;
                       return (
                         <div key={gi} style={{ background:`${C.sun}08`, borderRadius:14, padding:"12px 14px", borderLeft:`4px solid ${C.sun}` }}>
-                          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:6 }}>
+                          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
                             <div>
                               <div style={{ fontWeight:900, color:"#2C3E50", fontSize:13 }}>
-                                {g.membre ? `${g.membre.prenom} ${NOM(g.membre.nom)}` : "—"}
+                                {g.membre ? `${PRENOM(g.membre.prenom)} ${NOM(g.membre.nom)}` : "—"}
                               </div>
                               <div style={{ fontSize:11, color, fontWeight:700 }}>
                                 {g.type==="natation" ? `🏊 Natation · ${g.resas.length} séance${g.resas.length>1?"s":""}` : g.resas.some(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6) ? `🎟️ Carte Liberté · ${Number(g.resas[0]?.enfants?.[0])} demi-journées` : `🏖️ Club · ${g.resas.length} séance${g.resas.length>1?"s":""}`}
@@ -8632,6 +9618,10 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
           </div>
           );
         })()}
+
+        {tab === "equipe" && (
+          <EquipeTab />
+        )}
 
         {tab === "seances" && (
           <SeancesTab sessions={allSeasonSessions} setSessions={setAllSeasonSessions} />
@@ -8705,7 +9695,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                       const minuteCreation = (r.created_at||"").slice(0,16);
                       const enfantsKey = Array.isArray(r.enfants) ? [...r.enfants].sort().join(",") : "";
                       const keyClub = r._type === "club"
-                        ? `${r.membre_id}-club-${r.session}-${enfantsKey}-${minuteCreation}`
+                        ? `${r.membre_id}-club-${enfantsKey}-${minuteCreation}`
                         : null;
                       const key = keyClub || `${r.membre_id}-${r._type}-${enfantsKey}-${minuteCreation}`;
                       if (!groups[key]) groups[key] = { membre: r.membres, type: r._type, resas: [] };
@@ -8715,10 +9705,10 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                       const color = g.type === "natation" ? C.ocean : C.coral;
                       return (
                         <div key={key} style={{ background:`${C.sun}08`, borderRadius:12, padding:"12px 14px", borderLeft:`3px solid ${C.sun}` }}>
-                          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
+                          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
                             <div>
                               <div style={{ fontWeight:900, color:"#2C3E50", fontSize:13 }}>
-                                {g.membre ? `${g.membre.prenom} ${NOM(g.membre.nom)}` : "—"}
+                                {g.membre ? `${PRENOM(g.membre.prenom)} ${NOM(g.membre.nom)}` : "—"}
                               </div>
                               <div style={{ fontSize:11, color, fontWeight:700, marginTop:2 }}>
                                 {g.type === "natation" ? `🏊 Natation · ${g.resas.length} séance${g.resas.length>1?"s":""}` : g.resas.some(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6) ? `🎟️ Carte Liberté · ${Number(g.resas[0]?.enfants?.[0])} demi-journées` : `🏖️ Club · ${g.resas.length} séance${g.resas.length>1?"s":""}`}
@@ -8732,6 +9722,67 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                               cursor:"pointer", fontWeight:900, fontSize:12, fontFamily:"inherit",
                               boxShadow:`0 3px 10px ${C.green}44`, flexShrink:0, marginLeft:8,
                             }}>✅ Valider tout</button>
+                            {g.membre?.email && (
+                              <button onClick={async () => {
+                                const email = g.membre.email;
+                                const prenom = g.membre.prenom || "";
+                                const label = g.type === "natation"
+                                  ? `🏊 Natation · ${g.resas.length} séance${g.resas.length>1?"s":""}`
+                                  : `🏖️ Club · ${g.resas.length} séance${g.resas.length>1?"s":""}`;
+                                try {
+                                  const resp = await fetch("https://rnaosrftcntomehaepjh.supabase.co/functions/v1/send-email", {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json", "Authorization": "Bearer sb_publishable_n9m3QjIKt9OnyN_d8n9cAQ_VQpUpnOu" },
+                                    body: JSON.stringify({
+                                      type: "rappel",
+                                      to: email,
+                                      toName: `${prenom} ${NOM(g.membre.nom||"")}`.trim(),
+                                      subject: "🏖️ Eole Beach Club — Rappel pré-réservation en attente",
+                                      htmlContent: `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="font-family:Arial,sans-serif;color:#2C3E50;padding:0;margin:0;background:#f0f4f8">
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="padding:20px 0"><tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden">
+<tr><td style="background-color:#1A8FE3;padding:24px 28px">
+  <p style="margin:0 0 4px;font-size:22px;font-weight:900;color:#fff">🏖️ Eole Beach Club</p>
+  <p style="margin:0;font-size:13px;color:rgba(255,255,255,0.85)">Club de Plage · École de Natation · Piriac-sur-Mer · Saison 2026</p>
+</td></tr>
+<tr><td style="padding:24px 28px">
+  <p style="font-size:14px;color:#2C3E50;line-height:1.7;margin:0 0 16px">Bonjour <strong>${prenom}</strong>,</p>
+  <p style="font-size:14px;color:#2C3E50;line-height:1.7;margin:0 0 16px">Nous vous rappelons que votre pré-réservation suivante est en attente de paiement :</p>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:20px">
+    <tr><td style="background:#EEF8FF;border-left:4px solid #1A8FE3;border-radius:8px;padding:14px 16px">
+      <p style="margin:0;font-size:14px;font-weight:700;color:#1A8FE3">${label}</p>
+    </td></tr>
+  </table>
+  <p style="font-size:14px;color:#2C3E50;line-height:1.7;margin:0 0 16px">Pour finaliser votre inscription, merci de procéder au règlement selon l'un des modes suivants :<br/>🏦 Virement · ✉️ Chèque · 💶 Espèces · 🎫 Chèques vacances</p>
+  <p style="font-size:13px;color:#555;line-height:1.8;margin:0 0 20px">📞 07 67 78 69 22 · clubdeplage.piriacsurmer@hotmail.com</p>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:16px">
+    <tr><td style="background:#EFF6FF;border:1.5px solid #1A8FE3;border-radius:10px;padding:14px 16px">
+      <p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#1A8FE3">🏦 Coordonnées bancaires pour virement</p>
+      <table cellpadding="0" cellspacing="0" border="0" style="font-size:12px;color:#2C3E50;line-height:2">
+        <tr><td style="font-weight:700;padding-right:12px">Titulaire</td><td>SAUZEAU CHARLENE</td></tr>
+        <tr><td style="font-weight:700;padding-right:12px">IBAN</td><td>FR76 1027 8360 6600 0130 5200 228</td></tr>
+        <tr><td style="font-weight:700;padding-right:12px">BIC</td><td>CMCIFR2A</td></tr>
+      </table>
+      <p style="margin:8px 0 0;font-size:11px;color:#888">Le chèque est à libeller à l'ordre de : <strong>SAUZEAU Charlène</strong><br/>
+      En avant saison : Mme SAUZEAU Charlène · 4 allée des Roitelets · 44500 LA BAULE</p>
+    </td></tr>
+  </table>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr><td style="background:#F0F4F8;border-radius:10px;padding:14px;text-align:center;font-size:11px;color:#888;line-height:1.8">
+      <strong>Eole Beach Club · Club de Plage / École de Natation</strong><br/>
+      Plage Saint-Michel · Rue des Caps Horniers · 44420 Piriac-sur-Mer
+    </td></tr>
+  </table>
+</td></tr>
+</table></td></tr></table></body></html>`,
+                                    }),
+                                  });
+                                  const result = await resp.json();
+                                  if (result.success) alert(`✅ Mail envoyé à ${email}`);
+                                  else throw new Error(result.error);
+                                } catch(e) { alert("Erreur : " + e.message); }
+                              }} style={{ background:"#EEF8FF", border:"1.5px solid #1A8FE340", color:C.ocean, borderRadius:50, padding:"7px 12px", cursor:"pointer", fontWeight:900, fontSize:12, fontFamily:"inherit", flexShrink:0, marginLeft:4 }}>🔔 Relance</button>
+                            )}
                             <button onClick={async () => {
                               if (!window.confirm(`Supprimer ${g.resas.length} réservation${g.resas.length>1?"s":""} ?`)) return;
                               const table = g.type === "natation" ? "reservations_natation" : "reservations_club";
@@ -8801,7 +9852,11 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
         )}
 
         {tab === "comptes" && (
-          <ComptesTab dbMembres={dbMembres} dbResas={dbResas} dbResasClub={dbResasClub} onRefresh={() => getAllMembres().then(d => setDbMembres(d)).catch(() => {})} />
+          <ComptesTab dbMembres={dbMembres} dbResas={dbResas} dbResasClub={dbResasClub} dbCommandesClub={dbCommandesClub} onRefresh={() => getAllMembres().then(d => setDbMembres(d)).catch(() => {})} />
+        )}
+
+        {tab === "comptabilite" && (
+          <ComptabiliteTab dbMembres={dbMembres} dbResas={dbResas} dbResasClub={dbResasClub} dbCommandesClub={dbCommandesClub} />
         )}
 
         {tab === "factures" && (
@@ -8824,7 +9879,7 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
 
   // Si panier vide et pas en mode "done" ni en cours d'envoi, retourner aux formules
   useEffect(() => {
-    if (panier.length === 0 && !done && !sending) onNav("formules");
+    // Ne pas rediriger si panier vide — afficher l'écran panier vide
   }, [panier.length, done, sending]);
 
   const removeItem = (id) => setPanier(prev => prev.filter(item => item.id !== id));
@@ -8917,7 +9972,6 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
           const doublons = [];
           for (const iso of (item.dates || [])) {
             for (const sess of sessions) {
-              // Vérifier si un des enfants est déjà inscrit ce jour/session
               const enfantsDeja = (item.enfants||[]).filter(enf =>
                 existingSet.has(`${iso}-${sess}-${enf}`)
               );
@@ -8931,7 +9985,7 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
                 session:          sess,
                 statut:           "pending",
                 enfants:          item.enfants || [],
-                label_jour:       `[MONTANT:${item.prix}] ${new Date(iso).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}`,
+                label_jour:       new Date(iso).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"}),
               }]);
               if (e) throw e;
             }
@@ -8939,6 +9993,19 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
           if (doublons.length > 0) {
             alert(`⚠️ Inscription(s) ignorée(s) car déjà existante(s) :\n${doublons.join("\n")}`);
           }
+          // Enregistrer la commande globale avec le VRAI montant total
+          const { error: eCom } = await sb.from("commandes_club").insert([{
+            membre_id:     user.supabaseId,
+            session:       item.session,
+            formule:       item.label,
+            nb_enfants:    (item.enfants||[]).length,
+            enfants:       item.enfants || [],
+            nb_jours:      (item.dates||[]).length,
+            montant_total: item.prix,
+            statut:        "pending",
+            dates:         item.dates || [],
+          }]);
+          if (eCom) console.warn("commandes_club insert:", eCom);
         } else if (item.type === "liberte") {
           const { error: e } = await sb.from("reservations_club").insert([{
             membre_id:        user.supabaseId,
@@ -9367,7 +10434,7 @@ function ProfilConnecte({ user, setUser, setScreen, reservations }) {
   const loadData = async () => {
     if (!user?.supabaseId) { setLoading(false); return; }
     const [{ data: membreFrais }, { data: enf }, { data: fac }] = await Promise.all([
-      sb.from("membres").select("*").eq("id", user.supabaseId).single(),
+      sb.from("membres").select("*").eq("id", user.supabaseId).maybeSingle(),
       sb.from("enfants").select("*").eq("membre_id", user.supabaseId),
       sb.from("factures_numeros").select("*").eq("membre_id", user.supabaseId).order("created_at", { ascending: false }).limit(1),
     ]);
@@ -9485,7 +10552,7 @@ function ProfilConnecte({ user, setUser, setScreen, reservations }) {
       <Card style={{ marginTop:14 }}>
         <div style={{ textAlign:"center", marginBottom:16 }}>
           <div style={{ width:72, height:72, borderRadius:24, background:`linear-gradient(135deg,${C.ocean},${C.sea})`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:36, margin:"0 auto 12px" }}>👤</div>
-          <h2 style={{ color:C.dark, margin:"0 0 4px" }}>{user.prenom} {NOM(user.nom)}</h2>
+          <h2 style={{ color:C.dark, margin:"0 0 4px" }}>{PRENOM(user.prenom)} {NOM(user.nom)}</h2>
           <p style={{ color:"#888", fontSize:13, margin:"0 0 2px" }}>{user.email}</p>
           <p style={{ margin:0 }}><a href={`tel:${user.tel}`} style={{ color:C.ocean, fontWeight:700, textDecoration:"none", fontSize:13 }}>📞 {user.tel}</a></p>
         </div>
@@ -9593,7 +10660,7 @@ function AdminCodeAccess({ onUnlock, user }) {
       }
       setChecking(true);
       try {
-        const { data } = await sb.from("membres").select("is_admin, email").eq("id", user.supabaseId).single();
+        const { data } = await sb.from("membres").select("is_admin, email").eq("id", user.supabaseId).maybeSingle();
         const emailOk = ADMIN_EMAILS.includes((data?.email || "").toLowerCase());
         const dbOk    = data?.is_admin === true;
         if (emailOk || dbOk) {
@@ -9709,6 +10776,11 @@ function AdminCodeAccess({ onUnlock, user }) {
 export default function App() {
   const [screen, setScreen] = useState(() => {
     try {
+      // Détecter un lien de récupération de mot de passe dans l'URL
+      const hash = window.location.hash;
+      if (hash.includes("type=recovery") || (hash.includes("access_token") && hash.includes("type=recovery"))) {
+        return "reset-password";
+      }
       const savedScreen = localStorage.getItem("fncp_screen");
       const savedUser = localStorage.getItem("fncp_user");
       return savedScreen === "admin" && savedUser ? "admin" : "home";
@@ -9732,6 +10804,61 @@ export default function App() {
 
   const [sessions, setSessions] = useState(INIT_SESSIONS);
   const [allSeasonSessions, setAllSeasonSessions] = useState(ALL_SEASON_SLOTS_INIT);
+
+  // Charger les créneaux depuis Supabase (source de vérité)
+  useEffect(() => {
+    sb.from("seances_natation").select("date, heure, spots").then(({ data }) => {
+      if (!data || data.length === 0) return;
+      // Reconstruire allSeasonSessions depuis Supabase
+      const actifs = data.filter(s => s.spots >= 0);
+      if (actifs.length === 0) return;
+      const newSessions = actifs.map(({ date, heure, spots }) => {
+        const dayObj = ALL_SEASON_DAYS.find(d => {
+          const dd = d.date;
+          if (!dd) return false;
+          const iso = `${dd.getFullYear()}-${String(dd.getMonth()+1).padStart(2,"0")}-${String(dd.getDate()).padStart(2,"0")}`;
+          return iso === date;
+        });
+        if (!dayObj) return null;
+        return { id: `sb-${date}-${heure}`, day: dayObj.id, time: heure, spots };
+      }).filter(Boolean);
+      if (newSessions.length > 0) setAllSeasonSessions(newSessions);
+    }).catch(() => {});
+  }, []);
+
+  // Synchroniser les créneaux natation avec Supabase (suppressions/ajouts admin)
+  useEffect(() => {
+    sb.from("seances_natation").select("date, heure, spots").then(({ data }) => {
+      if (!data || data.length === 0) return;
+      setAllSeasonSessions(prev => {
+        let updated = [...prev];
+        data.forEach(({ date, heure, spots }) => {
+          if (spots === -1) {
+            // Supprimé par l'admin → retirer du client
+            updated = updated.filter(slot => {
+              const dayObj = ALL_SEASON_DAYS.find(d => d.id === slot.day);
+              if (!dayObj?.date) return true;
+              const d = dayObj.date;
+              const dateISO = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+              return !(dateISO === date && slot.time === heure);
+            });
+          } else if (spots >= 0) {
+            // Ajouté par l'admin → vérifier qu'il est présent
+            const dayObj = ALL_SEASON_DAYS.find(d => {
+              const dd = d.date;
+              if (!dd) return false;
+              const dateISO = `${dd.getFullYear()}-${String(dd.getMonth()+1).padStart(2,"0")}-${String(dd.getDate()).padStart(2,"0")}`;
+              return dateISO === date;
+            });
+            if (dayObj && !updated.some(s => s.day === dayObj.id && s.time === heure)) {
+              updated.push({ id: `sb-${date}-${heure}`, day: dayObj.id, time: heure, spots });
+            }
+          }
+        });
+        return updated;
+      });
+    }).catch(() => {});
+  }, []);
   const [reservations, setReservations] = useState([]);
   const [clubPlaces, setClubPlaces] = useState({ matin: 45, apmidi: 45, journee: 45 });
   const [panier, setPanier]         = useState([]); // reset à chaque session
@@ -9744,18 +10871,32 @@ export default function App() {
     } catch {}
   }, [user]);
 
+  // Rafraîchir les données membre au focus de la fenêtre
+  useEffect(() => {
+    const refreshUser = async () => {
+      try {
+        const { data: { session } } = await sb.auth.getSession();
+        if (!session?.user) return;
+        const { data } = await sb.from("membres").select("*, enfants(*)").eq("id", session.user.id).maybeSingle();
+        if (data) setUser(prev => prev ? { ...prev, ...data, enfants: data.enfants, supabaseId: data.id } : null);
+      } catch {}
+    };
+    window.addEventListener("focus", refreshUser);
+    return () => window.removeEventListener("focus", refreshUser);
+  }, []);
+
   // Écouter les changements d'authentification Supabase (magic link)
   useEffect(() => {
     // Vérifier si déjà connecté (session Supabase active)
       sb.auth.getSession().then(({ data: { session } }) => {
         if (session?.user) {
           // Chercher par id Supabase Auth pour avoir les données fraîches (même si admin a modifié l'email)
-          sb.from("membres").select("*, enfants(*)").eq("id", session.user.id).single()
+          sb.from("membres").select("*, enfants(*)").eq("id", session.user.id).maybeSingle()
             .then(({ data }) => {
               if (data) setUser({ ...data, supabaseId: data.id });
               else {
                 // Fallback par email
-                sb.from("membres").select("*, enfants(*)").eq("email", session.user.email).single()
+                sb.from("membres").select("*, enfants(*)").eq("email", session.user.email).maybeSingle()
                   .then(({ data: d }) => {
                     if (d) setUser({ ...d, supabaseId: d.id });
                     else {
@@ -9779,8 +10920,13 @@ export default function App() {
 
       // Écouter les connexions (magic link cliqué)
       const { data: { subscription } } = sb.auth.onAuthStateChange((event, session) => {
+        if (event === "PASSWORD_RECOVERY") {
+          setScreen("reset-password");
+          try { window.history.replaceState(null, "", window.location.pathname); } catch {}
+          return;
+        }
         if (event === "SIGNED_IN" && session?.user) {
-          sb.from("membres").select("*, enfants(*)").eq("id", session.user.id).single()
+          sb.from("membres").select("*, enfants(*)").eq("id", session.user.id).maybeSingle()
             .then(({ data }) => {
               const membre = data || null;
               if (membre) {
@@ -9806,7 +10952,7 @@ export default function App() {
           setScreen("home");
         }
         if (event === "TOKEN_REFRESHED" && session?.user) {
-          sb.from("membres").select("*, enfants(*)").eq("id", session.user.id).single()
+          sb.from("membres").select("*, enfants(*)").eq("id", session.user.id).maybeSingle()
             .then(({ data }) => {
               if (data) setUser(prev => prev ? { ...prev, ...data, supabaseId: data.id } : null);
             }).catch(() => {});
