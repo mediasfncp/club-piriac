@@ -655,10 +655,10 @@ function HomeScreen({ onNav, user }) {
         )}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 13, marginBottom: 13 }}>
           {[
-            { screen: "formules",         emoji: "🎫", label: "Formules",              sub: "Club · Natation",           bg: `linear-gradient(135deg, #00C9FF, ${C.ocean})`,    sh: C.ocean },
+            { screen: "prestations",      emoji: "🏖️", label: "Club de Plage",        sub: "3 à 12 ans · Matin / AM",     bg: `linear-gradient(135deg, ${C.coral}, ${C.sunset})`, sh: C.coral },
             { screen: "reservation",      emoji: "🏊", label: "École Natation",         sub: "Dès 4 ans · Créneaux 30 min", bg: `linear-gradient(135deg, ${C.sea}, #00B09B)`,     sh: C.sea   },
-            { screen: "prestations",      emoji: "🏖️", label: "Club de Plage",        sub: "3 à 12 ans · Matin / AM", bg: `linear-gradient(135deg, ${C.coral}, ${C.sunset})`, sh: C.coral },
-            { screen: "mes-reservations", emoji: "🎫", label: "Mes accès",             sub: "Saison 2026",                 bg: `linear-gradient(135deg, ${C.green}, #27AE60)`,    sh: C.green },
+            { screen: "formules",         emoji: "🎫", label: "Formules",              sub: "Club · Natation",              bg: `linear-gradient(135deg, #00C9FF, ${C.ocean})`,    sh: C.ocean },
+            { screen: "mes-reservations", emoji: "🎫", label: "Mes accès",             sub: "Saison 2026",                  bg: `linear-gradient(135deg, ${C.green}, #27AE60)`,    sh: C.green },
           ].map(item => (
             <div key={item.screen} onClick={() => onNav(item.screen)}
               style={{ background: item.bg, borderRadius: 22, padding: "20px 14px", cursor: "pointer", boxShadow: `0 8px 22px ${item.sh}44`, transition: "transform .18s", textAlign: "center" }}
