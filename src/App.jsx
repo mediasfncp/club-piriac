@@ -2373,7 +2373,7 @@ function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSession
     // Charger créneaux actifs depuis Supabase (source de vérité)
     Promise.all([
       sb.from("seances_natation").select("date, heure, spots").gte("spots", 0),
-      sb.from("reservations_natation").select("date_seance, heure, statut, enfants").in("statut", ["confirmed","pending"]),
+      sb.from("reservations_natation").select("date_seance, heure, statut, enfants").eq("statut", "confirmed"),
     ]).then(([{ data: seances }, { data: resas }]) => {
       if (!seances || seances.length === 0) return;
       const newSessions = seances.map(({ date, heure, spots }) => {
@@ -6164,10 +6164,10 @@ function AgeGroupCard({ dbMembres = [] }) {
 
   useEffect(() => {
     sb.from("reservations_natation").select("membre_id, date_seance, enfants, statut")
-      .in("statut", ["confirmed","pending"])
+      .eq("statut", "confirmed")
       .then(({ data }) => setDbResasNat(data || [])).catch(() => {});
     sb.from("reservations_club").select("membre_id, date_reservation, enfants, statut")
-      .in("statut", ["confirmed","pending"])
+      .eq("statut", "confirmed")
       .then(({ data }) => setDbResasClub(data || [])).catch(() => {});
     sb.from("membres").select("id, prenom, nom, enfants(*)")
       .then(({ data }) => setMembresLocaux(data || [])).catch(() => {});
@@ -6667,6 +6667,7 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
 
   // Natation
   const [forfaitNat, setForfaitNat]     = useState("unite");
+  const [nbSeancesLibre, setNbSeancesLibre] = useState(11); // pour formule libre > 10
   const [selectedCreneaux, setSelectedCreneaux] = useState([]); // [{dayISO, time}]
   const [natWeekIdx, setNatWeekIdx]     = useState(0);
   const [dbResasNat, setDbResasNat]     = useState([]);
@@ -6683,7 +6684,7 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
 
   useEffect(() => {
     sb.from("reservations_natation").select("date_seance, heure, statut, enfants")
-      .in("statut", ["confirmed","pending"])
+      .eq("statut","confirmed")
       .then(({ data }) => setDbResasNat(data || [])).catch(() => {});
   }, []);
 
@@ -6696,7 +6697,10 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
   const toggleEnfant = (prenom) => setSelectedEnfants(prev => prev.includes(prenom) ? prev.filter(e => e !== prenom) : [...prev, prenom]);
   const handleMembreChange = (id) => { setMembreId(id); setSelectedEnfants([]); };
 
-  const nbSeancesNat = forfaitNat === "unite" ? 1 : forfaitNat === "forfait5" ? 5 : forfaitNat === "forfait6" ? 6 : 10;
+  const nbSeancesNat = forfaitNat === "unite" ? 1 : forfaitNat === "forfait5" ? 5 : forfaitNat === "forfait6" ? 6 : forfaitNat === "forfait10" ? 10 : nbSeancesLibre;
+  const PRIX_NAT_ADMIN = { 1:20, 5:95, 6:113, 10:170 };
+  const getMontantNat = (n) => n <= 10 ? (PRIX_NAT_ADMIN[n] || n*20) : 170 + (n-10)*17;
+  const montantNat = getMontantNat(nbSeancesNat);
 
   const getSpots = (dayISO, time) => {
     const taken = dbResasNat.filter(r => r.date_seance?.slice(0,10) === dayISO && r.heure === time)
@@ -6755,7 +6759,7 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
             dateSeance: c.dayISO,
             enfants: selectedEnfants,
             rappelDate: getRappelDate(c.dayISO),
-            montant: forfaitNat === "unite" ? 20 : forfaitNat === "forfait5" ? 95 : forfaitNat === "forfait6" ? 113 : 170,
+            montant: montantNat,
             statut: statutResa,
           });
         }
@@ -6879,10 +6883,28 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
               <div>
                 <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, textTransform:"uppercase" }}>Formule</label>
                 <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-                  {[["unite","1 · 20€"],["forfait5","5 · 95€"],["forfait6","6 · 113€"],["forfait10","10 · 170€"]].map(([k,l]) => (
+                  {[["unite","1 · 20€"],["forfait5","5 · 95€"],["forfait6","6 · 113€"],["forfait10","10 · 170€"],["libre","Libre"]].map(([k,l]) => (
                     <button key={k} onClick={() => { setForfaitNat(k); setSelectedCreneaux([]); }} style={{ flex:1, background: forfaitNat===k ? C.ocean : "#f0f0f0", color: forfaitNat===k ? "#fff" : "#888", border:"none", borderRadius:12, padding:"8px 4px", cursor:"pointer", fontWeight:800, fontSize:10, fontFamily:"inherit" }}>{l}</button>
                   ))}
                 </div>
+                {forfaitNat === "libre" && (
+                  <div style={{ marginTop:10, background:"#F0F4F8", borderRadius:12, padding:"10px 14px" }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                      <label style={{ fontSize:12, fontWeight:800, color:C.dark, whiteSpace:"nowrap" }}>Nombre de séances</label>
+                      <input
+                        type="number" min={1} max={50} value={nbSeancesLibre}
+                        onChange={e => { const v = Math.max(1, parseInt(e.target.value)||1); setNbSeancesLibre(v); setSelectedCreneaux([]); }}
+                        style={{ width:70, border:`2px solid ${C.ocean}`, borderRadius:10, padding:"6px 10px", fontSize:15, fontWeight:900, textAlign:"center", fontFamily:"inherit", outline:"none" }}
+                      />
+                    </div>
+                    <div style={{ marginTop:8, fontSize:13, color:C.ocean, fontWeight:900 }}>
+                      💰 Prix calculé : <span style={{ fontSize:16 }}>{montantNat} €</span>
+                      <span style={{ fontSize:11, color:"#999", fontWeight:400, marginLeft:6 }}>
+                        ({nbSeancesLibre <= 10 ? `barème forfait` : `170€ + ${nbSeancesLibre-10}×17€`})
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Navigation semaine */}
