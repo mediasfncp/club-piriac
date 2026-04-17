@@ -7614,16 +7614,19 @@ function ModePaiementModal({ onConfirm, onClose, titre }) {
 
 // ── COMPTABILITE TAB ──────────────────────────────────────
 function ComptabiliteTab({ dbMembres, dbResas, dbResasClub, dbCommandesClub = [] }) {
-  const [loading, setLoading] = useState(true);
-  const [acomptes, setAcomptes] = useState({});
-  const [remises, setRemises]   = useState({});
+  const [loading, setLoading]     = useState(true);
+  const [vCompta, setVCompta]     = useState({ natation_encaisse: 0, club_encaisse: 0, total_encaisse: 0 });
+  const [acomptes, setAcomptes]   = useState({});
+  const [remises, setRemises]     = useState({});
   const [exclusions, setExclusions] = useState({});
 
   useEffect(() => {
     Promise.all([
+      sb.from("v_compta").select("*").single(),
       sb.from("comptes_acomptes").select("*"),
       sb.from("comptes_exclusions").select("*"),
-    ]).then(([{ data: ac }, { data: ex }]) => {
+    ]).then(([{ data: vc }, { data: ac }, { data: ex }]) => {
+      if (vc) setVCompta(vc);
       const acMap = {};
       (ac || []).forEach(a => { if (!acMap[a.membre_id]) acMap[a.membre_id] = []; acMap[a.membre_id].push(a); });
       setAcomptes(acMap);
@@ -7637,7 +7640,6 @@ function ComptabiliteTab({ dbMembres, dbResas, dbResasClub, dbCommandesClub = []
   const PRIX_NAT = { 1:20,2:40,3:60,4:80,5:95,6:113,7:131,8:147,9:162,10:170 };
   const LP = { 6:96,12:180,18:252,24:288,30:330 };
 
-  // Calcule le montant des prestations par membre (identique à getCompte dans ComptesTab)
   const getMontantMembre = (m) => {
     const resasNat  = dbResas.filter(r => r.membre_id === m.id && r.statut === "confirmed" && !exclusions[r.id]);
     const resasClub = dbResasClub.filter(r => r.membre_id === m.id && r.statut === "confirmed" && !exclusions[r.id]);
@@ -7666,48 +7668,19 @@ function ComptabiliteTab({ dbMembres, dbResas, dbResasClub, dbCommandesClub = []
     return { totalNat, totalClub: totalLiberte + totalClubNormal, totalPrestations, totalAcomptes, remise, solde, nbNat: resasNat.length, nbClub: resasClub.length };
   };
 
-  // Tous les membres (pas uniquement ceux en compte fin de saison)
   const tousMembres = dbMembres || [];
-  const MODES_LABEL = { especes:"💵 Espèces", cheque:"📝 Chèque", virement:"🏦 Virement", cb:"💳 CB", paypal:"🅿️ PayPal", offert:"🎁 Offert", compte_fin_saison:"📒 Fin de saison" };
 
-  // Calcul global à partir des réservations confirmées
-  const PRIX_NAT_G = { 1:20,2:40,3:60,4:80,5:95,6:113,7:131,8:147,9:162,10:170 };
-  const LP_G = { 6:96,12:180,18:252,24:288,30:330 };
+  // ── Montants depuis v_compta (source de vérité Supabase) ──
+  const totalEncNat  = Number(vCompta.natation_encaisse || 0);
+  const totalEncClub = Number(vCompta.club_encaisse     || 0);
+  const totalCA      = Number(vCompta.total_encaisse    || 0);
 
-  const confirmedNat  = (dbResas || []).filter(r => r.statut === "confirmed");
-  const confirmedClub = (dbResasClub || []).filter(r => r.statut === "confirmed");
+  // Comptes fin de saison — soldes restants
+  const membresCompte       = tousMembres.filter(m => m.compte_fin_saison && !m.compte_solde);
+  const bilanComptes        = loading ? [] : membresCompte.map(m => ({ m, ...getMontantMembre(m) }));
+  const totalRemisesComptes = bilanComptes.reduce((s, c) => s + c.remise, 0);
+  const totalSoldesComptes  = bilanComptes.reduce((s, c) => s + c.solde, 0);
 
-  // Total encaissé paiements directs (hors fin saison et offerts)
-  const confirmedNatPaie  = confirmedNat.filter(r => r.mode_paiement && r.mode_paiement !== "compte_fin_saison" && r.mode_paiement !== "offert");
-  const confirmedClubPaie = confirmedClub.filter(r => r.mode_paiement && r.mode_paiement !== "compte_fin_saison" && r.mode_paiement !== "offert");
-
-  const totalEncNat = (() => {
-    const g = {};
-    confirmedNatPaie.forEach(r => { const k = `${r.membre_id}|${(Array.isArray(r.enfants)?[...r.enfants].sort().join(","):"")}|${(r.created_at||"").slice(0,16)}`; if (!g[k]) g[k]=[]; g[k].push(r); });
-    return Object.values(g).reduce((s, gr) => { const n = gr.length; return s + (n<=10?(PRIX_NAT_G[n]||n*20):170+(n-10)*17); }, 0);
-  })();
-  const totalEncClub = (() => {
-    const g = {};
-    confirmedClubPaie.forEach(r => { const k = `${r.membre_id}|${r.session}|${(Array.isArray(r.enfants)?[...r.enfants].sort().join(","):"")}|${(r.created_at||"").slice(0,16)}`; if (!g[k]) g[k]=[]; g[k].push(r); });
-    return Object.values(g).reduce((s, gr) => {
-      const r0 = gr[0]; const nb = Number(Array.isArray(r0.enfants)?r0.enfants[0]:0);
-      if (nb>=6 && LP_G[nb]) return s+LP_G[nb];
-      if (r0.montant) return s+Number(r0.montant);
-      return s+gr.reduce((a,r)=>{ const m=(r.label_jour||"").match(/\[MONTANT:(\d+)\]/); return a+(m?Number(m[1]):0); },0);
-    }, 0);
-  })();
-
-  // Comptes fin de saison — totaux
-  const membresCompte = tousMembres.filter(m => m.compte_fin_saison && !m.compte_solde);
-  const bilanComptes  = loading ? [] : membresCompte.map(m => ({ m, ...getMontantMembre(m) }));
-  const totalPrestationsComptes = bilanComptes.reduce((s, c) => s + c.totalPrestations, 0);
-  const totalAcomptesComptes    = bilanComptes.reduce((s, c) => s + c.totalAcomptes, 0);
-  const totalRemisesComptes     = bilanComptes.reduce((s, c) => s + c.remise, 0);
-  const totalSoldesComptes      = bilanComptes.reduce((s, c) => s + c.solde, 0);
-
-  // Totaux globaux saison
-  // CA = uniquement ce qui est encaissé (paiements directs + acomptes) — les soldes restants N'entrent PAS dans le CA
-  const totalCA         = totalEncNat + totalEncClub + totalAcomptesComptes;
   const resteAEncaisser = Math.max(0, totalSoldesComptes - totalRemisesComptes);
   const pctEncaisse     = (totalCA + resteAEncaisser) > 0 ? Math.min(100, Math.round((totalCA / (totalCA + resteAEncaisser)) * 100)) : 100;
 
@@ -7723,7 +7696,7 @@ function ComptabiliteTab({ dbMembres, dbResas, dbResasClub, dbCommandesClub = []
           {[
             { label:"CA",                 val:`${totalCA} €`,           color:"#fff",    emoji:"💶" },
             { label:"Natation encaissé",  val:`${totalEncNat} €`,       color:"#87CEEB", emoji:"🏊" },
-            { label:"Club encaissé",      val:`${totalEncClub + totalAcomptesComptes} €`, color:"#FF8E53", emoji:"🏖️" },
+            { label:"Club encaissé",      val:`${totalEncClub} €`,      color:"#FF8E53", emoji:"🏖️" },
             { label:"Reste à encaisser",  val:`${resteAEncaisser} €`,   color: resteAEncaisser===0?"#6BCB77":"#FF6B6B", emoji:"⏳" },
             { label:"Comptes fin saison", val:`${membresCompte.length}`, color:"#FFD93D", emoji:"📒" },
           ].map(k => (
@@ -7746,11 +7719,9 @@ function ComptabiliteTab({ dbMembres, dbResas, dbResasClub, dbCommandesClub = []
       <div style={{ background:"#fff", borderRadius:18, padding:16, boxShadow:"0 2px 10px rgba(0,0,0,0.05)" }}>
         <div style={{ fontWeight:900, color:C.dark, fontSize:14, marginBottom:12 }}>📂 Ventilation des recettes</div>
         {[
-          { label:"🏊 Natation (paiements directs)",  val:totalEncNat,  color:C.ocean },
-          { label:"🏖️ Club de Plage (paiements directs)", val:totalEncClub, color:C.coral },
-          { label:"📒 Acomptes comptes fin saison",   val:totalAcomptesComptes, color:"#6366F1" },
-          { label:"⏳ Soldes restants fin saison",    val:totalSoldesComptes,   color:"#FF9500" },
-          { label:"🎁 Remises accordées",             val:totalRemisesComptes,  color:C.green },
+          { label:"🏊 Natation encaissé",  val:totalEncNat,     color:C.ocean },
+          { label:"🏖️ Club encaissé",      val:totalEncClub,    color:C.coral },
+          { label:"⏳ Reste à encaisser",  val:resteAEncaisser, color: resteAEncaisser===0?C.green:"#FF9500" },
         ].map(row => (
           <div key={row.label} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 0", borderBottom:"1px solid #f5f5f5" }}>
             <span style={{ fontSize:13, color:"#555" }}>{row.label}</span>
@@ -7803,7 +7774,7 @@ function ComptabiliteTab({ dbMembres, dbResas, dbResasClub, dbCommandesClub = []
               <div style={{ fontWeight:900, color:C.dark, fontSize:12 }}>TOTAL</div>
               <div style={{ textAlign:"center", fontWeight:900, color:C.ocean }}>{bilanComptes.reduce((s,c)=>s+c.totalNat,0)} €</div>
               <div style={{ textAlign:"center", fontWeight:900, color:C.coral }}>{bilanComptes.reduce((s,c)=>s+c.totalClub,0)} €</div>
-              <div style={{ textAlign:"center", fontWeight:900, color:C.green }}>{totalAcomptesComptes} €</div>
+              <div style={{ textAlign:"center", fontWeight:900, color:C.green }}>{bilanComptes.reduce((s,c)=>s+c.totalAcomptes,0)} €</div>
               <div style={{ textAlign:"center", fontWeight:900, color: totalSoldesComptes===0?C.green:"#FF9500" }}>
                 {totalSoldesComptes===0 ? "✅" : `${totalSoldesComptes} €`}
               </div>
