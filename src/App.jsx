@@ -2925,133 +2925,32 @@ function MesReservationsScreen({ onNav, user }) {
 }
 
 // ── LOGIN SCREEN ──────────────────────────────────────────
-// ── RESET MOT DE PASSE ────────────────────────────────────
-function ResetPasswordScreen({ onNav }) {
-  const [password, setPassword] = useState("");
-  const [confirm, setConfirm]   = useState("");
-  const [showPwd, setShowPwd]   = useState(false);
-  const [loading, setLoading]   = useState(false);
-  const [done, setDone]         = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
-
-  const handleReset = async () => {
-    if (!password || password.length < 8) { setErrorMsg("Mot de passe : 8 caractères minimum."); return; }
-    if (password !== confirm) { setErrorMsg("Les mots de passe ne correspondent pas."); return; }
-    setLoading(true); setErrorMsg("");
-    try {
-      const { error } = await sb.auth.updateUser({ password });
-      if (error) throw error;
-      setDone(true);
-    } catch(e) {
-      setErrorMsg(e.message || "Erreur. Réessayez.");
-    } finally { setLoading(false); }
-  };
-
-  const inp = { width:"100%", border:"2px solid #e0e8f0", borderRadius:14, padding:"13px 16px", fontSize:15, fontFamily:"inherit", outline:"none", boxSizing:"border-box", color:C.dark, background:"#fff" };
-
-  return (
-    <div style={{ background:C.shell, minHeight:"100%", display:"flex", flexDirection:"column" }}>
-      <div style={{ background:`linear-gradient(135deg,${C.ocean},${C.sea})`, padding:"24px 20px 0" }}>
-        <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:16 }}>
-          <button onClick={() => onNav("login")} style={{ background:"rgba(255,255,255,0.2)", border:"none", color:"#fff", borderRadius:"50%", width:36, height:36, cursor:"pointer", fontSize:18, fontFamily:"inherit" }}>←</button>
-          <h2 style={{ color:"#fff", margin:0, fontWeight:900, fontSize:20 }}>Nouveau mot de passe</h2>
-        </div>
-        <Wave fill={C.shell} />
-      </div>
-      <div style={{ flex:1, padding:"32px 20px", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center" }}>
-        {done ? (
-          <div style={{ textAlign:"center", maxWidth:320 }}>
-            <div style={{ fontSize:80, marginBottom:16 }}>✅</div>
-            <h2 style={{ color:C.dark, fontWeight:900, margin:"0 0 10px" }}>Mot de passe mis à jour !</h2>
-            <p style={{ color:"#666", fontSize:14, marginBottom:24 }}>Tu peux maintenant te connecter avec ton nouveau mot de passe.</p>
-            <SunBtn color={C.ocean} full onClick={() => onNav("login")}>🔑 Se connecter</SunBtn>
-          </div>
-        ) : (
-          <div style={{ width:"100%", maxWidth:340 }}>
-            <div style={{ textAlign:"center", marginBottom:24 }}>
-              <div style={{ fontSize:56, marginBottom:10 }}>🔐</div>
-              <h2 style={{ color:C.dark, fontWeight:900, margin:"0 0 6px" }}>Choisir un mot de passe</h2>
-              <p style={{ color:"#888", fontSize:14, margin:0 }}>Saisis ton nouveau mot de passe ci-dessous</p>
-            </div>
-            <Card>
-              <label style={{ fontSize:12, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, letterSpacing:0.5, textTransform:"uppercase" }}>🔑 Nouveau mot de passe</label>
-              <div style={{ position:"relative", marginBottom:14 }}>
-                <input type={showPwd?"text":"password"} value={password} placeholder="8 caractères minimum"
-                  onChange={e => { setPassword(e.target.value); setErrorMsg(""); }}
-                  style={{ ...inp, paddingRight:44 }} />
-                <button onClick={() => setShowPwd(v=>!v)} style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", cursor:"pointer", fontSize:18, color:"#aaa" }}>
-                  {showPwd?"🙈":"👁️"}
-                </button>
-              </div>
-              <label style={{ fontSize:12, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, letterSpacing:0.5, textTransform:"uppercase" }}>🔁 Confirmer</label>
-              <input type={showPwd?"text":"password"} value={confirm} placeholder="Répète ton mot de passe"
-                onChange={e => { setConfirm(e.target.value); setErrorMsg(""); }}
-                onKeyDown={e => e.key==="Enter" && handleReset()}
-                style={inp} />
-              {errorMsg && <div style={{ background:"#fff0f0", border:"1.5px solid #FF6B6B44", borderRadius:10, padding:"8px 12px", marginTop:10, fontSize:13, color:C.sunset, fontWeight:700 }}>⚠️ {errorMsg}</div>}
-              <SunBtn color={C.ocean} full onClick={handleReset} style={{ marginTop:16 }}>
-                {loading ? "⏳ En cours..." : "✅ Enregistrer le mot de passe"}
-              </SunBtn>
-            </Card>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 function LoginScreen({ onNav, setUser }) {
-  const [mode, setMode]         = useState("password");
   const [email, setEmail]       = useState("");
-  const [password, setPassword] = useState("");
-  const [isSignup, setIsSignup] = useState(false);
-  const [showPwd, setShowPwd]   = useState(false);
-  const [loading, setLoading]   = useState(false);
-  const [sent, setSent]         = useState(false);
+  const [step, setStep]         = useState("form"); // form | sent | loading | error
   const [errorMsg, setErrorMsg] = useState("");
 
-  const resetForm = () => { setErrorMsg(""); setLoading(false); };
-
-  const handlePassword = async () => {
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setErrorMsg("Email invalide."); return; }
-    if (!password || password.length < 8) { setErrorMsg("Mot de passe : 8 caractères minimum."); return; }
-    setLoading(true); setErrorMsg("");
-    try {
-      if (isSignup) {
-        const { error } = await sb.auth.signUp({ email, password });
-        if (error) throw error;
-        setSent(true);
-      } else {
-        const { error } = await sb.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-      }
-    } catch(e) {
-      const msg = e.message || "";
-      if (msg.includes("Invalid login")) setErrorMsg("Email ou mot de passe incorrect.");
-      else if (msg.includes("already registered")) setErrorMsg("Email déjà utilisé. Connectez-vous.");
-      else setErrorMsg(msg || "Erreur. Réessayez.");
-    } finally { setLoading(false); }
-  };
-
-  const handleMagic = async () => {
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setErrorMsg("Email invalide."); return; }
-    setLoading(true); setErrorMsg("");
+  const handleSend = async () => {
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setErrorMsg("Merci de saisir un email valide."); return;
+    }
+    setStep("loading");
     try {
       const { error } = await sb.auth.signInWithOtp({
         email,
-        options: { shouldCreateUser: true, emailRedirectTo: "https://fncp-club.vercel.app" },
+        options: { shouldCreateUser: true }
       });
       if (error) throw error;
-      setSent(true);
+      setStep("sent");
     } catch(e) {
       setErrorMsg(e.message || "Erreur lors de l'envoi. Réessayez.");
-    } finally { setLoading(false); }
+      setStep("error");
+    }
   };
-
-  const inp = { width:"100%", border:"2px solid #e0e8f0", borderRadius:14, padding:"13px 16px", fontSize:15, fontFamily:"inherit", outline:"none", boxSizing:"border-box", color:C.dark, background:"#fff" };
 
   return (
     <div style={{ background: C.shell, minHeight: "100%", display: "flex", flexDirection: "column" }}>
+      {/* Header */}
       <div style={{ background: `linear-gradient(135deg, ${C.ocean}, ${C.sea})`, padding: "24px 20px 0" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
           <button onClick={() => onNav("home")} style={{ background: "rgba(255,255,255,0.2)", border: "none", color: "#fff", borderRadius: "50%", width: 36, height: 36, cursor: "pointer", fontSize: 18, fontFamily: "inherit" }}>←</button>
@@ -3062,82 +2961,65 @@ function LoginScreen({ onNav, setUser }) {
 
       <div style={{ flex: 1, padding: "24px 20px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
 
-        {sent && mode==="magic" ? (
-          <div style={{ textAlign:"center", maxWidth:320 }}>
-            <div style={{ width:90, height:90, borderRadius:"50%", background:`linear-gradient(135deg,${C.green},#1E8449)`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:44, margin:"0 auto 20px" }}>📧</div>
-            <h2 style={{ color:C.dark, fontWeight:900, margin:"0 0 10px" }}>Email envoyé !</h2>
-            <p style={{ color:"#666", fontSize:14, lineHeight:1.6, margin:"0 0 8px" }}>Lien envoyé à <strong>{email}</strong></p>
-            <div style={{ background:`${C.ocean}12`, borderRadius:16, padding:"12px 16px", marginBottom:24, fontSize:13, color:C.ocean, fontWeight:700 }}>💡 Vérifiez aussi vos spams</div>
-            <button onClick={() => { setSent(false); setEmail(""); }} style={{ background:"none", border:"none", color:C.ocean, fontSize:14, cursor:"pointer", fontFamily:"inherit", fontWeight:700 }}>← Utiliser un autre email</button>
-          </div>
-
-        ) : sent && mode==="password" ? (
-          <div style={{ textAlign:"center", maxWidth:320 }}>
-            <div style={{ fontSize:70, marginBottom:16 }}>✅</div>
-            <h2 style={{ color:C.dark, fontWeight:900, margin:"0 0 10px" }}>Compte créé !</h2>
-            <p style={{ color:"#666", fontSize:14, lineHeight:1.6 }}>Un email de confirmation a été envoyé à <strong>{email}</strong>.</p>
-            <div style={{ background:`${C.ocean}12`, borderRadius:16, padding:"12px 16px", margin:"16px 0", fontSize:13, color:C.ocean, fontWeight:700 }}>💡 Vérifiez aussi vos spams</div>
-            <button onClick={() => { setSent(false); setIsSignup(false); }} style={{ background:"none", border:"none", color:C.ocean, fontSize:14, cursor:"pointer", fontFamily:"inherit", fontWeight:700 }}>← Se connecter</button>
-          </div>
-
-        ) : (
-          <div style={{ width: "100%", maxWidth: 340 }}>
-            <div style={{ textAlign: "center", marginBottom: 24 }}>
-              <div style={{ fontSize: 52, marginBottom: 10 }}>🏖️</div>
-              <h2 style={{ color: C.dark, fontWeight: 900, margin: "0 0 4px" }}>Connexion</h2>
+        {step === "sent" ? (
+          /* Succès */
+          <div style={{ textAlign: "center", maxWidth: 320 }}>
+            <div style={{ width: 90, height: 90, borderRadius: "50%", background: `linear-gradient(135deg, ${C.green}, #1E8449)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 44, margin: "0 auto 20px" }}>📧</div>
+            <h2 style={{ color: C.dark, fontWeight: 900, margin: "0 0 10px" }}>Email envoyé !</h2>
+            <p style={{ color: "#666", fontSize: 14, lineHeight: 1.6, margin: "0 0 8px" }}>
+              Un lien de connexion a été envoyé à <strong>{email}</strong>
+            </p>
+            <p style={{ color: "#888", fontSize: 13, margin: "0 0 28px" }}>
+              Cliquez sur le lien dans l'email pour accéder à votre compte. Valable 24h.
+            </p>
+            <div style={{ background: `${C.ocean}12`, borderRadius: 16, padding: "12px 16px", marginBottom: 24, fontSize: 13, color: C.ocean, fontWeight: 700 }}>
+              💡 Vérifiez aussi vos spams
             </div>
-
-            <div style={{ display:"flex", background:"#e8f0fb", borderRadius:14, padding:4, marginBottom:20 }}>
-              {[["password","🔑 Mot de passe"],["magic","✉️ Lien email"]].map(([m,label]) => (
-                <button key={m} onClick={() => { setMode(m); resetForm(); setSent(false); }} style={{
-                  flex:1, border:"none", borderRadius:11, padding:"10px 6px", cursor:"pointer",
-                  fontFamily:"inherit", fontWeight:800, fontSize:13, transition:"all .2s",
-                  background: mode===m?"#fff":"transparent", color: mode===m?C.ocean:"#999",
-                  boxShadow: mode===m?"0 2px 8px rgba(0,0,0,0.10)":"none",
-                }}>{label}</button>
-              ))}
+            <button onClick={() => { setStep("form"); setEmail(""); }} style={{ background: "none", border: "none", color: C.ocean, fontSize: 14, cursor: "pointer", fontFamily: "inherit", fontWeight: 700 }}>
+              ← Utiliser un autre email
+            </button>
+          </div>
+        ) : (
+          /* Formulaire */
+          <div style={{ width: "100%", maxWidth: 340 }}>
+            <div style={{ textAlign: "center", marginBottom: 28 }}>
+              <div style={{ fontSize: 56, marginBottom: 12 }}>🏖️</div>
+              <h2 style={{ color: C.dark, fontWeight: 900, margin: "0 0 8px" }}>Connexion</h2>
+              <p style={{ color: "#888", fontSize: 14, margin: 0 }}>
+                Entrez votre email — nous vous envoyons un lien de connexion instantané
+              </p>
             </div>
 
             <Card>
-              <label style={{ fontSize:12, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, letterSpacing:0.5, textTransform:"uppercase" }}>📧 Email</label>
-              <input type="email" value={email} placeholder="prenom@exemple.fr"
-                onChange={e => { setEmail(e.target.value); setErrorMsg(""); }}
-                onKeyDown={e => e.key==="Enter" && (mode==="password"?handlePassword():handleMagic())}
-                style={{ ...inp, marginBottom:14 }} />
+              <label style={{ fontSize: 12, fontWeight: 900, color: C.ocean, display: "block", marginBottom: 6, letterSpacing: 0.5, textTransform: "uppercase" }}>
+                📧 Votre email
+              </label>
+              <input
+                type="email" value={email}
+                onChange={e => { setEmail(e.target.value); setErrorMsg(""); setStep("form"); }}
+                placeholder="prenom@exemple.fr"
+                style={{ width: "100%", border: `2px solid ${errorMsg ? C.sunset : "#e0e8f0"}`, borderRadius: 14, padding: "13px 16px", fontSize: 15, fontFamily: "inherit", outline: "none", boxSizing: "border-box", color: C.dark }}
+                onFocus={e => e.target.style.borderColor = C.ocean}
+                onBlur={e => e.target.style.borderColor = errorMsg ? C.sunset : "#e0e8f0"}
+                onKeyDown={e => e.key === "Enter" && handleSend()}
+              />
 
-              {mode==="password" && (<>
-                <label style={{ fontSize:12, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, letterSpacing:0.5, textTransform:"uppercase" }}>🔑 Mot de passe</label>
-                <div style={{ position:"relative" }}>
-                  <input type={showPwd?"text":"password"} value={password}
-                    placeholder={isSignup ? "8 caractères minimum" : "Votre mot de passe"}
-                    onChange={e => { setPassword(e.target.value); setErrorMsg(""); }}
-                    onKeyDown={e => e.key==="Enter" && handlePassword()}
-                    style={{ ...inp, paddingRight:44 }} />
-                  <button onClick={() => setShowPwd(v=>!v)} style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", cursor:"pointer", fontSize:18, color:"#aaa" }}>
-                    {showPwd?"🙈":"👁️"}
-                  </button>
-                </div>
-                {isSignup && <div style={{ fontSize:11, color:"#aaa", marginTop:6 }}>Minimum 8 caractères</div>}
-              </>)}
-
-              {errorMsg && <div style={{ background:"#fff0f0", border:`1.5px solid ${C.sunset}44`, borderRadius:10, padding:"8px 12px", marginTop:12, fontSize:13, color:C.sunset, fontWeight:700 }}>⚠️ {errorMsg}</div>}
-
-              <SunBtn color={C.ocean} full onClick={mode==="password"?handlePassword:handleMagic} style={{ marginTop:16 }}>
-                {loading?"⏳ En cours...":mode==="password"?(isSignup?"📋 Créer mon compte":"🔑 Se connecter"):"✉️ Recevoir mon lien"}
-              </SunBtn>
-
-              {mode==="password" && (
-                <div style={{ textAlign:"center", marginTop:14 }}>
-                  <button onClick={() => { setIsSignup(v=>!v); setErrorMsg(""); setPassword(""); }} style={{ background:"none", border:"none", color:C.ocean, fontSize:13, cursor:"pointer", fontFamily:"inherit", fontWeight:700 }}>
-                    {isSignup?"Déjà un compte ? Se connecter →":"Pas encore de compte ? S'inscrire →"}
-                  </button>
+              {errorMsg && (
+                <div style={{ background: "#fff0f0", border: `1.5px solid ${C.sunset}44`, borderRadius: 10, padding: "8px 12px", marginTop: 10, fontSize: 13, color: C.sunset, fontWeight: 700 }}>
+                  ⚠️ {errorMsg}
                 </div>
               )}
+
+              <SunBtn color={C.ocean} full onClick={handleSend} style={{ marginTop: 16 }}>
+                {step === "loading" ? "⏳ Envoi en cours..." : "✉️ Recevoir mon lien de connexion"}
+              </SunBtn>
             </Card>
 
             <div style={{ textAlign: "center", marginTop: 20 }}>
-              <p style={{ color: "#aaa", fontSize: 13, margin: "0 0 10px" }}>Première visite ?</p>
-              <SunBtn color={C.coral} onClick={() => onNav("inscription")}>📋 S'inscrire au Club</SunBtn>
+              <p style={{ color: "#aaa", fontSize: 13, margin: "0 0 10px" }}>Pas encore de compte ?</p>
+              <SunBtn color={C.coral} onClick={() => onNav("inscription")}>
+                📋 S'inscrire au Club
+              </SunBtn>
             </div>
           </div>
         )}
@@ -4076,7 +3958,7 @@ function FicheEnfantModal({ enfant, onClose }) {
           <div style={{ background:"#fff", borderRadius:16, padding:"14px 16px", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
             <div style={{ fontWeight:800, color:"#2C3E50", fontSize:12, marginBottom:8, textTransform:"uppercase" }}>🏷️ Groupe d'âge</div>
             {(() => {
-              const grp = age <= 5 ? { label:"🐥 3–5 ans", color:"#FFD93D" } : age <= 9 ? { label:"🐬 6–9 ans", color:C.sea } : { label:"🏅 10–12 ans", color:C.ocean };
+              const grp = age <= 5 ? { label:"🐥 3–5 ans", color:"#FFD93D" } : age <= 8 ? { label:"🐬 6–8 ans", color:C.sea } : { label:"🏅 9–12 ans", color:C.ocean };
               return <Pill color={grp.color}>{grp.label}</Pill>;
             })()}
           </div>
@@ -6265,8 +6147,8 @@ th{background:#1A8FE3;color:#fff;padding:10px 12px;text-align:left}
 // ── AGE GROUP CARD ────────────────────────────────────────
 const AGE_GROUPS = [
   { label: "3 – 5 ans",  min: 3,  max: 5,  color: "#FF9500",  emoji: "🐥", bg: "#FFF8EE" },
-  { label: "6 – 9 ans",  min: 6,  max: 9,  color: C.ocean,    emoji: "🐬", bg: "#EEF8FF" },
-  { label: "10 – 12 ans",min: 10, max: 12, color: "#9B59B6",  emoji: "🏅", bg: "#F5EEFF" },
+  { label: "6 – 8 ans",  min: 6,  max: 8,  color: C.ocean,    emoji: "🐬", bg: "#EEF8FF" },
+  { label: "9 – 12 ans", min: 9,  max: 12, color: "#9B59B6",  emoji: "🏅", bg: "#F5EEFF" },
 ];
 
 function AgeGroupCard({ dbMembres = [] }) {
@@ -6784,8 +6666,7 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
   const [statutResa, setStatutResa]     = useState("pending");
 
   // Natation
-  const [forfaitNat, setForfaitNat]         = useState("unite");
-  const [nbSeancesLibre, setNbSeancesLibre] = useState(11);
+  const [forfaitNat, setForfaitNat]     = useState("unite");
   const [selectedCreneaux, setSelectedCreneaux] = useState([]); // [{dayISO, time}]
   const [natWeekIdx, setNatWeekIdx]     = useState(0);
   const [dbResasNat, setDbResasNat]     = useState([]);
@@ -6815,9 +6696,7 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
   const toggleEnfant = (prenom) => setSelectedEnfants(prev => prev.includes(prenom) ? prev.filter(e => e !== prenom) : [...prev, prenom]);
   const handleMembreChange = (id) => { setMembreId(id); setSelectedEnfants([]); };
 
-  const nbSeancesNat  = forfaitNat === "unite" ? 1 : forfaitNat === "forfait5" ? 5 : forfaitNat === "forfait6" ? 6 : forfaitNat === "forfait10" ? 10 : nbSeancesLibre;
-  const getMontantNat = (n) => { const P = {1:20,5:95,6:113,10:170}; return n <= 10 ? (P[n] || n*20) : 170+(n-10)*17; };
-  const montantNat    = getMontantNat(nbSeancesNat);
+  const nbSeancesNat = forfaitNat === "unite" ? 1 : forfaitNat === "forfait5" ? 5 : forfaitNat === "forfait6" ? 6 : 10;
 
   const getSpots = (dayISO, time) => {
     const taken = dbResasNat.filter(r => r.date_seance?.slice(0,10) === dayISO && r.heure === time)
@@ -6876,7 +6755,7 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
             dateSeance: c.dayISO,
             enfants: selectedEnfants,
             rappelDate: getRappelDate(c.dayISO),
-            montant: montantNat,
+            montant: forfaitNat === "unite" ? 20 : forfaitNat === "forfait5" ? 95 : forfaitNat === "forfait6" ? 113 : 170,
             statut: statutResa,
           });
         }
@@ -7000,26 +6879,10 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
               <div>
                 <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, textTransform:"uppercase" }}>Formule</label>
                 <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-                  {[["unite","1 · 20€"],["forfait5","5 · 95€"],["forfait6","6 · 113€"],["forfait10","10 · 170€"],["libre","🔢 Libre"]].map(([k,l]) => (
+                  {[["unite","1 · 20€"],["forfait5","5 · 95€"],["forfait6","6 · 113€"],["forfait10","10 · 170€"]].map(([k,l]) => (
                     <button key={k} onClick={() => { setForfaitNat(k); setSelectedCreneaux([]); }} style={{ flex:1, background: forfaitNat===k ? C.ocean : "#f0f0f0", color: forfaitNat===k ? "#fff" : "#888", border:"none", borderRadius:12, padding:"8px 4px", cursor:"pointer", fontWeight:800, fontSize:10, fontFamily:"inherit" }}>{l}</button>
                   ))}
                 </div>
-                {forfaitNat === "libre" && (
-                  <div style={{ marginTop:10, background:"#F0F4F8", borderRadius:12, padding:"12px 14px" }}>
-                    <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:8 }}>
-                      <label style={{ fontSize:12, fontWeight:800, color:C.dark, whiteSpace:"nowrap" }}>Nombre de séances</label>
-                      <input type="number" min={1} max={50} value={nbSeancesLibre}
-                        onChange={e => { const v = Math.max(1, parseInt(e.target.value)||1); setNbSeancesLibre(v); setSelectedCreneaux([]); }}
-                        style={{ width:70, border:`2px solid ${C.ocean}`, borderRadius:10, padding:"6px 10px", fontSize:15, fontWeight:900, textAlign:"center", fontFamily:"inherit", outline:"none" }} />
-                    </div>
-                    <div style={{ fontSize:13, color:C.ocean, fontWeight:900 }}>
-                      💰 Prix : <span style={{ fontSize:16 }}>{montantNat} €</span>
-                      <span style={{ fontSize:11, color:"#999", fontWeight:400, marginLeft:6 }}>
-                        {nbSeancesLibre <= 10 ? "barème forfait" : `170€ + ${nbSeancesLibre-10}×17€`}
-                      </span>
-                    </div>
-                  </div>
-                )}
               </div>
 
               {/* Navigation semaine */}
@@ -7751,19 +7614,16 @@ function ModePaiementModal({ onConfirm, onClose, titre }) {
 
 // ── COMPTABILITE TAB ──────────────────────────────────────
 function ComptabiliteTab({ dbMembres, dbResas, dbResasClub, dbCommandesClub = [] }) {
-  const [loading, setLoading]       = useState(true);
-  const [paiements, setPaiements]   = useState([]);
-  const [acomptes, setAcomptes]     = useState({});
-  const [remises, setRemises]       = useState({});
+  const [loading, setLoading] = useState(true);
+  const [acomptes, setAcomptes] = useState({});
+  const [remises, setRemises]   = useState({});
   const [exclusions, setExclusions] = useState({});
 
   useEffect(() => {
     Promise.all([
-      sb.from("paiements").select("*").eq("statut", "completed"),
       sb.from("comptes_acomptes").select("*"),
       sb.from("comptes_exclusions").select("*"),
-    ]).then(([{ data: pai }, { data: ac }, { data: ex }]) => {
-      setPaiements(pai || []);
+    ]).then(([{ data: ac }, { data: ex }]) => {
       const acMap = {};
       (ac || []).forEach(a => { if (!acMap[a.membre_id]) acMap[a.membre_id] = []; acMap[a.membre_id].push(a); });
       setAcomptes(acMap);
@@ -7777,6 +7637,7 @@ function ComptabiliteTab({ dbMembres, dbResas, dbResasClub, dbCommandesClub = []
   const PRIX_NAT = { 1:20,2:40,3:60,4:80,5:95,6:113,7:131,8:147,9:162,10:170 };
   const LP = { 6:96,12:180,18:252,24:288,30:330 };
 
+  // Calcule le montant des prestations par membre (identique à getCompte dans ComptesTab)
   const getMontantMembre = (m) => {
     const resasNat  = dbResas.filter(r => r.membre_id === m.id && r.statut === "confirmed" && !exclusions[r.id]);
     const resasClub = dbResasClub.filter(r => r.membre_id === m.id && r.statut === "confirmed" && !exclusions[r.id]);
@@ -7805,20 +7666,48 @@ function ComptabiliteTab({ dbMembres, dbResas, dbResasClub, dbCommandesClub = []
     return { totalNat, totalClub: totalLiberte + totalClubNormal, totalPrestations, totalAcomptes, remise, solde, nbNat: resasNat.length, nbClub: resasClub.length };
   };
 
+  // Tous les membres (pas uniquement ceux en compte fin de saison)
   const tousMembres = dbMembres || [];
+  const MODES_LABEL = { especes:"💵 Espèces", cheque:"📝 Chèque", virement:"🏦 Virement", cb:"💳 CB", paypal:"🅿️ PayPal", offert:"🎁 Offert", compte_fin_saison:"📒 Fin de saison" };
 
-  // ── Totaux depuis la table paiements (source de vérité) ──
-  const totalEncNat  = paiements.filter(p => p.type === "natation").reduce((s, p) => s + Number(p.montant || 0), 0);
-  const totalEncClub = paiements.filter(p => p.type === "club").reduce((s, p) => s + Number(p.montant || 0), 0);
+  // Calcul global à partir des réservations confirmées
+  const PRIX_NAT_G = { 1:20,2:40,3:60,4:80,5:95,6:113,7:131,8:147,9:162,10:170 };
+  const LP_G = { 6:96,12:180,18:252,24:288,30:330 };
 
-  // Comptes fin de saison — soldes restants
-  const membresCompte       = tousMembres.filter(m => m.compte_fin_saison && !m.compte_solde);
-  const bilanComptes        = loading ? [] : membresCompte.map(m => ({ m, ...getMontantMembre(m) }));
-  const totalRemisesComptes = bilanComptes.reduce((s, c) => s + c.remise, 0);
-  const totalSoldesComptes  = bilanComptes.reduce((s, c) => s + c.solde, 0);
+  const confirmedNat  = (dbResas || []).filter(r => r.statut === "confirmed");
+  const confirmedClub = (dbResasClub || []).filter(r => r.statut === "confirmed");
 
-  // CA = encaissé uniquement. Soldes restants exclus.
-  const totalCA         = totalEncNat + totalEncClub;
+  // Total encaissé paiements directs (hors fin saison et offerts)
+  const confirmedNatPaie  = confirmedNat.filter(r => r.mode_paiement && r.mode_paiement !== "compte_fin_saison" && r.mode_paiement !== "offert");
+  const confirmedClubPaie = confirmedClub.filter(r => r.mode_paiement && r.mode_paiement !== "compte_fin_saison" && r.mode_paiement !== "offert");
+
+  const totalEncNat = (() => {
+    const g = {};
+    confirmedNatPaie.forEach(r => { const k = `${r.membre_id}|${(Array.isArray(r.enfants)?[...r.enfants].sort().join(","):"")}|${(r.created_at||"").slice(0,16)}`; if (!g[k]) g[k]=[]; g[k].push(r); });
+    return Object.values(g).reduce((s, gr) => { const n = gr.length; return s + (n<=10?(PRIX_NAT_G[n]||n*20):170+(n-10)*17); }, 0);
+  })();
+  const totalEncClub = (() => {
+    const g = {};
+    confirmedClubPaie.forEach(r => { const k = `${r.membre_id}|${r.session}|${(Array.isArray(r.enfants)?[...r.enfants].sort().join(","):"")}|${(r.created_at||"").slice(0,16)}`; if (!g[k]) g[k]=[]; g[k].push(r); });
+    return Object.values(g).reduce((s, gr) => {
+      const r0 = gr[0]; const nb = Number(Array.isArray(r0.enfants)?r0.enfants[0]:0);
+      if (nb>=6 && LP_G[nb]) return s+LP_G[nb];
+      if (r0.montant) return s+Number(r0.montant);
+      return s+gr.reduce((a,r)=>{ const m=(r.label_jour||"").match(/\[MONTANT:(\d+)\]/); return a+(m?Number(m[1]):0); },0);
+    }, 0);
+  })();
+
+  // Comptes fin de saison — totaux
+  const membresCompte = tousMembres.filter(m => m.compte_fin_saison && !m.compte_solde);
+  const bilanComptes  = loading ? [] : membresCompte.map(m => ({ m, ...getMontantMembre(m) }));
+  const totalPrestationsComptes = bilanComptes.reduce((s, c) => s + c.totalPrestations, 0);
+  const totalAcomptesComptes    = bilanComptes.reduce((s, c) => s + c.totalAcomptes, 0);
+  const totalRemisesComptes     = bilanComptes.reduce((s, c) => s + c.remise, 0);
+  const totalSoldesComptes      = bilanComptes.reduce((s, c) => s + c.solde, 0);
+
+  // Totaux globaux saison
+  // CA = uniquement ce qui est encaissé (paiements directs + acomptes) — les soldes restants N'entrent PAS dans le CA
+  const totalCA         = totalEncNat + totalEncClub + totalAcomptesComptes;
   const resteAEncaisser = Math.max(0, totalSoldesComptes - totalRemisesComptes);
   const pctEncaisse     = (totalCA + resteAEncaisser) > 0 ? Math.min(100, Math.round((totalCA / (totalCA + resteAEncaisser)) * 100)) : 100;
 
@@ -7834,7 +7723,7 @@ function ComptabiliteTab({ dbMembres, dbResas, dbResasClub, dbCommandesClub = []
           {[
             { label:"CA",                 val:`${totalCA} €`,           color:"#fff",    emoji:"💶" },
             { label:"Natation encaissé",  val:`${totalEncNat} €`,       color:"#87CEEB", emoji:"🏊" },
-            { label:"Club encaissé",      val:`${totalEncClub} €`,      color:"#FF8E53", emoji:"🏖️" },
+            { label:"Club encaissé",      val:`${totalEncClub + totalAcomptesComptes} €`, color:"#FF8E53", emoji:"🏖️" },
             { label:"Reste à encaisser",  val:`${resteAEncaisser} €`,   color: resteAEncaisser===0?"#6BCB77":"#FF6B6B", emoji:"⏳" },
             { label:"Comptes fin saison", val:`${membresCompte.length}`, color:"#FFD93D", emoji:"📒" },
           ].map(k => (
@@ -7857,9 +7746,11 @@ function ComptabiliteTab({ dbMembres, dbResas, dbResasClub, dbCommandesClub = []
       <div style={{ background:"#fff", borderRadius:18, padding:16, boxShadow:"0 2px 10px rgba(0,0,0,0.05)" }}>
         <div style={{ fontWeight:900, color:C.dark, fontSize:14, marginBottom:12 }}>📂 Ventilation des recettes</div>
         {[
-          { label:"🏊 Natation encaissé",  val:totalEncNat,     color:C.ocean },
-          { label:"🏖️ Club encaissé",      val:totalEncClub,    color:C.coral },
-          { label:"⏳ Reste à encaisser",  val:resteAEncaisser, color: resteAEncaisser===0?C.green:"#FF9500" },
+          { label:"🏊 Natation (paiements directs)",  val:totalEncNat,  color:C.ocean },
+          { label:"🏖️ Club de Plage (paiements directs)", val:totalEncClub, color:C.coral },
+          { label:"📒 Acomptes comptes fin saison",   val:totalAcomptesComptes, color:"#6366F1" },
+          { label:"⏳ Soldes restants fin saison",    val:totalSoldesComptes,   color:"#FF9500" },
+          { label:"🎁 Remises accordées",             val:totalRemisesComptes,  color:C.green },
         ].map(row => (
           <div key={row.label} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 0", borderBottom:"1px solid #f5f5f5" }}>
             <span style={{ fontSize:13, color:"#555" }}>{row.label}</span>
@@ -7912,7 +7803,7 @@ function ComptabiliteTab({ dbMembres, dbResas, dbResasClub, dbCommandesClub = []
               <div style={{ fontWeight:900, color:C.dark, fontSize:12 }}>TOTAL</div>
               <div style={{ textAlign:"center", fontWeight:900, color:C.ocean }}>{bilanComptes.reduce((s,c)=>s+c.totalNat,0)} €</div>
               <div style={{ textAlign:"center", fontWeight:900, color:C.coral }}>{bilanComptes.reduce((s,c)=>s+c.totalClub,0)} €</div>
-              <div style={{ textAlign:"center", fontWeight:900, color:C.green }}>{bilanComptes.reduce((s,c)=>s+c.totalAcomptes,0)} €</div>
+              <div style={{ textAlign:"center", fontWeight:900, color:C.green }}>{totalAcomptesComptes} €</div>
               <div style={{ textAlign:"center", fontWeight:900, color: totalSoldesComptes===0?C.green:"#FF9500" }}>
                 {totalSoldesComptes===0 ? "✅" : `${totalSoldesComptes} €`}
               </div>
@@ -9348,9 +9239,10 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
   const confirmedNatToday  = dbResas.filter(r => r.statut === "confirmed" && toLocalDate(r.validated_at || r.created_at) === todayISO);
   const confirmedClubToday = dbResasClub.filter(r => r.statut === "confirmed" && toLocalDate(r.validated_at || r.created_at) === todayISO);
 
-  // Paiements du jour depuis table paiements (montants corrects, multi-enfants inclus)
+  // Paiements du jour depuis table paiements — utilise date_paiement en priorité
   const paiementsAujourdhui = (dbPaiements||[]).filter(p =>
-    p.statut === "completed" && p.type !== "offert" && toLocalDate(p.created_at) === todayISO
+    p.statut === "completed" && p.type !== "offert" &&
+    toLocalDate(p.date_paiement || p.created_at) === todayISO
   );
   const realTotal = paiementsAujourdhui.reduce((s, p) => s + Number(p.montant||0), 0);
   const pendingCount = dbResas.filter(r => r.statut === "pending").length + dbResasClub.filter(r => r.statut === "pending").length;
@@ -11079,7 +10971,6 @@ export default function App() {
     switch (screen) {
       case "home":             return <HomeScreen {...props} />;
       case "login":            return <LoginScreen {...props} />;
-      case "reset-password":   return <ResetPasswordScreen {...props} />;
       case "formules":          return <FormulesChoixScreen {...props} />;
       case "formules-natation": return <FormulesNatationScreen {...props} />;
       case "formules-eveil":    return <FormulesEveilScreen {...props} />;
