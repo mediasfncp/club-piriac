@@ -2925,101 +2925,224 @@ function MesReservationsScreen({ onNav, user }) {
 }
 
 // ── LOGIN SCREEN ──────────────────────────────────────────
-function LoginScreen({ onNav, setUser }) {
-  const [email, setEmail]       = useState("");
-  const [step, setStep]         = useState("form"); // form | sent | loading | error
+// ── RESET MOT DE PASSE ────────────────────────────────────
+function ResetPasswordScreen({ onNav }) {
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm]   = useState("");
+  const [showPwd, setShowPwd]   = useState(false);
+  const [loading, setLoading]   = useState(false);
+  const [done, setDone]         = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
-  const handleSend = async () => {
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setErrorMsg("Merci de saisir un email valide."); return;
-    }
-    setStep("loading");
+  const handleReset = async () => {
+    if (!password || password.length < 8) { setErrorMsg("Mot de passe : 8 caractères minimum."); return; }
+    if (password !== confirm) { setErrorMsg("Les mots de passe ne correspondent pas."); return; }
+    setLoading(true); setErrorMsg("");
+    try {
+      const { error } = await sb.auth.updateUser({ password });
+      if (error) throw error;
+      setDone(true);
+    } catch(e) {
+      setErrorMsg(e.message || "Erreur. Réessayez.");
+    } finally { setLoading(false); }
+  };
+
+  const inp = { width:"100%", border:"2px solid #e0e8f0", borderRadius:14, padding:"13px 16px", fontSize:15, fontFamily:"inherit", outline:"none", boxSizing:"border-box", color:C.dark, background:"#fff" };
+
+  return (
+    <div style={{ background:C.shell, minHeight:"100%", display:"flex", flexDirection:"column" }}>
+      <div style={{ background:`linear-gradient(135deg,${C.ocean},${C.sea})`, padding:"24px 20px 0" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:16 }}>
+          <button onClick={() => onNav("login")} style={{ background:"rgba(255,255,255,0.2)", border:"none", color:"#fff", borderRadius:"50%", width:36, height:36, cursor:"pointer", fontSize:18, fontFamily:"inherit" }}>←</button>
+          <h2 style={{ color:"#fff", margin:0, fontWeight:900, fontSize:20 }}>Nouveau mot de passe</h2>
+        </div>
+        <Wave fill={C.shell} />
+      </div>
+      <div style={{ flex:1, padding:"32px 20px", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center" }}>
+        {done ? (
+          <div style={{ textAlign:"center", maxWidth:320 }}>
+            <div style={{ fontSize:80, marginBottom:16 }}>✅</div>
+            <h2 style={{ color:C.dark, fontWeight:900, margin:"0 0 10px" }}>Mot de passe mis à jour !</h2>
+            <p style={{ color:"#666", fontSize:14, marginBottom:24 }}>Tu peux maintenant te connecter avec ton nouveau mot de passe.</p>
+            <SunBtn color={C.ocean} full onClick={() => onNav("login")}>🔑 Se connecter</SunBtn>
+          </div>
+        ) : (
+          <div style={{ width:"100%", maxWidth:340 }}>
+            <div style={{ textAlign:"center", marginBottom:24 }}>
+              <div style={{ fontSize:56, marginBottom:10 }}>🔐</div>
+              <h2 style={{ color:C.dark, fontWeight:900, margin:"0 0 6px" }}>Choisir un mot de passe</h2>
+              <p style={{ color:"#888", fontSize:14, margin:0 }}>Saisis ton nouveau mot de passe ci-dessous</p>
+            </div>
+            <Card>
+              <label style={{ fontSize:12, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, letterSpacing:0.5, textTransform:"uppercase" }}>🔑 Nouveau mot de passe</label>
+              <div style={{ position:"relative", marginBottom:14 }}>
+                <input type={showPwd?"text":"password"} value={password} placeholder="8 caractères minimum"
+                  onChange={e => { setPassword(e.target.value); setErrorMsg(""); }}
+                  style={{ ...inp, paddingRight:44 }} />
+                <button onClick={() => setShowPwd(v=>!v)} style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", cursor:"pointer", fontSize:18, color:"#aaa" }}>
+                  {showPwd?"🙈":"👁️"}
+                </button>
+              </div>
+              <label style={{ fontSize:12, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, letterSpacing:0.5, textTransform:"uppercase" }}>🔁 Confirmer</label>
+              <input type={showPwd?"text":"password"} value={confirm} placeholder="Répète ton mot de passe"
+                onChange={e => { setConfirm(e.target.value); setErrorMsg(""); }}
+                onKeyDown={e => e.key==="Enter" && handleReset()}
+                style={inp} />
+              {errorMsg && (
+                <div style={{ background:"#fff0f0", border:"1.5px solid #FF6B6B44", borderRadius:10, padding:"8px 12px", marginTop:10, fontSize:13, color:C.sunset, fontWeight:700 }}>⚠️ {errorMsg}</div>
+              )}
+              <SunBtn color={C.ocean} full onClick={handleReset} style={{ marginTop:16 }}>
+                {loading ? "⏳ En cours..." : "✅ Enregistrer le mot de passe"}
+              </SunBtn>
+            </Card>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function LoginScreen({ onNav, setUser }) {
+  const [mode, setMode]         = useState("password");
+  const [email, setEmail]       = useState("");
+  const [password, setPassword] = useState("");
+  const [isSignup, setIsSignup] = useState(false);
+  const [showPwd, setShowPwd]   = useState(false);
+  const [loading, setLoading]   = useState(false);
+  const [sent, setSent]         = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const resetForm = () => { setErrorMsg(""); setLoading(false); };
+
+  const handlePassword = async () => {
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setErrorMsg("Email invalide."); return; }
+    if (!password || password.length < 8) { setErrorMsg("Mot de passe : 8 caractères minimum."); return; }
+    setLoading(true); setErrorMsg("");
+    try {
+      if (isSignup) {
+        const { error } = await sb.auth.signUp({ email, password });
+        if (error) throw error;
+        setSent(true);
+      } else {
+        const { error } = await sb.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+      }
+    } catch(e) {
+      const msg = e.message || "";
+      if (msg.includes("Invalid login")) setErrorMsg("Email ou mot de passe incorrect.");
+      else if (msg.includes("already registered")) setErrorMsg("Email déjà utilisé. Connectez-vous.");
+      else setErrorMsg(msg || "Erreur. Réessayez.");
+    } finally { setLoading(false); }
+  };
+
+  const handleMagic = async () => {
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setErrorMsg("Email invalide."); return; }
+    setLoading(true); setErrorMsg("");
     try {
       const { error } = await sb.auth.signInWithOtp({
         email,
-        options: { shouldCreateUser: true }
+        options: { shouldCreateUser: true, emailRedirectTo: "https://fncp-club.vercel.app" },
       });
       if (error) throw error;
-      setStep("sent");
+      setSent(true);
     } catch(e) {
       setErrorMsg(e.message || "Erreur lors de l'envoi. Réessayez.");
-      setStep("error");
-    }
+    } finally { setLoading(false); }
   };
 
+  const inp = { width:"100%", border:"2px solid #e0e8f0", borderRadius:14, padding:"13px 16px", fontSize:15, fontFamily:"inherit", outline:"none", boxSizing:"border-box", color:C.dark, background:"#fff" };
+
   return (
-    <div style={{ background: C.shell, minHeight: "100%", display: "flex", flexDirection: "column" }}>
-      {/* Header */}
-      <div style={{ background: `linear-gradient(135deg, ${C.ocean}, ${C.sea})`, padding: "24px 20px 0" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-          <button onClick={() => onNav("home")} style={{ background: "rgba(255,255,255,0.2)", border: "none", color: "#fff", borderRadius: "50%", width: 36, height: 36, cursor: "pointer", fontSize: 18, fontFamily: "inherit" }}>←</button>
-          <h2 style={{ color: "#fff", margin: 0, fontWeight: 900, fontSize: 20 }}>Mon espace Eole Beach Club</h2>
+    <div style={{ background:C.shell, minHeight:"100%", display:"flex", flexDirection:"column" }}>
+      <div style={{ background:`linear-gradient(135deg,${C.ocean},${C.sea})`, padding:"24px 20px 0" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:16 }}>
+          <button onClick={() => onNav("home")} style={{ background:"rgba(255,255,255,0.2)", border:"none", color:"#fff", borderRadius:"50%", width:36, height:36, cursor:"pointer", fontSize:18, fontFamily:"inherit" }}>←</button>
+          <h2 style={{ color:"#fff", margin:0, fontWeight:900, fontSize:20 }}>Mon espace Eole Beach Club</h2>
         </div>
         <Wave fill={C.shell} />
       </div>
 
-      <div style={{ flex: 1, padding: "24px 20px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ flex:1, padding:"24px 20px", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center" }}>
 
-        {step === "sent" ? (
-          /* Succès */
-          <div style={{ textAlign: "center", maxWidth: 320 }}>
-            <div style={{ width: 90, height: 90, borderRadius: "50%", background: `linear-gradient(135deg, ${C.green}, #1E8449)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 44, margin: "0 auto 20px" }}>📧</div>
-            <h2 style={{ color: C.dark, fontWeight: 900, margin: "0 0 10px" }}>Email envoyé !</h2>
-            <p style={{ color: "#666", fontSize: 14, lineHeight: 1.6, margin: "0 0 8px" }}>
-              Un lien de connexion a été envoyé à <strong>{email}</strong>
-            </p>
-            <p style={{ color: "#888", fontSize: 13, margin: "0 0 28px" }}>
-              Cliquez sur le lien dans l'email pour accéder à votre compte. Valable 24h.
-            </p>
-            <div style={{ background: `${C.ocean}12`, borderRadius: 16, padding: "12px 16px", marginBottom: 24, fontSize: 13, color: C.ocean, fontWeight: 700 }}>
-              💡 Vérifiez aussi vos spams
-            </div>
-            <button onClick={() => { setStep("form"); setEmail(""); }} style={{ background: "none", border: "none", color: C.ocean, fontSize: 14, cursor: "pointer", fontFamily: "inherit", fontWeight: 700 }}>
-              ← Utiliser un autre email
-            </button>
+        {sent && mode==="magic" ? (
+          <div style={{ textAlign:"center", maxWidth:320 }}>
+            <div style={{ width:90, height:90, borderRadius:"50%", background:`linear-gradient(135deg,${C.green},#1E8449)`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:44, margin:"0 auto 20px" }}>📧</div>
+            <h2 style={{ color:C.dark, fontWeight:900, margin:"0 0 10px" }}>Email envoyé !</h2>
+            <p style={{ color:"#666", fontSize:14, lineHeight:1.6, margin:"0 0 8px" }}>Lien envoyé à <strong>{email}</strong></p>
+            <div style={{ background:`${C.ocean}12`, borderRadius:16, padding:"12px 16px", marginBottom:24, fontSize:13, color:C.ocean, fontWeight:700 }}>💡 Vérifiez aussi vos spams</div>
+            <button onClick={() => { setSent(false); setEmail(""); }} style={{ background:"none", border:"none", color:C.ocean, fontSize:14, cursor:"pointer", fontFamily:"inherit", fontWeight:700 }}>← Utiliser un autre email</button>
           </div>
+
+        ) : sent && mode==="password" ? (
+          <div style={{ textAlign:"center", maxWidth:320 }}>
+            <div style={{ fontSize:70, marginBottom:16 }}>✅</div>
+            <h2 style={{ color:C.dark, fontWeight:900, margin:"0 0 10px" }}>Compte créé !</h2>
+            <p style={{ color:"#666", fontSize:14, lineHeight:1.6 }}>Un email de confirmation a été envoyé à <strong>{email}</strong>.</p>
+            <div style={{ background:`${C.ocean}12`, borderRadius:16, padding:"12px 16px", margin:"16px 0", fontSize:13, color:C.ocean, fontWeight:700 }}>💡 Vérifiez aussi vos spams</div>
+            <button onClick={() => { setSent(false); setIsSignup(false); }} style={{ background:"none", border:"none", color:C.ocean, fontSize:14, cursor:"pointer", fontFamily:"inherit", fontWeight:700 }}>← Se connecter</button>
+          </div>
+
         ) : (
-          /* Formulaire */
-          <div style={{ width: "100%", maxWidth: 340 }}>
-            <div style={{ textAlign: "center", marginBottom: 28 }}>
-              <div style={{ fontSize: 56, marginBottom: 12 }}>🏖️</div>
-              <h2 style={{ color: C.dark, fontWeight: 900, margin: "0 0 8px" }}>Connexion</h2>
-              <p style={{ color: "#888", fontSize: 14, margin: 0 }}>
-                Entrez votre email — nous vous envoyons un lien de connexion instantané
-              </p>
+          <div style={{ width:"100%", maxWidth:340 }}>
+            <div style={{ textAlign:"center", marginBottom:24 }}>
+              <div style={{ fontSize:52, marginBottom:10 }}>🏖️</div>
+              <h2 style={{ color:C.dark, fontWeight:900, margin:"0 0 4px" }}>Connexion</h2>
+            </div>
+
+            <div style={{ display:"flex", background:"#e8f0fb", borderRadius:14, padding:4, marginBottom:20 }}>
+              {[["password","🔑 Mot de passe"],["magic","✉️ Lien email"]].map(([m,label]) => (
+                <button key={m} onClick={() => { setMode(m); resetForm(); setSent(false); }} style={{
+                  flex:1, border:"none", borderRadius:11, padding:"10px 6px", cursor:"pointer",
+                  fontFamily:"inherit", fontWeight:800, fontSize:13, transition:"all .2s",
+                  background: mode===m?"#fff":"transparent",
+                  color: mode===m?C.ocean:"#999",
+                  boxShadow: mode===m?"0 2px 8px rgba(0,0,0,0.10)":"none",
+                }}>{label}</button>
+              ))}
             </div>
 
             <Card>
-              <label style={{ fontSize: 12, fontWeight: 900, color: C.ocean, display: "block", marginBottom: 6, letterSpacing: 0.5, textTransform: "uppercase" }}>
-                📧 Votre email
-              </label>
-              <input
-                type="email" value={email}
-                onChange={e => { setEmail(e.target.value); setErrorMsg(""); setStep("form"); }}
-                placeholder="prenom@exemple.fr"
-                style={{ width: "100%", border: `2px solid ${errorMsg ? C.sunset : "#e0e8f0"}`, borderRadius: 14, padding: "13px 16px", fontSize: 15, fontFamily: "inherit", outline: "none", boxSizing: "border-box", color: C.dark }}
-                onFocus={e => e.target.style.borderColor = C.ocean}
-                onBlur={e => e.target.style.borderColor = errorMsg ? C.sunset : "#e0e8f0"}
-                onKeyDown={e => e.key === "Enter" && handleSend()}
-              />
+              <label style={{ fontSize:12, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, letterSpacing:0.5, textTransform:"uppercase" }}>📧 Email</label>
+              <input type="email" value={email} placeholder="prenom@exemple.fr"
+                onChange={e => { setEmail(e.target.value); setErrorMsg(""); }}
+                onKeyDown={e => e.key==="Enter" && (mode==="password"?handlePassword():handleMagic())}
+                style={{ ...inp, marginBottom:14 }} />
+
+              {mode==="password" && (<>
+                <label style={{ fontSize:12, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, letterSpacing:0.5, textTransform:"uppercase" }}>🔑 Mot de passe</label>
+                <div style={{ position:"relative" }}>
+                  <input type={showPwd?"text":"password"} value={password}
+                    placeholder={isSignup ? "8 caractères minimum" : "Votre mot de passe"}
+                    onChange={e => { setPassword(e.target.value); setErrorMsg(""); }}
+                    onKeyDown={e => e.key==="Enter" && handlePassword()}
+                    style={{ ...inp, paddingRight:44 }} />
+                  <button onClick={() => setShowPwd(v=>!v)} style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", cursor:"pointer", fontSize:18, color:"#aaa" }}>
+                    {showPwd?"🙈":"👁️"}
+                  </button>
+                </div>
+                {isSignup && <div style={{ fontSize:11, color:"#aaa", marginTop:6 }}>Minimum 8 caractères</div>}
+              </>)}
 
               {errorMsg && (
-                <div style={{ background: "#fff0f0", border: `1.5px solid ${C.sunset}44`, borderRadius: 10, padding: "8px 12px", marginTop: 10, fontSize: 13, color: C.sunset, fontWeight: 700 }}>
-                  ⚠️ {errorMsg}
-                </div>
+                <div style={{ background:"#fff0f0", border:`1.5px solid ${C.sunset}44`, borderRadius:10, padding:"8px 12px", marginTop:12, fontSize:13, color:C.sunset, fontWeight:700 }}>⚠️ {errorMsg}</div>
               )}
 
-              <SunBtn color={C.ocean} full onClick={handleSend} style={{ marginTop: 16 }}>
-                {step === "loading" ? "⏳ Envoi en cours..." : "✉️ Recevoir mon lien de connexion"}
+              <SunBtn color={C.ocean} full onClick={mode==="password"?handlePassword:handleMagic} style={{ marginTop:16 }}>
+                {loading?"⏳ En cours...":mode==="password"?(isSignup?"📋 Créer mon compte":"🔑 Se connecter"):"✉️ Recevoir mon lien"}
               </SunBtn>
+
+              {mode==="password" && (
+                <div style={{ textAlign:"center", marginTop:14 }}>
+                  <button onClick={() => { setIsSignup(v=>!v); setErrorMsg(""); setPassword(""); }} style={{ background:"none", border:"none", color:C.ocean, fontSize:13, cursor:"pointer", fontFamily:"inherit", fontWeight:700 }}>
+                    {isSignup?"Déjà un compte ? Se connecter →":"Pas encore de compte ? S'inscrire →"}
+                  </button>
+                </div>
+              )}
             </Card>
 
-            <div style={{ textAlign: "center", marginTop: 20 }}>
-              <p style={{ color: "#aaa", fontSize: 13, margin: "0 0 10px" }}>Pas encore de compte ?</p>
-              <SunBtn color={C.coral} onClick={() => onNav("inscription")}>
-                📋 S'inscrire au Club
-              </SunBtn>
+            <div style={{ textAlign:"center", marginTop:20 }}>
+              <p style={{ color:"#aaa", fontSize:13, margin:"0 0 10px" }}>Première visite ?</p>
+              <SunBtn color={C.coral} onClick={() => onNav("inscription")}>📋 S'inscrire au Club</SunBtn>
             </div>
           </div>
         )}
@@ -10965,6 +11088,7 @@ export default function App() {
     switch (screen) {
       case "home":             return <HomeScreen {...props} />;
       case "login":            return <LoginScreen {...props} />;
+      case "reset-password":   return <ResetPasswordScreen {...props} />;
       case "formules":          return <FormulesChoixScreen {...props} />;
       case "formules-natation": return <FormulesNatationScreen {...props} />;
       case "formules-eveil":    return <FormulesEveilScreen {...props} />;
