@@ -3574,7 +3574,7 @@ function SeancesTab({ sessions, setSessions }) {
   // Charger résas + appliquer suppressions/ajouts admin depuis Supabase
   useEffect(() => {
     sb.from("reservations_natation").select("date_seance, heure, statut, enfants")
-      .eq("statut", "confirmed")
+      .in("statut", ["confirmed", "pending"])
       .then(({ data }) => setDbResasNat(data || []))
       .catch(() => {});
 
@@ -3611,7 +3611,7 @@ function SeancesTab({ sessions, setSessions }) {
     const dayObj = ALL_SEASON_DAYS.find(d => d.id === dayId);
     if (!dayObj?.date) return 2;
     const dateISO = `${dayObj.date.getFullYear()}-${String(dayObj.date.getMonth()+1).padStart(2,"0")}-${String(dayObj.date.getDate()).padStart(2,"0")}`;
-    const taken = dbResasNat.filter(r => r.date_seance?.slice(0,10) === dateISO && r.heure === time && r.statut === "confirmed")
+    const taken = dbResasNat.filter(r => r.date_seance?.slice(0,10) === dateISO && r.heure === time)
       .reduce((acc, r) => acc + (Array.isArray(r.enfants) ? r.enfants.length : 1), 0);
     return Math.max(0, 2 - taken);
   };
