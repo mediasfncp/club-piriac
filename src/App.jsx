@@ -4919,7 +4919,29 @@ function PaiementsTab({ onValidate }) {
   const toggleStatut = async (groupe) => {
     const table     = groupe.type === "natation" ? "reservations_natation" : "reservations_club";
     const newStatut = groupe.statut === "pending" ? "confirmed" : "pending";
-    await Promise.all(groupe.resas.map(r => sb.from(table).update({ statut: newStatut }).eq("id", r.id)));
+    await Promise.all(groupe.resas.map(r => sb.from(table).update({ statut: newStatut, mode_paiement: newStatut === "pending" ? null : r.mode_paiement }).eq("id", r.id)));
+
+    // Si on repasse en pending → supprimer l'entrée dans paiements
+    if (newStatut === "pending") {
+      const membreId = groupe.resas[0]?.membre_id;
+      if (membreId) {
+        // Trouver le paiement correspondant créé au moment de la validation
+        const validatedAt = groupe.resas[0]?.validated_at;
+        if (validatedAt) {
+          // Supprimer le paiement du même type créé le même jour
+          const dateStr = validatedAt.slice(0, 10);
+          const { data: pais } = await sb.from("paiements")
+            .select("id, created_at")
+            .eq("membre_id", membreId)
+            .eq("type", groupe.type)
+            .eq("statut", "completed");
+          const matching = (pais || []).filter(p => p.created_at?.slice(0, 10) === dateStr);
+          if (matching.length > 0) {
+            await sb.from("paiements").delete().eq("id", matching[0].id);
+          }
+        }
+      }
+    }
 
     // Si c'est un achat Carte Liberté → créditer ou décréditer le solde
     if (groupe.type === "club" && groupe.resas.some(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6)) {
@@ -4944,7 +4966,7 @@ function PaiementsTab({ onValidate }) {
       if (membreId && nbUtil > 0) {
         const { data: m } = await sb.from("membres").select("liberte_balance").eq("id", membreId).maybeSingle();
         if (m) {
-          const delta = newStatut === "confirmed" ? -nbUtil : nbUtil; // confirmer = décrémenter
+          const delta = newStatut === "confirmed" ? -nbUtil : nbUtil;
           await sb.from("membres").update({ liberte_balance: Math.max(0, (m.liberte_balance||0) + delta) }).eq("id", membreId);
         }
       }
@@ -7629,7 +7651,11 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
                             const email = g.membre?.email; if (!email) return alert("Email introuvable");
                             const prenom = g.membre?.prenom || "";
                             const dateStr = r.date_seance ? new Date(r.date_seance).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"}) : "—";
-                            const html = genMailRelanceNat(prenom, r.heure, dateStr, Number(r.montant || 0));
+                            // Calculer le montant total des séances natation pending du groupe
+                            const PRIX_NAT_R = {1:20,2:40,3:60,4:80,5:95,6:113,7:131,8:147,9:162,10:170};
+                            const nbSeances = g.nat.filter(x => x.statut === "pending").length;
+                            const totalNat = nbSeances <= 10 ? (PRIX_NAT_R[nbSeances] || nbSeances*20) : 170+(nbSeances-10)*17;
+                            const html = genMailRelanceNat(prenom, r.heure, dateStr, totalNat);
                             try {
                               await fetch("https://api.resend.com/emails", { method:"POST", headers:{"Authorization":"Bearer re_fncp_placeholder","Content-Type":"application/json"}, body: JSON.stringify({ from:"FNCP Club de Plage <noreply@fncp-club.fr>", to:email, subject:"🔔 Rappel : votre séance de natation", html }) });
                               alert(`🔔 Relance envoyée à ${email}`);
@@ -7724,8 +7750,71 @@ const MODES_PAIEMENT = [
   { id:"compte_fin_saison",    label:"📒 Compte fin de saison",     color:"#6366F1" },
 ];
 
-function ModePaiementModal({ onConfirm, onClose, titre }) {
+function ModePaiementModal({ onConfirm, onClose, titre, montantTotal = 0 }) {
   const [mode, setMode] = useState("");
+  const [showPlusieurs, setShowPlusieurs] = useState(false);
+  const [lignes, setLignes] = useState([
+    { mode: "especes", montant: "" },
+    { mode: "virement", montant: "" },
+  ]);
+
+  const totalLignes = lignes.reduce((s, l) => s + Number(l.montant || 0), 0);
+  const resteAVentiler = montantTotal > 0 ? montantTotal - totalLignes : null;
+
+  if (showPlusieurs) return (
+    <div style={{ position:"fixed", inset:0, zIndex:1200, display:"flex", alignItems:"center", justifyContent:"center", padding:"0 20px" }}>
+      <div onClick={onClose} style={{ position:"absolute", inset:0, background:"rgba(0,20,50,0.65)", backdropFilter:"blur(5px)" }} />
+      <div style={{ position:"relative", background:"#fff", borderRadius:24, padding:"24px 20px", width:"100%", maxWidth:400, boxShadow:"0 24px 64px rgba(0,0,0,0.3)", maxHeight:"90vh", overflowY:"auto" }}>
+        <div style={{ fontWeight:900, color:C.dark, fontSize:16, marginBottom:4 }}>🔀 Plusieurs paiements</div>
+        <div style={{ fontSize:12, color:"#aaa", marginBottom:16 }}>Saisissez la répartition des paiements</div>
+        {montantTotal > 0 && (
+          <div style={{ background:"#F0F4F8", borderRadius:12, padding:"10px 14px", marginBottom:16, display:"flex", justifyContent:"space-between" }}>
+            <span style={{ fontSize:13, color:"#555" }}>Total à régler</span>
+            <span style={{ fontWeight:900, color:C.dark }}>{montantTotal} €</span>
+          </div>
+        )}
+        <div style={{ display:"flex", flexDirection:"column", gap:10, marginBottom:16 }}>
+          {lignes.map((l, i) => (
+            <div key={i} style={{ display:"flex", gap:8, alignItems:"center" }}>
+              <select value={l.mode} onChange={e => { const nl = [...lignes]; nl[i].mode = e.target.value; setLignes(nl); }}
+                style={{ flex:2, border:"2px solid #e0e8f0", borderRadius:10, padding:"9px 10px", fontSize:13, fontFamily:"inherit", outline:"none", background:"#f8fbff" }}>
+                {MODES_PAIEMENT.filter(m => m.id !== "plusieurs_paiements" && m.id !== "compte_fin_saison").map(m => (
+                  <option key={m.id} value={m.id}>{m.label}</option>
+                ))}
+              </select>
+              <input type="number" placeholder="Montant €" value={l.montant}
+                onChange={e => { const nl = [...lignes]; nl[i].montant = e.target.value; setLignes(nl); }}
+                style={{ flex:1, border:"2px solid #e0e8f0", borderRadius:10, padding:"9px 10px", fontSize:13, fontFamily:"inherit", outline:"none", textAlign:"right" }} />
+              {lignes.length > 2 && (
+                <button onClick={() => setLignes(ll => ll.filter((_, j) => j !== i))}
+                  style={{ background:"none", border:"none", color:C.sunset, fontSize:18, cursor:"pointer", flexShrink:0 }}>✕</button>
+              )}
+            </div>
+          ))}
+        </div>
+        <button onClick={() => setLignes(ll => [...ll, { mode:"especes", montant:"" }])}
+          style={{ width:"100%", background:"#f0f4f8", border:"2px dashed #ccd", borderRadius:10, padding:"8px", cursor:"pointer", fontSize:13, color:"#888", fontFamily:"inherit", marginBottom:12 }}>
+          + Ajouter un mode
+        </button>
+        {resteAVentiler !== null && (
+          <div style={{ background: Math.abs(resteAVentiler) < 1 ? "#f0fff4" : "#fff8f0", border:`1.5px solid ${Math.abs(resteAVentiler) < 1 ? C.green : C.coral}`, borderRadius:10, padding:"8px 14px", marginBottom:14, display:"flex", justifyContent:"space-between", fontSize:13 }}>
+            <span style={{ color:"#555" }}>Reste à ventiler</span>
+            <span style={{ fontWeight:900, color: Math.abs(resteAVentiler) < 1 ? C.green : C.coral }}>{resteAVentiler.toFixed(0)} €</span>
+          </div>
+        )}
+        <div style={{ display:"flex", gap:8 }}>
+          <button onClick={() => setShowPlusieurs(false)} style={{ flex:1, background:"#f0f0f0", border:"none", color:"#888", borderRadius:12, padding:"11px", cursor:"pointer", fontWeight:800, fontFamily:"inherit" }}>← Retour</button>
+          <button onClick={() => {
+            const detail = lignes.filter(l => Number(l.montant) > 0).map(l => `${MODES_PAIEMENT.find(m=>m.id===l.mode)?.label||l.mode} : ${l.montant}€`).join(" + ");
+            onConfirm("plusieurs_paiements", detail, totalLignes);
+          }} style={{ flex:2, background:`linear-gradient(135deg,${C.green},#27AE60)`, border:"none", color:"#fff", borderRadius:12, padding:"11px", cursor:"pointer", fontWeight:900, fontFamily:"inherit", fontSize:14 }}>
+            ✅ Confirmer
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div style={{ position:"fixed", inset:0, zIndex:1200, display:"flex", alignItems:"center", justifyContent:"center", padding:"0 20px" }}>
       <div onClick={onClose} style={{ position:"absolute", inset:0, background:"rgba(0,20,50,0.65)", backdropFilter:"blur(5px)" }} />
@@ -7734,10 +7823,11 @@ function ModePaiementModal({ onConfirm, onClose, titre }) {
         <div style={{ fontSize:12, color:"#aaa", marginBottom:16 }}>{titre || "Choisissez le mode de règlement"}</div>
         <div style={{ display:"flex", flexDirection:"column", gap:8, marginBottom:20 }}>
           {MODES_PAIEMENT.map(m => (
-            <div key={m.id} onClick={() => setMode(m.id)}
-              style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 14px", borderRadius:14, cursor:"pointer", border:`2px solid ${mode===m.id ? m.color : "#e0e8f0"}`, background: mode===m.id ? `${m.color}12` : "#f8fbff", transition:"all .15s" }}>
-              <div style={{ width:20, height:20, borderRadius:"50%", border:`3px solid ${mode===m.id ? m.color : "#ddd"}`, background: mode===m.id ? m.color : "transparent", flexShrink:0 }} />
-              <span style={{ fontWeight:800, color: mode===m.id ? m.color : "#555", fontSize:14 }}>{m.label}</span>
+            <div key={m.id} onClick={() => { if (m.id === "plusieurs_paiements") { setShowPlusieurs(true); return; } setMode(m.id); }}
+              style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 14px", borderRadius:14, cursor:"pointer", border:`2px solid ${mode===m.id ? m.color : m.id==="plusieurs_paiements"?"#F97316":"#e0e8f0"}`, background: mode===m.id ? `${m.color}12` : m.id==="plusieurs_paiements"?"#fff8f2":"#f8fbff", transition:"all .15s" }}>
+              <div style={{ width:20, height:20, borderRadius:"50%", border:`3px solid ${mode===m.id ? m.color : m.id==="plusieurs_paiements"?"#F97316":"#ddd"}`, background: mode===m.id ? m.color : "transparent", flexShrink:0 }} />
+              <span style={{ fontWeight:800, color: mode===m.id ? m.color : m.id==="plusieurs_paiements"?"#F97316":"#555", fontSize:14 }}>{m.label}</span>
+              {m.id === "plusieurs_paiements" && <span style={{ marginLeft:"auto", fontSize:10, color:"#F97316" }}>→</span>}
             </div>
           ))}
         </div>
