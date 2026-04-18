@@ -4919,29 +4919,7 @@ function PaiementsTab({ onValidate }) {
   const toggleStatut = async (groupe) => {
     const table     = groupe.type === "natation" ? "reservations_natation" : "reservations_club";
     const newStatut = groupe.statut === "pending" ? "confirmed" : "pending";
-    await Promise.all(groupe.resas.map(r => sb.from(table).update({ statut: newStatut, mode_paiement: newStatut === "pending" ? null : r.mode_paiement }).eq("id", r.id)));
-
-    // Si on repasse en pending → supprimer l'entrée dans paiements
-    if (newStatut === "pending") {
-      const membreId = groupe.resas[0]?.membre_id;
-      if (membreId) {
-        // Trouver le paiement correspondant créé au moment de la validation
-        const validatedAt = groupe.resas[0]?.validated_at;
-        if (validatedAt) {
-          // Supprimer le paiement du même type créé le même jour
-          const dateStr = validatedAt.slice(0, 10);
-          const { data: pais } = await sb.from("paiements")
-            .select("id, created_at")
-            .eq("membre_id", membreId)
-            .eq("type", groupe.type)
-            .eq("statut", "completed");
-          const matching = (pais || []).filter(p => p.created_at?.slice(0, 10) === dateStr);
-          if (matching.length > 0) {
-            await sb.from("paiements").delete().eq("id", matching[0].id);
-          }
-        }
-      }
-    }
+    await Promise.all(groupe.resas.map(r => sb.from(table).update({ statut: newStatut }).eq("id", r.id)));
 
     // Si c'est un achat Carte Liberté → créditer ou décréditer le solde
     if (groupe.type === "club" && groupe.resas.some(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6)) {
@@ -4966,7 +4944,7 @@ function PaiementsTab({ onValidate }) {
       if (membreId && nbUtil > 0) {
         const { data: m } = await sb.from("membres").select("liberte_balance").eq("id", membreId).maybeSingle();
         if (m) {
-          const delta = newStatut === "confirmed" ? -nbUtil : nbUtil;
+          const delta = newStatut === "confirmed" ? -nbUtil : nbUtil; // confirmer = décrémenter
           await sb.from("membres").update({ liberte_balance: Math.max(0, (m.liberte_balance||0) + delta) }).eq("id", membreId);
         }
       }
@@ -7547,6 +7525,14 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
         <ModePaiementModal
           titre={`Valider la réservation de ${modePaiementConfirm.resa.membre_id}`}
           onClose={() => setModePaiementConfirm(null)}
+          montantTotal={(() => {
+            const { resa, type } = modePaiementConfirm;
+            if (type === "natation") return Number(resa.montant || 20);
+            const isLib = !isNaN(Number(resa.enfants?.[0])) && Number(resa.enfants?.[0]) >= 6;
+            if (isLib) { const LP={6:96,12:180,18:252,24:288,30:330}; return LP[Number(resa.enfants[0])]||0; }
+            const m2=(resa.label_jour||"").match(/\[MONTANT:(\d+)\]/);
+            return m2?Number(m2[1]):0;
+          })()}
           onConfirm={async (mode) => {
             const { resa, type } = modePaiementConfirm;
             if (type === "natation") {
@@ -7651,11 +7637,7 @@ function ResasMembreView({ dbResas, dbResasClub, refreshResas, setModifierResa, 
                             const email = g.membre?.email; if (!email) return alert("Email introuvable");
                             const prenom = g.membre?.prenom || "";
                             const dateStr = r.date_seance ? new Date(r.date_seance).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"}) : "—";
-                            // Calculer le montant total des séances natation pending du groupe
-                            const PRIX_NAT_R = {1:20,2:40,3:60,4:80,5:95,6:113,7:131,8:147,9:162,10:170};
-                            const nbSeances = g.nat.filter(x => x.statut === "pending").length;
-                            const totalNat = nbSeances <= 10 ? (PRIX_NAT_R[nbSeances] || nbSeances*20) : 170+(nbSeances-10)*17;
-                            const html = genMailRelanceNat(prenom, r.heure, dateStr, totalNat);
+                            const html = genMailRelanceNat(prenom, r.heure, dateStr, Number(r.montant || 0));
                             try {
                               await fetch("https://api.resend.com/emails", { method:"POST", headers:{"Authorization":"Bearer re_fncp_placeholder","Content-Type":"application/json"}, body: JSON.stringify({ from:"FNCP Club de Plage <noreply@fncp-club.fr>", to:email, subject:"🔔 Rappel : votre séance de natation", html }) });
                               alert(`🔔 Relance envoyée à ${email}`);
@@ -7752,73 +7734,6 @@ const MODES_PAIEMENT = [
 
 function ModePaiementModal({ onConfirm, onClose, titre, montantTotal = 0 }) {
   const [mode, setMode] = useState("");
-  const [showPlusieurs, setShowPlusieurs] = useState(false);
-  const [lignes, setLignes] = useState([
-    { mode: "especes", montant: "" },
-    { mode: "virement", montant: "" },
-  ]);
-
-  const totalLignes = lignes.reduce((s, l) => s + Number(l.montant || 0), 0);
-  const resteAVentiler = montantTotal > 0 ? montantTotal - totalLignes : null;
-
-  if (showPlusieurs) return (
-    <div style={{ position:"fixed", inset:0, zIndex:1200, display:"flex", alignItems:"center", justifyContent:"center", padding:"0 20px" }}>
-      <div onClick={onClose} style={{ position:"absolute", inset:0, background:"rgba(0,20,50,0.65)", backdropFilter:"blur(5px)" }} />
-      <div style={{ position:"relative", background:"#fff", borderRadius:24, padding:"24px 20px", width:"100%", maxWidth:400, boxShadow:"0 24px 64px rgba(0,0,0,0.3)", maxHeight:"90vh", overflowY:"auto" }}>
-        <div style={{ fontWeight:900, color:C.dark, fontSize:16, marginBottom:4 }}>🔀 Plusieurs paiements</div>
-        <div style={{ fontSize:12, color:"#aaa", marginBottom:16 }}>Saisissez la répartition des paiements</div>
-        {montantTotal > 0 && (
-          <div style={{ background:"#F0F4F8", borderRadius:12, padding:"10px 14px", marginBottom:16, display:"flex", justifyContent:"space-between" }}>
-            <span style={{ fontSize:13, color:"#555" }}>Total à régler</span>
-            <span style={{ fontWeight:900, color:C.dark }}>{montantTotal} €</span>
-          </div>
-        )}
-        <div style={{ display:"flex", flexDirection:"column", gap:10, marginBottom:16 }}>
-          {lignes.map((l, i) => (
-            <div key={i} style={{ display:"flex", gap:8, alignItems:"center" }}>
-              <select value={l.mode} onChange={e => { const nl = [...lignes]; nl[i].mode = e.target.value; setLignes(nl); }}
-                style={{ flex:2, border:"2px solid #e0e8f0", borderRadius:10, padding:"9px 10px", fontSize:13, fontFamily:"inherit", outline:"none", background:"#f8fbff" }}>
-                {MODES_PAIEMENT.filter(m => m.id !== "plusieurs_paiements" && m.id !== "compte_fin_saison").map(m => (
-                  <option key={m.id} value={m.id}>{m.label}</option>
-                ))}
-              </select>
-              <input type="number" placeholder="Montant €" value={l.montant}
-                onChange={e => { const nl = [...lignes]; nl[i].montant = e.target.value; setLignes(nl); }}
-                style={{ flex:1, border:"2px solid #e0e8f0", borderRadius:10, padding:"9px 10px", fontSize:13, fontFamily:"inherit", outline:"none", textAlign:"right" }} />
-              {lignes.length > 2 && (
-                <button onClick={() => setLignes(ll => ll.filter((_, j) => j !== i))}
-                  style={{ background:"none", border:"none", color:C.sunset, fontSize:18, cursor:"pointer", flexShrink:0 }}>✕</button>
-              )}
-            </div>
-          ))}
-        </div>
-        <button onClick={() => setLignes(ll => [...ll, { mode:"especes", montant:"" }])}
-          style={{ width:"100%", background:"#f0f4f8", border:"2px dashed #ccd", borderRadius:10, padding:"8px", cursor:"pointer", fontSize:13, color:"#888", fontFamily:"inherit", marginBottom:12 }}>
-          + Ajouter un mode
-        </button>
-        {resteAVentiler !== null && (
-          <div style={{ background: Math.abs(resteAVentiler) < 1 ? "#f0fff4" : "#fff8f0", border:`1.5px solid ${Math.abs(resteAVentiler) < 1 ? C.green : C.coral}`, borderRadius:10, padding:"8px 14px", marginBottom:14, display:"flex", justifyContent:"space-between", fontSize:13 }}>
-            <span style={{ color:"#555" }}>Reste à ventiler</span>
-            <span style={{ fontWeight:900, color: Math.abs(resteAVentiler) < 1 ? C.green : C.coral }}>{resteAVentiler.toFixed(0)} €</span>
-          </div>
-        )}
-        <div style={{ display:"flex", gap:8 }}>
-          <button onClick={() => setShowPlusieurs(false)} style={{ flex:1, background:"#f0f0f0", border:"none", color:"#888", borderRadius:12, padding:"11px", cursor:"pointer", fontWeight:800, fontFamily:"inherit" }}>← Retour</button>
-          <button onClick={() => {
-            if (montantTotal > 0 && totalLignes > montantTotal) {
-              alert(`Le total saisi (${totalLignes} €) dépasse le montant à régler (${montantTotal} €).`);
-              return;
-            }
-            const detail = lignes.filter(l => Number(l.montant) > 0).map(l => `${MODES_PAIEMENT.find(m=>m.id===l.mode)?.label||l.mode} : ${l.montant}€`).join(" + ");
-            onConfirm("plusieurs_paiements", detail, totalLignes);
-          }} style={{ flex:2, background: (montantTotal > 0 && totalLignes > montantTotal) ? "#ddd" : `linear-gradient(135deg,${C.green},#27AE60)`, border:"none", color:"#fff", borderRadius:12, padding:"11px", cursor: (montantTotal > 0 && totalLignes > montantTotal) ? "not-allowed" : "pointer", fontWeight:900, fontFamily:"inherit", fontSize:14 }}>
-            ✅ Confirmer
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-
   return (
     <div style={{ position:"fixed", inset:0, zIndex:1200, display:"flex", alignItems:"center", justifyContent:"center", padding:"0 20px" }}>
       <div onClick={onClose} style={{ position:"absolute", inset:0, background:"rgba(0,20,50,0.65)", backdropFilter:"blur(5px)" }} />
@@ -7827,11 +7742,10 @@ function ModePaiementModal({ onConfirm, onClose, titre, montantTotal = 0 }) {
         <div style={{ fontSize:12, color:"#aaa", marginBottom:16 }}>{titre || "Choisissez le mode de règlement"}</div>
         <div style={{ display:"flex", flexDirection:"column", gap:8, marginBottom:20 }}>
           {MODES_PAIEMENT.map(m => (
-            <div key={m.id} onClick={() => { if (m.id === "plusieurs_paiements") { setShowPlusieurs(true); return; } setMode(m.id); }}
-              style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 14px", borderRadius:14, cursor:"pointer", border:`2px solid ${mode===m.id ? m.color : m.id==="plusieurs_paiements"?"#F97316":"#e0e8f0"}`, background: mode===m.id ? `${m.color}12` : m.id==="plusieurs_paiements"?"#fff8f2":"#f8fbff", transition:"all .15s" }}>
-              <div style={{ width:20, height:20, borderRadius:"50%", border:`3px solid ${mode===m.id ? m.color : m.id==="plusieurs_paiements"?"#F97316":"#ddd"}`, background: mode===m.id ? m.color : "transparent", flexShrink:0 }} />
-              <span style={{ fontWeight:800, color: mode===m.id ? m.color : m.id==="plusieurs_paiements"?"#F97316":"#555", fontSize:14 }}>{m.label}</span>
-              {m.id === "plusieurs_paiements" && <span style={{ marginLeft:"auto", fontSize:10, color:"#F97316" }}>→</span>}
+            <div key={m.id} onClick={() => setMode(m.id)}
+              style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 14px", borderRadius:14, cursor:"pointer", border:`2px solid ${mode===m.id ? m.color : "#e0e8f0"}`, background: mode===m.id ? `${m.color}12` : "#f8fbff", transition:"all .15s" }}>
+              <div style={{ width:20, height:20, borderRadius:"50%", border:`3px solid ${mode===m.id ? m.color : "#ddd"}`, background: mode===m.id ? m.color : "transparent", flexShrink:0 }} />
+              <span style={{ fontWeight:800, color: mode===m.id ? m.color : "#555", fontSize:14 }}>{m.label}</span>
             </div>
           ))}
         </div>
@@ -9401,6 +9315,10 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
           setClubPlaces(prev => ({ ...prev, matin: Math.max(0, 45 - counts.matin), apmidi: Math.max(0, 45 - counts.apmidi) }));
         }
       });
+
+    // Recharger aussi les paiements pour mettre à jour le dashboard
+    sb.from("paiements").select("*").eq("statut", "completed").order("created_at", { ascending: false })
+      .then(({ data }) => setDbPaiements(data || [])).catch(() => {});
   };
 
   const supprimerResaNatation = async (id) => {
@@ -9493,6 +9411,22 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
         <ModePaiementModal
           titre={`Valider ${pendingModalConfirm.resas?.length} réservation${pendingModalConfirm.resas?.length>1?"s":""}`}
           onClose={() => setPendingModalConfirm(null)}
+          montantTotal={(() => {
+            const g = pendingModalConfirm;
+            if (!g) return 0;
+            const LIBERTE_PRIX_V = {6:96,12:180,18:252,24:288,30:330};
+            const PRIX_NAT_V = {1:20,2:40,3:60,4:80,5:95,6:113,7:131,8:147,9:162,10:170};
+            if (g.type === "natation") {
+              const n = g.resas.length;
+              return n <= 10 ? (PRIX_NAT_V[n]||n*20) : 170+(n-10)*17;
+            }
+            const r0 = g.resas[0];
+            const isLib = !isNaN(Number(r0?.enfants?.[0])) && Number(r0?.enfants?.[0]) >= 6;
+            if (isLib) return LIBERTE_PRIX_V[Number(r0.enfants[0])]||0;
+            const montants = g.resas.map(r => { const m2=(r.label_jour||"").match(/\[MONTANT:(\d+)\]/); return r.montant?Number(r.montant):(m2?Number(m2[1]):0); });
+            const allSame = montants.every(m => m === montants[0]);
+            return allSame && g.resas.length > 1 ? montants[0] : montants.reduce((s,m)=>s+m,0);
+          })()}
           onConfirm={async (mode) => {
             const g = pendingModalConfirm;
             const table = g.type === "natation" ? "reservations_natation" : "reservations_club";
@@ -9524,46 +9458,27 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
 
             if (g.type === "club") {
               const LIBERTE_PRIX_V = {6:96,12:180,18:252,24:288,30:330};
-              const membreIdClub = g.resas[0]?.membre_id;
               let totalMontantClub = 0;
-
-              // 1. Chercher d'abord dans commandes_club (source de vérité pour forfaits semaine)
-              const datesResas = new Set(g.resas.map(r => r.date_reservation?.slice(0,10)).filter(Boolean));
-              const { data: cmds } = await sb.from("commandes_club").select("montant_total, dates").eq("membre_id", membreIdClub);
-              const cmdMatching = (cmds||[]).filter(c => Array.isArray(c.dates) && c.dates.some(d => datesResas.has(d)));
-              if (cmdMatching.length > 0) {
+              for (const r of g.resas) {
+                let montant = 0;
+                const isLib = !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6;
+                if (isLib) { montant = LIBERTE_PRIX_V[Number(r.enfants[0])]||0; }
+                else { const m2=(r.label_jour||"").match(/\[MONTANT:(\d+)\]/); montant=m2?Number(m2[1]):0; }
+                await sb.from(table).update({ statut:"confirmed", validated_at:new Date().toISOString(), montant, mode_paiement:mode }).eq("id", r.id);
+                totalMontantClub += montant;
+              }
+              // Si montant 0 (forfait semaine via commandes_club), chercher dans commandes_club
+              if (totalMontantClub === 0) {
+                const membreIdClub = g.resas[0]?.membre_id;
+                const datesResas = new Set(g.resas.map(r => r.date_reservation?.slice(0,10)).filter(Boolean));
+                const { data: cmds } = await sb.from("commandes_club").select("montant_total, dates").eq("membre_id", membreIdClub);
+                const cmdMatching = (cmds||[]).filter(c => Array.isArray(c.dates) && c.dates.some(d => datesResas.has(d)));
                 totalMontantClub = cmdMatching.reduce((s, c) => s + Number(c.montant_total||0), 0);
               }
-
-              // 2. Sinon : carte liberté ou demi-journée unitaire
-              if (totalMontantClub === 0) {
-                const r0 = g.resas[0];
-                const isLib = !isNaN(Number(r0?.enfants?.[0])) && Number(r0?.enfants?.[0]) >= 6;
-                if (isLib) {
-                  totalMontantClub = LIBERTE_PRIX_V[Number(r0.enfants[0])] || 0;
-                } else {
-                  const montants = g.resas.map(r => {
-                    const m2 = (r.label_jour||"").match(/\[MONTANT:(\d+)\]/);
-                    return r.montant ? Number(r.montant) : (m2 ? Number(m2[1]) : 0);
-                  });
-                  const allSame = montants.every(m => m === montants[0]);
-                  if (allSame && g.resas.length > 1) {
-                    // Forfait réparti par jour → total = valeur d'une seule ligne
-                    totalMontantClub = montants[0];
-                  } else {
-                    totalMontantClub = montants.reduce((s, m) => s + m, 0);
-                  }
-                }
-              }
-
-              // Mettre à jour les résas
-              for (const r of g.resas) {
-                await sb.from(table).update({ statut:"confirmed", validated_at:new Date().toISOString(), mode_paiement:mode }).eq("id", r.id);
-              }
-
               // ── Insert paiement club ──
               if (totalMontantClub > 0) {
-                await sb.from("paiements").insert([{ membre_id:membreIdClub, montant:totalMontantClub, type:"club", label:`Club · ${g.resas.length} réservation${g.resas.length>1?"s":""}`, statut:"completed", date_paiement: new Date().toISOString() }]);
+                const membreId = g.resas[0]?.membre_id;
+                await sb.from("paiements").insert([{ membre_id:membreId, montant:totalMontantClub, type:"club", label:`Club · ${g.resas.length} réservation${g.resas.length>1?"s":""}`, statut:"completed" }]);
               }
             } else {
               // Natation : calculer montant forfait × nombre d'enfants
