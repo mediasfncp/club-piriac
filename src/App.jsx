@@ -7733,7 +7733,72 @@ const MODES_PAIEMENT = [
 ];
 
 function ModePaiementModal({ onConfirm, onClose, titre, montantTotal = 0 }) {
-  const [mode, setMode] = useState("");
+  const [mode, setMode]               = useState("");
+  const [showPlusieurs, setShowPlusieurs] = useState(false);
+  const [lignes, setLignes]           = useState([
+    { mode: "especes", montant: "" },
+    { mode: "virement", montant: "" },
+  ]);
+
+  const totalLignes    = lignes.reduce((s, l) => s + Number(l.montant || 0), 0);
+  const resteAVentiler = montantTotal > 0 ? montantTotal - totalLignes : null;
+  const depasse        = montantTotal > 0 && totalLignes > montantTotal;
+
+  if (showPlusieurs) return (
+    <div style={{ position:"fixed", inset:0, zIndex:1200, display:"flex", alignItems:"center", justifyContent:"center", padding:"0 20px" }}>
+      <div onClick={onClose} style={{ position:"absolute", inset:0, background:"rgba(0,20,50,0.65)", backdropFilter:"blur(5px)" }} />
+      <div style={{ position:"relative", background:"#fff", borderRadius:24, padding:"24px 20px", width:"100%", maxWidth:400, boxShadow:"0 24px 64px rgba(0,0,0,0.3)", maxHeight:"90vh", overflowY:"auto" }}>
+        <div style={{ fontWeight:900, color:C.dark, fontSize:16, marginBottom:4 }}>🔀 Plusieurs paiements</div>
+        <div style={{ fontSize:12, color:"#aaa", marginBottom:16 }}>Saisissez la répartition des paiements</div>
+        {montantTotal > 0 && (
+          <div style={{ background:"#F0F4F8", borderRadius:12, padding:"10px 14px", marginBottom:16, display:"flex", justifyContent:"space-between" }}>
+            <span style={{ fontSize:13, color:"#555" }}>Total à régler</span>
+            <span style={{ fontWeight:900, color:C.dark }}>{montantTotal} €</span>
+          </div>
+        )}
+        <div style={{ display:"flex", flexDirection:"column", gap:10, marginBottom:12 }}>
+          {lignes.map((l, i) => (
+            <div key={i} style={{ display:"flex", gap:8, alignItems:"center" }}>
+              <select value={l.mode} onChange={e => { const nl=[...lignes]; nl[i].mode=e.target.value; setLignes(nl); }}
+                style={{ flex:2, border:"2px solid #e0e8f0", borderRadius:10, padding:"9px 10px", fontSize:13, fontFamily:"inherit", outline:"none", background:"#f8fbff" }}>
+                {MODES_PAIEMENT.filter(m => m.id !== "plusieurs_paiements" && m.id !== "compte_fin_saison").map(m => (
+                  <option key={m.id} value={m.id}>{m.label}</option>
+                ))}
+              </select>
+              <input type="number" placeholder="Montant €" value={l.montant}
+                onChange={e => { const nl=[...lignes]; nl[i].montant=e.target.value; setLignes(nl); }}
+                style={{ flex:1, border:`2px solid ${depasse?"#FF6B6B":"#e0e8f0"}`, borderRadius:10, padding:"9px 10px", fontSize:13, fontFamily:"inherit", outline:"none", textAlign:"right" }} />
+              {lignes.length > 2 && (
+                <button onClick={() => setLignes(ll => ll.filter((_,j) => j!==i))}
+                  style={{ background:"none", border:"none", color:C.sunset, fontSize:18, cursor:"pointer", flexShrink:0 }}>✕</button>
+              )}
+            </div>
+          ))}
+        </div>
+        <button onClick={() => setLignes(ll => [...ll, { mode:"especes", montant:"" }])}
+          style={{ width:"100%", background:"#f0f4f8", border:"2px dashed #ccd", borderRadius:10, padding:"8px", cursor:"pointer", fontSize:13, color:"#888", fontFamily:"inherit", marginBottom:12 }}>
+          + Ajouter un mode
+        </button>
+        {resteAVentiler !== null && (
+          <div style={{ background: depasse?"#fff0f0":Math.abs(resteAVentiler)<1?"#f0fff4":"#fff8f0", border:`1.5px solid ${depasse?"#FF6B6B":Math.abs(resteAVentiler)<1?C.green:C.coral}`, borderRadius:10, padding:"8px 14px", marginBottom:14, display:"flex", justifyContent:"space-between", fontSize:13 }}>
+            <span style={{ color:"#555" }}>{depasse?"⚠️ Dépassement":"Reste à ventiler"}</span>
+            <span style={{ fontWeight:900, color: depasse?"#FF6B6B":Math.abs(resteAVentiler)<1?C.green:C.coral }}>{resteAVentiler.toFixed(0)} €</span>
+          </div>
+        )}
+        <div style={{ display:"flex", gap:8 }}>
+          <button onClick={() => setShowPlusieurs(false)} style={{ flex:1, background:"#f0f0f0", border:"none", color:"#888", borderRadius:12, padding:"11px", cursor:"pointer", fontWeight:800, fontFamily:"inherit" }}>← Retour</button>
+          <button onClick={() => {
+            if (depasse) { alert(`Le total (${totalLignes} €) dépasse le montant à régler (${montantTotal} €).`); return; }
+            const detail = lignes.filter(l => Number(l.montant) > 0).map(l => `${MODES_PAIEMENT.find(m=>m.id===l.mode)?.label||l.mode} : ${l.montant}€`).join(" + ");
+            onConfirm("plusieurs_paiements", detail, totalLignes);
+          }} style={{ flex:2, background: depasse?"#ddd":`linear-gradient(135deg,${C.green},#27AE60)`, border:"none", color:"#fff", borderRadius:12, padding:"11px", cursor: depasse?"not-allowed":"pointer", fontWeight:900, fontFamily:"inherit", fontSize:14 }}>
+            ✅ Confirmer
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div style={{ position:"fixed", inset:0, zIndex:1200, display:"flex", alignItems:"center", justifyContent:"center", padding:"0 20px" }}>
       <div onClick={onClose} style={{ position:"absolute", inset:0, background:"rgba(0,20,50,0.65)", backdropFilter:"blur(5px)" }} />
@@ -7742,10 +7807,13 @@ function ModePaiementModal({ onConfirm, onClose, titre, montantTotal = 0 }) {
         <div style={{ fontSize:12, color:"#aaa", marginBottom:16 }}>{titre || "Choisissez le mode de règlement"}</div>
         <div style={{ display:"flex", flexDirection:"column", gap:8, marginBottom:20 }}>
           {MODES_PAIEMENT.map(m => (
-            <div key={m.id} onClick={() => setMode(m.id)}
-              style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 14px", borderRadius:14, cursor:"pointer", border:`2px solid ${mode===m.id ? m.color : "#e0e8f0"}`, background: mode===m.id ? `${m.color}12` : "#f8fbff", transition:"all .15s" }}>
-              <div style={{ width:20, height:20, borderRadius:"50%", border:`3px solid ${mode===m.id ? m.color : "#ddd"}`, background: mode===m.id ? m.color : "transparent", flexShrink:0 }} />
-              <span style={{ fontWeight:800, color: mode===m.id ? m.color : "#555", fontSize:14 }}>{m.label}</span>
+            <div key={m.id} onClick={() => { if (m.id === "plusieurs_paiements") { setShowPlusieurs(true); return; } setMode(m.id); }}
+              style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 14px", borderRadius:14, cursor:"pointer",
+                border:`2px solid ${mode===m.id ? m.color : m.id==="plusieurs_paiements"?"#F97316":"#e0e8f0"}`,
+                background: mode===m.id ? `${m.color}12` : m.id==="plusieurs_paiements"?"#fff8f2":"#f8fbff", transition:"all .15s" }}>
+              <div style={{ width:20, height:20, borderRadius:"50%", border:`3px solid ${mode===m.id ? m.color : m.id==="plusieurs_paiements"?"#F97316":"#ddd"}`, background: mode===m.id ? m.color : "transparent", flexShrink:0 }} />
+              <span style={{ fontWeight:800, color: mode===m.id ? m.color : m.id==="plusieurs_paiements"?"#F97316":"#555", fontSize:14 }}>{m.label}</span>
+              {m.id === "plusieurs_paiements" && <span style={{ marginLeft:"auto", fontSize:11, color:"#F97316" }}>→ Saisir</span>}
             </div>
           ))}
         </div>
