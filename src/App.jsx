@@ -7805,9 +7805,13 @@ function ModePaiementModal({ onConfirm, onClose, titre, montantTotal = 0 }) {
         <div style={{ display:"flex", gap:8 }}>
           <button onClick={() => setShowPlusieurs(false)} style={{ flex:1, background:"#f0f0f0", border:"none", color:"#888", borderRadius:12, padding:"11px", cursor:"pointer", fontWeight:800, fontFamily:"inherit" }}>← Retour</button>
           <button onClick={() => {
+            if (montantTotal > 0 && totalLignes > montantTotal) {
+              alert(`Le total saisi (${totalLignes} €) dépasse le montant à régler (${montantTotal} €).`);
+              return;
+            }
             const detail = lignes.filter(l => Number(l.montant) > 0).map(l => `${MODES_PAIEMENT.find(m=>m.id===l.mode)?.label||l.mode} : ${l.montant}€`).join(" + ");
             onConfirm("plusieurs_paiements", detail, totalLignes);
-          }} style={{ flex:2, background:`linear-gradient(135deg,${C.green},#27AE60)`, border:"none", color:"#fff", borderRadius:12, padding:"11px", cursor:"pointer", fontWeight:900, fontFamily:"inherit", fontSize:14 }}>
+          }} style={{ flex:2, background: (montantTotal > 0 && totalLignes > montantTotal) ? "#ddd" : `linear-gradient(135deg,${C.green},#27AE60)`, border:"none", color:"#fff", borderRadius:12, padding:"11px", cursor: (montantTotal > 0 && totalLignes > montantTotal) ? "not-allowed" : "pointer", fontWeight:900, fontFamily:"inherit", fontSize:14 }}>
             ✅ Confirmer
           </button>
         </div>
@@ -9520,27 +9524,46 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
 
             if (g.type === "club") {
               const LIBERTE_PRIX_V = {6:96,12:180,18:252,24:288,30:330};
+              const membreIdClub = g.resas[0]?.membre_id;
               let totalMontantClub = 0;
-              for (const r of g.resas) {
-                let montant = 0;
-                const isLib = !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6;
-                if (isLib) { montant = LIBERTE_PRIX_V[Number(r.enfants[0])]||0; }
-                else { const m2=(r.label_jour||"").match(/\[MONTANT:(\d+)\]/); montant=m2?Number(m2[1]):0; }
-                await sb.from(table).update({ statut:"confirmed", validated_at:new Date().toISOString(), montant, mode_paiement:mode }).eq("id", r.id);
-                totalMontantClub += montant;
-              }
-              // Si montant 0 (forfait semaine via commandes_club), chercher dans commandes_club
-              if (totalMontantClub === 0) {
-                const membreIdClub = g.resas[0]?.membre_id;
-                const datesResas = new Set(g.resas.map(r => r.date_reservation?.slice(0,10)).filter(Boolean));
-                const { data: cmds } = await sb.from("commandes_club").select("montant_total, dates").eq("membre_id", membreIdClub);
-                const cmdMatching = (cmds||[]).filter(c => Array.isArray(c.dates) && c.dates.some(d => datesResas.has(d)));
+
+              // 1. Chercher d'abord dans commandes_club (source de vérité pour forfaits semaine)
+              const datesResas = new Set(g.resas.map(r => r.date_reservation?.slice(0,10)).filter(Boolean));
+              const { data: cmds } = await sb.from("commandes_club").select("montant_total, dates").eq("membre_id", membreIdClub);
+              const cmdMatching = (cmds||[]).filter(c => Array.isArray(c.dates) && c.dates.some(d => datesResas.has(d)));
+              if (cmdMatching.length > 0) {
                 totalMontantClub = cmdMatching.reduce((s, c) => s + Number(c.montant_total||0), 0);
               }
+
+              // 2. Sinon : carte liberté ou demi-journée unitaire
+              if (totalMontantClub === 0) {
+                const r0 = g.resas[0];
+                const isLib = !isNaN(Number(r0?.enfants?.[0])) && Number(r0?.enfants?.[0]) >= 6;
+                if (isLib) {
+                  totalMontantClub = LIBERTE_PRIX_V[Number(r0.enfants[0])] || 0;
+                } else {
+                  const montants = g.resas.map(r => {
+                    const m2 = (r.label_jour||"").match(/\[MONTANT:(\d+)\]/);
+                    return r.montant ? Number(r.montant) : (m2 ? Number(m2[1]) : 0);
+                  });
+                  const allSame = montants.every(m => m === montants[0]);
+                  if (allSame && g.resas.length > 1) {
+                    // Forfait réparti par jour → total = valeur d'une seule ligne
+                    totalMontantClub = montants[0];
+                  } else {
+                    totalMontantClub = montants.reduce((s, m) => s + m, 0);
+                  }
+                }
+              }
+
+              // Mettre à jour les résas
+              for (const r of g.resas) {
+                await sb.from(table).update({ statut:"confirmed", validated_at:new Date().toISOString(), mode_paiement:mode }).eq("id", r.id);
+              }
+
               // ── Insert paiement club ──
               if (totalMontantClub > 0) {
-                const membreId = g.resas[0]?.membre_id;
-                await sb.from("paiements").insert([{ membre_id:membreId, montant:totalMontantClub, type:"club", label:`Club · ${g.resas.length} réservation${g.resas.length>1?"s":""}`, statut:"completed" }]);
+                await sb.from("paiements").insert([{ membre_id:membreIdClub, montant:totalMontantClub, type:"club", label:`Club · ${g.resas.length} réservation${g.resas.length>1?"s":""}`, statut:"completed", date_paiement: new Date().toISOString() }]);
               }
             } else {
               // Natation : calculer montant forfait × nombre d'enfants
