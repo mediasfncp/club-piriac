@@ -9526,27 +9526,38 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
 
             if (g.type === "club") {
               const LIBERTE_PRIX_V = {6:96,12:180,18:252,24:288,30:330};
+              const membreIdClub = g.resas[0]?.membre_id;
+              const r0club = g.resas[0];
+              const isLiberte = !isNaN(Number(r0club?.enfants?.[0])) && Number(r0club?.enfants?.[0]) >= 6;
               let totalMontantClub = 0;
-              for (const r of g.resas) {
-                let montant = 0;
-                const isLib = !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6;
-                if (isLib) { montant = LIBERTE_PRIX_V[Number(r.enfants[0])]||0; }
-                else { const m2=(r.label_jour||"").match(/\[MONTANT:(\d+)\]/); montant=m2?Number(m2[1]):0; }
-                await sb.from(table).update({ statut:"confirmed", validated_at:new Date().toISOString(), montant, mode_paiement:mode }).eq("id", r.id);
-                totalMontantClub += montant;
-              }
-              // Si montant 0 (forfait semaine via commandes_club), chercher dans commandes_club
-              if (totalMontantClub === 0) {
-                const membreIdClub = g.resas[0]?.membre_id;
+
+              if (isLiberte) {
+                // Carte liberté : prix fixe + créditer le solde
+                totalMontantClub = LIBERTE_PRIX_V[Number(r0club.enfants[0])] || 0;
+                await Promise.all(g.resas.map(r => sb.from(table).update({ statut:"confirmed", validated_at:new Date().toISOString(), mode_paiement:mode }).eq("id", r.id)));
+                const credit = Number(r0club.enfants[0]) || 0;
+                if (credit > 0 && membreIdClub) {
+                  const { data: m } = await sb.from("membres").select("liberte_balance, liberte_total").eq("id", membreIdClub).maybeSingle();
+                  if (m) await sb.from("membres").update({ liberte_balance:(m.liberte_balance||0)+credit, liberte_total:(m.liberte_total||0)+credit }).eq("id", membreIdClub);
+                }
+              } else {
+                // Forfait semaine ou demi-journée : chercher d'abord dans commandes_club
                 const datesResas = new Set(g.resas.map(r => r.date_reservation?.slice(0,10)).filter(Boolean));
                 const { data: cmds } = await sb.from("commandes_club").select("montant_total, dates").eq("membre_id", membreIdClub);
                 const cmdMatching = (cmds||[]).filter(c => Array.isArray(c.dates) && c.dates.some(d => datesResas.has(d)));
-                totalMontantClub = cmdMatching.reduce((s, c) => s + Number(c.montant_total||0), 0);
+                if (cmdMatching.length > 0) {
+                  totalMontantClub = cmdMatching.reduce((s, c) => s + Number(c.montant_total||0), 0);
+                } else {
+                  const montants = g.resas.map(r => { const m2=(r.label_jour||"").match(/\[MONTANT:(\d+)\]/); return r.montant?Number(r.montant):(m2?Number(m2[1]):0); });
+                  const allSame = montants.every(m => m === montants[0]);
+                  totalMontantClub = allSame && g.resas.length > 1 ? montants[0] : montants.reduce((s,m)=>s+m,0);
+                }
+                await Promise.all(g.resas.map(r => sb.from(table).update({ statut:"confirmed", validated_at:new Date().toISOString(), mode_paiement:mode }).eq("id", r.id)));
               }
+
               // ── Insert paiement club ──
               if (totalMontantClub > 0) {
-                const membreId = g.resas[0]?.membre_id;
-                await sb.from("paiements").insert([{ membre_id:membreId, montant:totalMontantClub, type:"club", label:`Club · ${g.resas.length} réservation${g.resas.length>1?"s":""}`, statut:"completed" }]);
+                await sb.from("paiements").insert([{ membre_id:membreIdClub, montant:totalMontantClub, type:"club", label:`Club · ${g.resas.length} réservation${g.resas.length>1?"s":""}`, statut:"completed", date_paiement:new Date().toISOString() }]);
               }
             } else {
               // Natation : calculer montant forfait × nombre d'enfants
@@ -9568,16 +9579,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
               // ── Insert paiement natation ──
               await sb.from("paiements").insert([{ membre_id:membreId, montant:montantNat, type:"natation", label:`Natation · ${n} leçon${n>1?"s":""} · ${nbEnfants} enfant${nbEnfants>1?"s":""}`, statut:"completed" }]);
             }
-            // Carte liberté → créditer
-            if (g.type === "club" && g.resas.some(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6)) {
-              const r0 = g.resas[0];
-              const credit = Number(r0.enfants?.[0])||0;
-              if (credit > 0 && r0.membre_id) {
-                const { data: m } = await sb.from("membres").select("liberte_balance, liberte_total").eq("id", r0.membre_id).maybeSingle();
-                if (m) await sb.from("membres").update({ liberte_balance:(m.liberte_balance||0)+credit, liberte_total:(m.liberte_total||0)+credit }).eq("id", r0.membre_id);
-              }
-            }
-            // Liberté → décrémenter
+            // Liberté → décrémenter si utilisation
             if (g.type === "club" && g.resas.some(r => (r.label_jour||"").startsWith("[LIBERTE]"))) {
               const membreId = g.resas[0]?.membre_id;
               const nbUtil = g.resas.filter(r => (r.label_jour||"").startsWith("[LIBERTE]")).length;
