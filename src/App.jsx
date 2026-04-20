@@ -7230,72 +7230,121 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
 }
 
 function CartesLiberteTab({ dbMembres }) {
-  const [cartes, setCartes]   = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [query, setQuery]     = useState("");
+  const [cartes, setCartes]         = useState([]);
+  const [loading, setLoading]       = useState(true);
+  const [query, setQuery]           = useState("");
+  const [modalCarte, setModalCarte] = useState(null); // { membre, balance }
+  const [dateResa, setDateResa]     = useState("");
+  const [sessionResa, setSessionResa] = useState("matin");
+  const [enfantsResa, setEnfantsResa] = useState([]);
+  const [saving, setSaving]         = useState(false);
 
-  useEffect(() => {
-    const load = async () => {
-      // Résas club confirmed
-      const { data: toutesResas } = await sb.from("reservations_club")
-        .select("id, membre_id, date_reservation, session, statut, enfants, label_jour, created_at, membres(id, prenom, nom, email, liberte_balance, liberte_total)")
-        .eq("statut", "confirmed")
-        .order("date_reservation", { ascending: true });
+  const load = async () => {
+    setLoading(true);
+    const { data: toutesResas } = await sb.from("reservations_club")
+      .select("id, membre_id, date_reservation, session, statut, enfants, label_jour, created_at, membres(id, prenom, nom, email, liberte_balance, liberte_total)")
+      .eq("statut", "confirmed")
+      .order("date_reservation", { ascending: true });
+    const { data: tousEnfants } = await sb.from("enfants").select("membre_id, prenom, activite");
+    if (!toutesResas) { setLoading(false); return; }
+    const isCarteLib = r => { const val=r.enfants; if(!Array.isArray(val)||val.length===0) return false; const n=Number(val[0]); return !isNaN(n)&&n>=6; };
+    const byMembre = {};
+    toutesResas.forEach(r => {
+      if (!r.membre_id) return;
+      if (!byMembre[r.membre_id]) byMembre[r.membre_id] = { membre: r.membres, achats: [], utilisees: [] };
+      if (isCarteLib(r)) byMembre[r.membre_id].achats.push(r);
+      else if (r.date_reservation && (r.label_jour || "").startsWith("[LIBERTE]")) byMembre[r.membre_id].utilisees.push(r);
+    });
+    (tousEnfants || []).forEach(e => {
+      if (byMembre[e.membre_id] && (e.activite === "club" || e.activite === "les deux")) {
+        if (!byMembre[e.membre_id].enfantsClub) byMembre[e.membre_id].enfantsClub = [];
+        byMembre[e.membre_id].enfantsClub.push(e.prenom);
+      }
+    });
+    setCartes(Object.values(byMembre).filter(c => c.achats.length > 0));
+    setLoading(false);
+  };
 
-      // Enfants séparément
-      const { data: tousEnfants } = await sb.from("enfants")
-        .select("membre_id, prenom, activite");
+  useEffect(() => { load().catch(() => setLoading(false)); }, []);
 
-      if (!toutesResas) { setLoading(false); return; }
-
-      // Séparer cartes liberté des résas normales
-      // Carte liberté = enfants est un array dont le premier élément est un nombre >= 6
-      const isCarteLib = r => {
-        const val = r.enfants;
-        if (!Array.isArray(val) || val.length === 0) return false;
-        const n = Number(val[0]);
-        return !isNaN(n) && n >= 6;
-      };
-
-      // Grouper par membre
-      const byMembre = {};
-      toutesResas.forEach(r => {
-        if (!r.membre_id) return;
-        if (!byMembre[r.membre_id]) {
-          byMembre[r.membre_id] = { membre: r.membres, achats: [], utilisees: [] };
-        }
-        if (isCarteLib(r)) {
-          byMembre[r.membre_id].achats.push(r);
-        } else if (r.date_reservation && (r.label_jour || "").startsWith("[LIBERTE]")) {
-          byMembre[r.membre_id].utilisees.push(r); // uniquement résas utilisées avec la carte
-        }
-      });
-
-      // Ajouter les enfants club à chaque membre
-      (tousEnfants || []).forEach(e => {
-        if (byMembre[e.membre_id] && (e.activite === "club" || e.activite === "les deux")) {
-          if (!byMembre[e.membre_id].enfantsClub) byMembre[e.membre_id].enfantsClub = [];
-          byMembre[e.membre_id].enfantsClub.push(e.prenom);
-        }
-      });
-
-      const result = Object.values(byMembre).filter(c => c.achats.length > 0);
-      setCartes(result);
-      setLoading(false);
-    };
-    load().catch(() => setLoading(false));
-  }, []);
+  const handleUtiliser = async () => {
+    if (!dateResa) { alert("Choisissez une date."); return; }
+    if (enfantsResa.length === 0) { alert("Sélectionnez au moins un enfant."); return; }
+    if (modalCarte.balance <= 0) { alert("Plus de demi-journées disponibles."); return; }
+    setSaving(true);
+    try {
+      const membreId = modalCarte.membre.id;
+      // Créer la réservation club en confirmed avec label [LIBERTE]
+      await sb.from("reservations_club").insert([{
+        membre_id:        membreId,
+        date_reservation: dateResa,
+        session:          sessionResa,
+        statut:           "confirmed",
+        enfants:          enfantsResa,
+        label_jour:       `[LIBERTE] ${new Date(dateResa).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}`,
+        validated_at:     new Date().toISOString(),
+        mode_paiement:    "carte_liberte",
+        montant:          0,
+      }]);
+      // Décrémenter le solde
+      const { data: m } = await sb.from("membres").select("liberte_balance").eq("id", membreId).maybeSingle();
+      if (m) await sb.from("membres").update({ liberte_balance: Math.max(0, (m.liberte_balance||0) - 1) }).eq("id", membreId);
+      setModalCarte(null);
+      setDateResa(""); setSessionResa("matin"); setEnfantsResa([]);
+      await load();
+    } catch(e) { alert("Erreur : " + e.message); }
+    setSaving(false);
+  };
 
   const q = query.toLowerCase().trim();
-  const filtered = q
-    ? cartes.filter(c =>
-        `${c.membre?.prenom} ${c.membre?.nom}`.toLowerCase().includes(q) ||
-        c.membre?.email?.toLowerCase().includes(q)
-      )
-    : cartes;
+  const filtered = q ? cartes.filter(c => `${c.membre?.prenom} ${c.membre?.nom}`.toLowerCase().includes(q) || c.membre?.email?.toLowerCase().includes(q)) : cartes;
 
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+
+      {/* Modal utiliser demi-journée */}
+      {modalCarte && (
+        <div style={{ position:"fixed", inset:0, zIndex:1200, display:"flex", alignItems:"center", justifyContent:"center", padding:"0 20px" }}>
+          <div onClick={() => setModalCarte(null)} style={{ position:"absolute", inset:0, background:"rgba(0,20,50,0.65)", backdropFilter:"blur(5px)" }} />
+          <div style={{ position:"relative", background:"#fff", borderRadius:24, padding:"24px 20px", width:"100%", maxWidth:380, boxShadow:"0 24px 64px rgba(0,0,0,0.3)" }}>
+            <div style={{ fontWeight:900, color:C.dark, fontSize:16, marginBottom:4 }}>🎟️ Utiliser une demi-journée</div>
+            <div style={{ fontSize:12, color:"#aaa", marginBottom:16 }}>{modalCarte.membre?.prenom} {NOM(modalCarte.membre?.nom)} · <span style={{ color:C.green, fontWeight:700 }}>{modalCarte.balance} restante{modalCarte.balance>1?"s":""}</span></div>
+
+            <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, textTransform:"uppercase" }}>📅 Date</label>
+            <input type="date" value={dateResa} onChange={e => setDateResa(e.target.value)}
+              min="2026-07-06" max="2026-08-22"
+              style={{ width:"100%", border:"2px solid #e0e8f0", borderRadius:12, padding:"10px 14px", fontSize:14, fontFamily:"inherit", outline:"none", marginBottom:14, boxSizing:"border-box" }} />
+
+            <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, textTransform:"uppercase" }}>🌅 Session</label>
+            <div style={{ display:"flex", gap:8, marginBottom:14 }}>
+              {[["matin","☀️ Matin"],["apmidi","🌊 Après-midi"]].map(([k,l]) => (
+                <button key={k} onClick={() => setSessionResa(k)} style={{ flex:1, background: sessionResa===k?C.coral:"#f0f0f0", color: sessionResa===k?"#fff":"#888", border:"none", borderRadius:12, padding:"10px", cursor:"pointer", fontWeight:800, fontSize:13, fontFamily:"inherit" }}>{l}</button>
+              ))}
+            </div>
+
+            {modalCarte.enfantsClub?.length > 0 && (<>
+              <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, textTransform:"uppercase" }}>👧 Enfants</label>
+              <div style={{ display:"flex", flexWrap:"wrap", gap:8, marginBottom:16 }}>
+                {modalCarte.enfantsClub.map((e,i) => {
+                  const sel = enfantsResa.includes(e);
+                  return <div key={i} onClick={() => setEnfantsResa(prev => sel?prev.filter(x=>x!==e):[...prev,e])}
+                    style={{ background:sel?C.coral:"#f0f0f0", color:sel?"#fff":"#888", borderRadius:50, padding:"6px 14px", cursor:"pointer", fontWeight:800, fontSize:13 }}>
+                    {sel?"✓ ":""}{e}
+                  </div>;
+                })}
+              </div>
+            </>)}
+
+            <div style={{ display:"flex", gap:8 }}>
+              <button onClick={() => { setModalCarte(null); setDateResa(""); setEnfantsResa([]); }} style={{ flex:1, background:"#f0f0f0", border:"none", color:"#888", borderRadius:12, padding:"11px", cursor:"pointer", fontWeight:800, fontFamily:"inherit" }}>Annuler</button>
+              <button onClick={handleUtiliser} disabled={saving}
+                style={{ flex:2, background:`linear-gradient(135deg,${C.coral},${C.sun})`, border:"none", color:"#fff", borderRadius:12, padding:"11px", cursor:saving?"not-allowed":"pointer", fontWeight:900, fontFamily:"inherit", fontSize:14, opacity:saving?0.7:1 }}>
+                {saving?"⏳ En cours...":"🎟️ Confirmer l'utilisation"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Barre de recherche */}
       <div style={{ position:"relative" }}>
@@ -7396,6 +7445,14 @@ function CartesLiberteTab({ dbMembres }) {
               </div>
             ) : (
               <div style={{ fontSize:12, color:"#bbb", fontStyle:"italic" }}>Aucune demi-journée utilisée pour l'instant</div>
+            )}
+
+            {/* Bouton utiliser */}
+            {balance > 0 && (
+              <button onClick={() => { setModalCarte({ membre:c.membre, balance, enfantsClub }); setDateResa(""); setSessionResa("matin"); setEnfantsResa([]); }}
+                style={{ width:"100%", marginTop:14, background:`linear-gradient(135deg,${C.coral},${C.sun})`, border:"none", color:"#fff", borderRadius:14, padding:"11px", cursor:"pointer", fontWeight:900, fontSize:13, fontFamily:"inherit", boxShadow:`0 4px 14px ${C.coral}44` }}>
+                🎟️ Utiliser une demi-journée
+              </button>
             )}
           </div>
         );
