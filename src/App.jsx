@@ -9384,9 +9384,10 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
         }
       });
 
-    // Recharger aussi les paiements pour mettre à jour le dashboard
+    // Recharger aussi les paiements et membres pour mettre à jour le dashboard
     sb.from("paiements").select("*").eq("statut", "completed").order("created_at", { ascending: false })
       .then(({ data }) => setDbPaiements(data || [])).catch(() => {});
+    getAllMembres().then(d => setDbMembres(d)).catch(() => {});
   };
 
   const supprimerResaNatation = async (id) => {
