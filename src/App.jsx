@@ -8775,28 +8775,24 @@ ${mpHtml}
 </body></html>`;
   };
 
-  const getMontantClubReel = async (membreId, resasClub) => {
-    // 1. Chercher dans commandes_club (forfaits semaine)
-    const datesResas = new Set(resasClub.map(r => r.date_reservation?.slice(0,10)).filter(Boolean));
-    const { data: cmds } = await sb.from("commandes_club").select("montant_total, dates").eq("membre_id", membreId);
-    const cmdMatching = (cmds||[]).filter(c => Array.isArray(c.dates) && c.dates.some(d => datesResas.has(d)));
-    if (cmdMatching.length > 0) return cmdMatching.reduce((s,c) => s+Number(c.montant_total||0), 0);
-
-    // 2. Sinon depuis paiements completed
-    const { data: pais } = await sb.from("paiements").select("montant").eq("membre_id", membreId).eq("type","club").eq("statut","completed");
-    if (pais?.length > 0) return pais.reduce((s,p) => s+Number(p.montant||0), 0);
-
-    // 3. Fallback: sommer montants lignes
-    return resasClub.reduce((s,r) => {
-      const m2 = (r.label_jour||"").match(/\[MONTANT:(\d+)\]/);
-      return s + (r.montant ? Number(r.montant) : m2 ? Number(m2[1]) : 0);
-    }, 0);
+  const getMontantClubReel = async (membreId) => {
+    const { data } = await sb.from("paiements")
+      .select("montant")
+      .eq("membre_id", membreId)
+      .eq("type", "club")
+      .eq("statut", "completed");
+    if (data?.length > 0) return data.reduce((s,p) => s + Number(p.montant||0), 0);
+    return 0;
   };
 
   const getMontantNatReel = async (membreId) => {
-    const { data: pais } = await sb.from("paiements").select("montant").eq("membre_id", membreId).eq("type","natation").eq("statut","completed");
-    if (pais?.length > 0) return pais.reduce((s,p) => s+Number(p.montant||0), 0);
-    return null; // fallback sur calcul forfait
+    const { data } = await sb.from("paiements")
+      .select("montant")
+      .eq("membre_id", membreId)
+      .eq("type", "natation")
+      .eq("statut", "completed");
+    if (data?.length > 0) return data.reduce((s,p) => s + Number(p.montant||0), 0);
+    return null;
   };
 
   const genererFacture = async (membre) => {
@@ -8815,7 +8811,7 @@ ${mpHtml}
 
       // ── Montants réels depuis paiements ──
       const montantNatReel  = resasNat.length > 0 ? (await getMontantNatReel(membre.id)) : 0;
-      const montantClubReel = resasClub.length > 0 ? (await getMontantClubReel(membre.id, resasClub)) : 0;
+      const montantClubReel = resasClub.length > 0 ? (await getMontantClubReel(membre.id)) : 0;
 
       const groupesNat  = resasNat.length > 0 ? [{
         label: `🏊 École de Natation — Forfait ${resasNat.length} leçon${resasNat.length>1?"s":""}`,
@@ -8823,7 +8819,7 @@ ${mpHtml}
         detail: `${resasNat.length} séance${resasNat.length>1?"s":""}`
       }] : [];
       const groupesClub = resasClub.length > 0 ? [{
-        label: `🏖️ Club de Plage`,
+        label: `🏖️ Club de Plage — ${resasClub.filter(r=>r.session==="matin").length > 0 && resasClub.filter(r=>r.session==="apmidi").length > 0 ? "Matin & Après-midi" : resasClub.some(r=>r.session==="matin") ? "Matin" : "Après-midi"}`,
         montant: montantClubReel,
         detail: `${resasClub.length} jour${resasClub.length>1?"s":""}`
       }] : [];
