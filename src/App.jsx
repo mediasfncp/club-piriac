@@ -8638,31 +8638,25 @@ function FacturesTab({ dbMembres, dbResas, dbResasClub }) {
     return groupes;
   };
 
-  const buildFactureHtml = (membre, numFac, dateEmission, modePaiement = null, remise = 0, enfantsFilter = null) => {
-    // Filtrer les résas selon les enfants sélectionnés
+  const buildFactureHtml = (membre, numFac, dateEmission, modePaiement = null, remise = 0, enfantsFilter = null, toutesLignesOverride = null, totalOverride = null, soldeOverride = null, acomptesOverride = null) => {
     const filterByEnfants = (resas) => {
       if (!enfantsFilter || enfantsFilter.size === 0) return resas;
-      return resas.filter(r => {
-        const enfs = Array.isArray(r.enfants) ? r.enfants : [];
-        // Garder si au moins un enfant de la résa est dans la sélection
-        return enfs.some(e => enfantsFilter.has(e));
-      });
+      return resas.filter(r => { const enfs = Array.isArray(r.enfants) ? r.enfants : []; return enfs.some(e => enfantsFilter.has(e)); });
     };
 
     const resasNatAll  = (dbResas||[]).filter(r => r.membre_id === membre.id && r.statut === "confirmed");
     const resasClubAll = (dbResasClub||[]).filter(r => r.membre_id === membre.id && r.statut === "confirmed" && !(Number(r.enfants?.[0]) >= 6 && !isNaN(Number(r.enfants?.[0]))));
-
     const resasNat  = filterByEnfants(resasNatAll);
     const resasClub = filterByEnfants(resasClubAll);
-    const acMembre  = acomptes[membre.id] || [];
+    const acMembre  = acomptesOverride || acomptes[membre.id] || [];
 
     const groupesNat  = grouperNatation(resasNat, enfantsFilter);
     const groupesClub = grouperClub(resasClub, enfantsFilter);
-    const toutesLignes = [...groupesNat, ...groupesClub];
+    const toutesLignes = toutesLignesOverride || [...groupesNat, ...groupesClub];
 
-    const totalPrestations = toutesLignes.reduce((s,l)=>s+l.montant, 0);
+    const totalPrestations = totalOverride !== null ? totalOverride : toutesLignes.reduce((s,l)=>s+l.montant, 0);
     const totalAcomptes    = acMembre.reduce((s,a)=>s+a.montant, 0);
-    const solde            = Math.max(0, totalPrestations - totalAcomptes - remise);
+    const solde            = soldeOverride !== null ? soldeOverride : Math.max(0, totalPrestations - totalAcomptes - remise);
 
     // Résoudre le mode paiement en texte/couleur AVANT le template
     const mpObj = modePaiement ? MODES_PAIEMENT.find(m => m.id === modePaiement) : null;
@@ -8781,46 +8775,80 @@ ${mpHtml}
 </body></html>`;
   };
 
+  const getMontantClubReel = async (membreId, resasClub) => {
+    // 1. Chercher dans commandes_club (forfaits semaine)
+    const datesResas = new Set(resasClub.map(r => r.date_reservation?.slice(0,10)).filter(Boolean));
+    const { data: cmds } = await sb.from("commandes_club").select("montant_total, dates").eq("membre_id", membreId);
+    const cmdMatching = (cmds||[]).filter(c => Array.isArray(c.dates) && c.dates.some(d => datesResas.has(d)));
+    if (cmdMatching.length > 0) return cmdMatching.reduce((s,c) => s+Number(c.montant_total||0), 0);
+
+    // 2. Sinon depuis paiements completed
+    const { data: pais } = await sb.from("paiements").select("montant").eq("membre_id", membreId).eq("type","club").eq("statut","completed");
+    if (pais?.length > 0) return pais.reduce((s,p) => s+Number(p.montant||0), 0);
+
+    // 3. Fallback: sommer montants lignes
+    return resasClub.reduce((s,r) => {
+      const m2 = (r.label_jour||"").match(/\[MONTANT:(\d+)\]/);
+      return s + (r.montant ? Number(r.montant) : m2 ? Number(m2[1]) : 0);
+    }, 0);
+  };
+
+  const getMontantNatReel = async (membreId) => {
+    const { data: pais } = await sb.from("paiements").select("montant").eq("membre_id", membreId).eq("type","natation").eq("statut","completed");
+    if (pais?.length > 0) return pais.reduce((s,p) => s+Number(p.montant||0), 0);
+    return null; // fallback sur calcul forfait
+  };
+
   const genererFacture = async (membre) => {
     setGenerating(membre.id);
     try {
       const selEnfants = enfantsSelectionnes[membre.id] || new Set((membre.enfants||[]).map(e => e.prenom));
       const filterByEnfants = (resas) => {
         if (!selEnfants || selEnfants.size === 0) return resas;
-        return resas.filter(r => {
-          const enfs = Array.isArray(r.enfants) ? r.enfants : [];
-          return enfs.some(e => selEnfants.has(e));
-        });
+        return resas.filter(r => { const enfs = Array.isArray(r.enfants) ? r.enfants : []; return enfs.some(e => selEnfants.has(e)); });
       };
       const resasNatAll  = (dbResas||[]).filter(r => r.membre_id === membre.id && r.statut === "confirmed");
       const resasClubAll = (dbResasClub||[]).filter(r => r.membre_id === membre.id && r.statut === "confirmed" && !(Number(r.enfants?.[0]) >= 6 && !isNaN(Number(r.enfants?.[0]))));
       const resasNat  = filterByEnfants(resasNatAll);
       const resasClub = filterByEnfants(resasClubAll);
       const acMembre  = acomptes[membre.id] || [];
-      const groupesNat  = grouperNatation(resasNat, selEnfants);
-      const groupesClub = grouperClub(resasClub, selEnfants);
-      const total = [...groupesNat,...groupesClub].reduce((s,l)=>s+l.montant,0);
-      const totalAc = acMembre.reduce((s,a)=>s+a.montant,0);
-      const solde = total - totalAc;
 
-      // Détecter le mode de paiement (premier trouvé parmi les résas confirmées)
+      // ── Montants réels depuis paiements ──
+      const montantNatReel  = resasNat.length > 0 ? (await getMontantNatReel(membre.id)) : 0;
+      const montantClubReel = resasClub.length > 0 ? (await getMontantClubReel(membre.id, resasClub)) : 0;
+
+      const groupesNat  = resasNat.length > 0 ? [{
+        label: `🏊 École de Natation — Forfait ${resasNat.length} leçon${resasNat.length>1?"s":""}`,
+        montant: montantNatReel !== null ? montantNatReel : grouperNatation(resasNat, selEnfants).reduce((s,l)=>s+l.montant,0),
+        detail: `${resasNat.length} séance${resasNat.length>1?"s":""}`
+      }] : [];
+      const groupesClub = resasClub.length > 0 ? [{
+        label: `🏖️ Club de Plage`,
+        montant: montantClubReel,
+        detail: `${resasClub.length} jour${resasClub.length>1?"s":""}`
+      }] : [];
+
+      const total    = groupesNat.reduce((s,l)=>s+l.montant,0) + groupesClub.reduce((s,l)=>s+l.montant,0);
+      const totalAc  = acMembre.reduce((s,a)=>s+a.montant,0);
+      const solde    = Math.max(0, total - totalAc);
+
       const modePaiement = [...resasNat,...resasClub].find(r => r.mode_paiement)?.mode_paiement || null;
 
-      // Numéro de facture
+      // ── Numéro de facture depuis la base (compteur réel) ──
       let numFac;
       const existing = factures[membre.id];
       if (existing) {
         numFac = existing.numero;
-        // Mettre à jour le contenu si nécessaire
         await sb.from("factures_numeros").update({ total, solde, contenu:{ groupesNat, groupesClub, acomptes:acMembre } }).eq("id", existing.id);
       } else {
-        const count = Object.keys(factures).length + 1;
-        numFac = `FAC-2026-${String(count).padStart(3,"0")}`;
+        // Compter le vrai nombre de factures en base pour le numéro séquentiel
+        const { count: nbFac } = await sb.from("factures_numeros").select("*", { count:"exact", head:true });
+        const nextNum = (nbFac||0) + 1;
+        numFac = `FAC-2026-${String(nextNum).padStart(3,"0")}`;
         const dateEmission = new Date().toISOString().slice(0,10);
-        const contenu = { groupesNat, groupesClub, acomptes: acMembre };
         const { data } = await sb.from("factures_numeros").insert([{
           membre_id: membre.id, numero: numFac,
-          date_emission: dateEmission, total, solde, contenu
+          date_emission: dateEmission, total, solde, contenu:{ groupesNat, groupesClub, acomptes:acMembre }
         }]).select().single();
         if (data) setFactures(prev => ({ ...prev, [membre.id]: data }));
       }
@@ -8829,7 +8857,10 @@ ${mpHtml}
         ? (() => { const p=existing.date_emission.slice(0,10).split("-"); return `${p[2]}/${p[1]}/${p[0]}`; })()
         : new Date().toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"});
 
-      const html = buildFactureHtml(membre, numFac, dateEmission, modePaiement, 0, enfantsSelectionnes[membre.id]);
+      // Rebuild groupes pour le HTML avec les bons montants
+      const toutesLignes = [...groupesNat, ...groupesClub];
+      const htmlData = { ...membre, _groupesNat: groupesNat, _groupesClub: groupesClub };
+      const html = buildFactureHtml(membre, numFac, dateEmission, modePaiement, 0, selEnfants, toutesLignes, total, solde, acMembre);
       const win = window.open("","_blank");
       if (win) { win.document.write(html); win.document.close(); }
     } catch(e) { alert("Erreur : " + e.message); }
