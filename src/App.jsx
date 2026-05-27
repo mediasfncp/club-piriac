@@ -68,49 +68,113 @@ function getRappelDate(dateISO) {
 }
 
 // ── TARIFS CLUB ────────────────────────────────────────
-const TARIFS_MATIN = {
-  label: "Matin", emoji: "🌅", color: C.coral, horaires: "9h30 – 12h30",
-  rows: [
-    { label: "1 demi-journée", e1: 15,  e2: 28,  e3: 39,  sup: 11 },
-    { label: "1 semaine",      e1: 78,  e2: 144, e3: 198, sup: 54 },
-    { label: "2 semaines",     e1: 144, e2: 264, e3: 360, sup: 96 },
-    { label: "3 semaines",     e1: 189, e2: 342, e3: 459, sup: 126 },
-    { label: "4 semaines",     e1: 216, e2: 384, e3: 504, sup: 144 },
+// Sélection automatique selon la date (avant/après 1er juin 2026)
+const TARIFS_V1 = { // Avant le 1er juin 2026
+  matin: {
+    label: "Matin", emoji: "🌅", color: C.coral, horaires: "9h30 – 12h30",
+    rows: [
+      { label: "1 demi-journée", e1: 15,  e2: 28,  e3: 39,  sup: 11 },
+      { label: "1 semaine",      e1: 78,  e2: 144, e3: 198, sup: 54 },
+      { label: "2 semaines",     e1: 144, e2: 264, e3: 360, sup: 96 },
+      { label: "3 semaines",     e1: 189, e2: 342, e3: 459, sup: 126 },
+      { label: "4 semaines",     e1: 216, e2: 384, e3: 504, sup: 144 },
+    ],
+  },
+  apmidi: {
+    label: "Après-midi", emoji: "🌊", color: C.ocean, horaires: "14h30 – 18h00",
+    rows: [
+      { label: "1 demi-journée", e1: 17,  e2: 32,  e3: 45,  sup: 13 },
+      { label: "1 semaine",      e1: 90,  e2: 168, e3: 234, sup: 66 },
+      { label: "2 semaines",     e1: 168, e2: 312, e3: 432, sup: 120 },
+      { label: "3 semaines",     e1: 225, e2: 414, e3: 567, sup: 162 },
+      { label: "4 semaines",     e1: 264, e2: 480, e3: 648, sup: 192 },
+    ],
+  },
+  journee: {
+    label: "Journée", emoji: "☀️", color: C.green, horaires: "9h30 – 12h30 · 14h30 – 18h00",
+    rows: [
+      { label: "1 journée",  e1: 25,  e2: 48,  e3: 69,   sup: 21 },
+      { label: "1 semaine",  e1: 138, e2: 264, e3: 378,  sup: 114 },
+      { label: "2 semaines", e1: 264, e2: 504, e3: 720,  sup: 216 },
+      { label: "3 semaines", e1: 369, e2: 702, e3: 999,  sup: 306 },
+      { label: "4 semaines", e1: 456, e2: 864, e3: 1224, sup: 384 },
+    ],
+  },
+  liberte: [
+    { label: "6 demi-journées",  price: 96  },
+    { label: "12 demi-journées", price: 180 },
+    { label: "18 demi-journées", price: 252 },
+    { label: "24 demi-journées", price: 288 },
+    { label: "30 demi-journées", price: 330 },
   ],
 };
-const TARIFS_APMIDI = {
-  label: "Après-midi", emoji: "🌊", color: C.ocean, horaires: "14h30 – 18h00",
-  rows: [
-    { label: "1 demi-journée", e1: 17,  e2: 32,  e3: 45,  sup: 13 },
-    { label: "1 semaine",      e1: 90,  e2: 168, e3: 234, sup: 66 },
-    { label: "2 semaines",     e1: 168, e2: 312, e3: 432, sup: 120 },
-    { label: "3 semaines",     e1: 225, e2: 414, e3: 567, sup: 162 },
-    { label: "4 semaines",     e1: 264, e2: 480, e3: 648, sup: 192 },
-  ],
-};
-const TARIFS_JOURNEE = {
-  label: "Journée", emoji: "☀️", color: C.green, horaires: "9h30 – 12h30 · 14h30 – 18h00",
-  rows: [
-    { label: "1 journée",  e1: 25,  e2: 48,  e3: 69,   sup: 21 },
-    { label: "1 semaine",  e1: 138, e2: 264, e3: 378,  sup: 114 },
-    { label: "2 semaines", e1: 264, e2: 504, e3: 720,  sup: 216 },
-    { label: "3 semaines", e1: 369, e2: 702, e3: 999,  sup: 306 },
-    { label: "4 semaines", e1: 456, e2: 864, e3: 1224, sup: 384 },
-  ],
-};
-const TARIFS_LIBERTE = [
-  { label: "6 demi-journées",  price: 96  },
-  { label: "12 demi-journées", price: 180 },
-  { label: "18 demi-journées", price: 252 },
-  { label: "24 demi-journées", price: 288 },
-  { label: "30 demi-journées", price: 330 },
-];
 
-const FORMULES_NAT = [
-  { id: "f1", label: "1 leçon",   qty: 1,  price: 20,  emoji: "🐠", color: C.sea,   badge: "Découverte" },
-  { id: "f2", label: "5 leçons",  qty: 5,  price: 95,  emoji: "🐬", color: C.ocean, badge: "Populaire ⭐", saving: "5€ offerts" },
-  { id: "f3", label: "6 leçons",  qty: 6,  price: 113, emoji: "🦈", color: C.coral, badge: "Été complet 🌞", saving: "7€ offerts" },
-  { id: "f4", label: "10 leçons", qty: 10, price: 170, emoji: "🌊", color: C.green, badge: "Best value 🏆", saving: "20€ offerts" },
+const TARIFS_V2 = { // À partir du 1er juin 2026
+  matin: {
+    label: "Matin", emoji: "🌅", color: C.coral, horaires: "9h30 – 12h30",
+    rows: [
+      { label: "1 demi-journée", e1: 17,  e2: 32,  e3: 46,  sup: 14 },
+      { label: "1 semaine",      e1: 90,  e2: 168, e3: 234, sup: 66 },
+      { label: "2 semaines",     e1: 163, e2: 302, e3: 425, sup: 123 },
+      { label: "3 semaines",     e1: 214, e2: 391, e3: 541, sup: 150 },
+      { label: "4 semaines",     e1: 245, e2: 440, e3: 595, sup: 155 },
+    ],
+  },
+  apmidi: {
+    label: "Après-midi", emoji: "🌊", color: C.ocean, horaires: "14h30 – 18h00",
+    rows: [
+      { label: "1 demi-journée", e1: 19,  e2: 36,  e3: 51,  sup: 15 },
+      { label: "1 semaine",      e1: 100, e2: 192, e3: 270, sup: 78 },
+      { label: "2 semaines",     e1: 192, e2: 351, e3: 490, sup: 139 },
+      { label: "3 semaines",     e1: 252, e2: 466, e3: 643, sup: 177 },
+      { label: "4 semaines",     e1: 295, e2: 540, e3: 734, sup: 194 },
+    ],
+  },
+  journee: {
+    label: "Journée", emoji: "☀️", color: C.green, horaires: "9h30 – 12h30 · 14h30 – 18h00",
+    rows: [
+      { label: "1 journée",  e1: 28,  e2: 53,  e3: 76,   sup: 23 },
+      { label: "1 semaine",  e1: 155, e2: 292, e3: 416,  sup: 124 },
+      { label: "2 semaines", e1: 296, e2: 557, e3: 793,  sup: 236 },
+      { label: "3 semaines", e1: 413, e2: 725, e3: 1100, sup: 375 },
+      { label: "4 semaines", e1: 511, e2: 954, e3: 1348, sup: 394 },
+    ],
+  },
+  liberte: [
+    { label: "6 demi-journées",  price: 108 },
+    { label: "12 demi-journées", price: 204 },
+    { label: "18 demi-journées", price: 288 },
+    { label: "24 demi-journées", price: 360 },
+    { label: "30 demi-journées", price: 420 },
+  ],
+};
+
+const DATE_NOUVEAUX_TARIFS = new Date("2026-06-01");
+const getTarifsVersion = (dateRef = new Date()) => {
+  const d = typeof dateRef === "string" ? new Date(dateRef) : dateRef;
+  return d >= DATE_NOUVEAUX_TARIFS ? TARIFS_V2 : TARIFS_V1;
+};
+
+// Alias pour compatibilité (utilise les tarifs actuels par défaut)
+const TARIFS_MATIN   = TARIFS_V2.matin;
+const TARIFS_APMIDI  = TARIFS_V2.apmidi;
+const TARIFS_JOURNEE = TARIFS_V2.journee;
+const TARIFS_LIBERTE = TARIFS_V2.liberte;
+
+// ── TARIFS NATATION ────────────────────────────────────
+const PRIX_NAT_V1 = { 1:20, 2:40, 3:60, 4:80, 5:95, 6:113, 7:131, 8:147, 9:162, 10:170 };
+const PRIX_NAT_V2 = { 1:23, 2:46, 3:69, 4:92, 5:105, 6:120, 7:143, 8:166, 9:183, 10:190 };
+const getPrixNatGlobal = (n, dateRef = new Date()) => {
+  const d = typeof dateRef === "string" ? new Date(dateRef) : dateRef;
+  const P = d >= DATE_NOUVEAUX_TARIFS ? PRIX_NAT_V2 : PRIX_NAT_V1;
+  const maxPrix = d >= DATE_NOUVEAUX_TARIFS ? 190 : 170;
+  const prixSup = d >= DATE_NOUVEAUX_TARIFS ? 19 : 17;
+  return n <= 10 ? (P[n] || n*23) : maxPrix + (n-10)*prixSup;
+};
+  { id: "f1", label: "1 leçon",   qty: 1,  price: 23,  emoji: "🐠", color: C.sea,   badge: "Découverte" },
+  { id: "f2", label: "5 leçons",  qty: 5,  price: 105, emoji: "🐬", color: C.ocean, badge: "Populaire ⭐", saving: "10€ offerts" },
+  { id: "f3", label: "6 leçons",  qty: 6,  price: 120, emoji: "🦈", color: C.coral, badge: "Été complet 🌞", saving: "18€ offerts" },
+  { id: "f4", label: "10 leçons", qty: 10, price: 190, emoji: "🌊", color: C.green, badge: "Best value 🏆", saving: "40€ offerts" },
 ];
 
 const DAYS = [
@@ -1784,7 +1848,8 @@ function PrestationsScreen({ onNav, clubPlaces, setClubPlaces, user, setUser, pa
     return [...prev, prenom];
   });
 
-  const tarifData = formulType === "matin" ? TARIFS_MATIN : formulType === "apmidi" ? TARIFS_APMIDI : TARIFS_JOURNEE;
+  const tarifs = getTarifsVersion(new Date());
+  const tarifData = formulType === "matin" ? tarifs.matin : formulType === "apmidi" ? tarifs.apmidi : tarifs.journee;
 
   const priceForRow = (row) => {
     if (nbEnfants === 1) return row.e1;
@@ -5071,8 +5136,8 @@ function PaiementsTab({ onValidate }) {
       const n = g.resas.length;
       // Nb enfants = max enfants dans une résa du groupe
       const nbEnfants = Math.max(1, ...g.resas.map(r => (r.enfants||[]).length));
-      const PRIX_NAT = { 1:20, 2:40, 3:60, 4:80, 5:95, 6:113, 7:131, 8:147, 9:162, 10:170 };
-      const prixForfait = n <= 10 ? (PRIX_NAT[n] || n*20) : 170 + (n-10)*17;
+      const PRIX_NAT = PRIX_NAT_V2;
+      const prixForfait = n <= 10 ? (PRIX_NAT[n] || n*20) : 190 + (n-10)*19;
       return `${prixForfait * nbEnfants} €`;
     }
     return getClubMontant(g);
@@ -6823,7 +6888,7 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
   const handleMembreChange = (id) => { setMembreId(id); setSelectedEnfants([]); };
 
   const nbSeancesNat  = forfaitNat === "unite" ? 1 : forfaitNat === "forfait5" ? 5 : forfaitNat === "forfait6" ? 6 : forfaitNat === "forfait10" ? 10 : nbSeancesLibre;
-  const getMontantNat = (n) => { const P = {1:20,5:95,6:113,10:170}; return n <= 10 ? (P[n] || n*20) : 170+(n-10)*17; };
+  const getMontantNat = (n) => { const P = PRIX_NAT_V2; return n <= 10 ? (P[n] || n*23) : 190+(n-10)*19; };
   const montantNat    = getMontantNat(nbSeancesNat);
 
   const getSpots = (dayISO, time) => {
@@ -6893,7 +6958,8 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
           const days = getClubWeekDays();
           const sessions = sessionClub === "journee" ? ["matin","apmidi"] : [sessionClub];
           // Calculer le montant par enfant selon les tarifs
-          const tarifData = sessionClub === "matin" ? TARIFS_MATIN : sessionClub === "apmidi" ? TARIFS_APMIDI : TARIFS_JOURNEE;
+          const tarifs = getTarifsVersion(new Date());
+          const tarifData = sessionClub === "matin" ? tarifs.matin : sessionClub === "apmidi" ? tarifs.apmidi : tarifs.journee;
           const nbEnf = selectedEnfants.length || 1;
           // rows[0]=unitaire, rows[1]=1sem, rows[2]=2sem, rows[3]=3sem, rows[4]=4sem
           const rowIdx = Math.min(Math.max(1, nbSemainesClub), tarifData.rows.length - 1);
@@ -7029,7 +7095,7 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
                     <div style={{ fontSize:13, color:C.ocean, fontWeight:900 }}>
                       💰 Prix : <span style={{ fontSize:16 }}>{montantNat} €</span>
                       <span style={{ fontSize:11, color:"#999", fontWeight:400, marginLeft:6 }}>
-                        {nbSeancesLibre <= 10 ? "barème forfait" : `170€ + ${nbSeancesLibre-10}×17€`}
+                        {nbSeancesLibre <= 10 ? "barème forfait" : `190€ + ${nbSeancesLibre-10}×19€`}
                       </span>
                     </div>
                   </div>
@@ -7925,7 +7991,7 @@ function ComptabiliteTab({ dbMembres, dbResas, dbResasClub, dbCommandesClub = []
     }).catch(() => setLoading(false));
   }, []);
 
-  const PRIX_NAT = { 1:20,2:40,3:60,4:80,5:95,6:113,7:131,8:147,9:162,10:170 };
+  const PRIX_NAT = PRIX_NAT_V2;
   const LP = { 6:96,12:180,18:252,24:288,30:330 };
 
   const getMontantMembre = (m) => {
@@ -7939,7 +8005,7 @@ function ComptabiliteTab({ dbMembres, dbResas, dbResasClub, dbCommandesClub = []
     });
     const totalNat = Object.values(natGroups).reduce((s, g) => {
       const n = g.length;
-      return s + (n <= 10 ? (PRIX_NAT[n] || n*20) : 170+(n-10)*17);
+      return s + (n <= 10 ? (PRIX_NAT[n] || n*20) : 190+(n-10)*19);
     }, 0);
     const resasLiberte  = resasClub.filter(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6);
     const totalLiberte  = resasLiberte.reduce((s, r) => s + (LP[Number(r.enfants?.[0])] || 0), 0);
@@ -8106,8 +8172,8 @@ function ComptesTab({ dbMembres, dbResas, dbResasClub, dbCommandesClub = [], onR
     load().catch(() => setLoading(false));
   }, []);
 
-  const PRIX_NAT = { 1:20,2:40,3:60,4:80,5:95,6:113,7:131,8:147,9:162,10:170 };
-  const getPrixNat = n => n <= 10 ? (PRIX_NAT[n] || n*20) : 170+(n-10)*17;
+  const PRIX_NAT = PRIX_NAT_V2;
+  const getPrixNat = n => n <= 10 ? (PRIX_NAT[n] || n*20) : 190+(n-10)*19;
 
   // Membres avec compte fin de saison
   const membresCompte = (dbMembres || []).filter(m => m.compte_fin_saison && !m.compte_solde);
@@ -8134,16 +8200,16 @@ function ComptesTab({ dbMembres, dbResas, dbResasClub, dbCommandesClub = [], onR
       if (!natGroups[k]) natGroups[k] = [];
       natGroups[k].push(r);
     });
-    const PRIX_NAT = {1:20,2:40,3:60,4:80,5:95,6:113,7:131,8:147,9:162,10:170};
+    const PRIX_NAT = PRIX_NAT_V2;
     const totalNat = Object.values(natGroups).reduce((s, g) => {
       const n = g.length;
-      return s + (n <= 10 ? (PRIX_NAT[n] || n*20) : 170+(n-10)*17);
+      return s + (n <= 10 ? (PRIX_NAT[n] || n*20) : 190+(n-10)*19);
     }, 0);
 
     // Club : utiliser commandes_club pour le montant exact (même logique que PaiementsTab)
     const LP = {6:96,12:180,18:252,24:288,30:330};
-    const TARIFS_MATIN_rows  = [{e1:15,e2:28,e3:39,sup:11},{e1:78,e2:144,e3:198,sup:54},{e1:144,e2:264,e3:360,sup:96},{e1:189,e2:342,e3:459,sup:126},{e1:216,e2:384,e3:504,sup:144}];
-    const TARIFS_APMIDI_rows = [{e1:17,e2:32,e3:45,sup:13},{e1:90,e2:168,e3:234,sup:66},{e1:168,e2:312,e3:432,sup:120},{e1:225,e2:414,e3:567,sup:162},{e1:264,e2:480,e3:648,sup:192}];
+    const TARIFS_MATIN_rows  = TARIFS_V2.matin.rows;
+    const TARIFS_APMIDI_rows = TARIFS_V2.apmidi.rows;
 
     // Liberté
     const resasLiberte = resasClub.filter(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6);
@@ -8538,8 +8604,8 @@ function FacturesTab({ dbMembres, dbResas, dbResasClub }) {
   const [sendingMail, setSendingMail]   = useState(null);
   const [enfantsSelectionnes, setEnfantsSelectionnes] = useState({}); // { membreId: Set(prenom) }
 
-  const PRIX_NAT = {1:20,2:40,3:60,4:80,5:95,6:113,7:131,8:147,9:162,10:170};
-  const getPrixNat = n => n<=10?(PRIX_NAT[n]||n*20):170+(n-10)*17;
+  const PRIX_NAT = PRIX_NAT_V2;
+  const getPrixNat = n => n<=10?(PRIX_NAT[n]||n*20):190+(n-10)*19;
 
   useEffect(() => {
     const load = async () => {
@@ -9582,10 +9648,10 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
             const g = pendingModalConfirm;
             if (!g) return 0;
             const LIBERTE_PRIX_V = {6:96,12:180,18:252,24:288,30:330};
-            const PRIX_NAT_V = {1:20,2:40,3:60,4:80,5:95,6:113,7:131,8:147,9:162,10:170};
+            const PRIX_NAT_V = PRIX_NAT_V2;
             if (g.type === "natation") {
               const n = g.resas.length;
-              return n <= 10 ? (PRIX_NAT_V[n]||n*20) : 170+(n-10)*17;
+              return n <= 10 ? (PRIX_NAT_V[n]||n*20) : 190+(n-10)*19;
             }
             const r0 = g.resas[0];
             const isLib = !isNaN(Number(r0?.enfants?.[0])) && Number(r0?.enfants?.[0]) >= 6;
@@ -9660,7 +9726,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
               }
             } else {
               // Natation : calculer montant forfait × nombre d'enfants
-              const PRIX_NAT_V = {1:20,2:40,3:60,4:80,5:95,6:113,7:131,8:147,9:162,10:170};
+              const PRIX_NAT_V = PRIX_NAT_V2;
               const membreId = g.resas[0]?.membre_id;
               const r0 = g.resas[0];
               const nbEnfants = Math.max(1, Array.isArray(r0?.enfants) ? r0.enfants.length : 1);
@@ -9672,7 +9738,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                 return k2 === enfKey && (r.created_at||"").slice(0,16) === minute;
               });
               const n = sameGroup.length;
-              const prixParEnfant = n <= 10 ? (PRIX_NAT_V[n]||n*20) : 170+(n-10)*17;
+              const prixParEnfant = n <= 10 ? (PRIX_NAT_V[n]||n*20) : 190+(n-10)*19;
               const montantNat = prixParEnfant * nbEnfants;
               await Promise.all(g.resas.map(r => sb.from(table).update({ statut:"confirmed", validated_at:new Date().toISOString(), mode_paiement:mode }).eq("id", r.id)));
               // ── Insert paiement natation ──
@@ -10195,7 +10261,7 @@ function PanierScreen({ onNav, user, panier, setPanier }) {
   const removeItem = (id) => setPanier(prev => prev.filter(item => item.id !== id));
 
   // Grille tarifaire natation
-  const PRIX_NAT_FORFAIT = { 1:20, 2:40, 3:60, 4:80, 5:95, 6:113, 7:131, 8:147, 9:162, 10:170 };
+  const PRIX_NAT_FORFAIT = PRIX_NAT_V2;
   const getPrixNat = (nbSeances) => {
     if (nbSeances <= 10) return PRIX_NAT_FORFAIT[nbSeances] || nbSeances * 20;
     return 170 + (nbSeances - 10) * 17; // forfait 10 + 17€ par séance supplémentaire
