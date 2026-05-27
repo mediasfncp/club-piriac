@@ -6888,11 +6888,18 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
           // Calculer le montant par enfant selon les tarifs
           const tarifData = sessionClub === "matin" ? TARIFS_MATIN : sessionClub === "apmidi" ? TARIFS_APMIDI : TARIFS_JOURNEE;
           const nbEnf = selectedEnfants.length || 1;
-          const rowIdx = Math.min(nbSemainesClub, 4); // 0=unité,1=1sem,2=2sem,3=3sem,4=4sem
-          const tarifRow = tarifData.rows[rowIdx] || tarifData.rows[tarifData.rows.length-1];
+          // rows[0]=unitaire, rows[1]=1sem, rows[2]=2sem, rows[3]=3sem, rows[4]=4sem
+          const rowIdx = Math.min(Math.max(1, nbSemainesClub), tarifData.rows.length - 1);
+          const tarifRow = tarifData.rows[rowIdx];
           const montantTotal = nbEnf === 1 ? tarifRow.e1 : nbEnf === 2 ? tarifRow.e2 : nbEnf === 3 ? tarifRow.e3 : tarifRow.e3 + (nbEnf-3)*tarifRow.sup;
           const nbJours = days.length * sessions.length;
           const montantParJour = nbJours > 0 ? Math.round(montantTotal / nbJours) : 0;
+
+          // Stocker le montant total dans commandes_club pour récupération fiable lors du paiement
+          const allDates = days.map(day => `${day.date.getFullYear()}-${String(day.date.getMonth()+1).padStart(2,"0")}-${String(day.date.getDate()).padStart(2,"0")}`);
+          if (membreId) {
+            await sb.from("commandes_club").insert([{ membre_id: membreId, montant_total: montantTotal, dates: allDates, session: sessionClub, nb_enfants: nbEnf }]);
+          }
           for (const day of days) {
             const dateStr = `${day.date.getFullYear()}-${String(day.date.getMonth()+1).padStart(2,"0")}-${String(day.date.getDate()).padStart(2,"0")}`;
             for (const sess of sessions) {
