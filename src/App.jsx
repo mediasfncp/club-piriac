@@ -5044,11 +5044,18 @@ function PaiementsTab({ onValidate }) {
     const calcSession = (resasSess, tarif) => {
       const nbJ = resasSess.length;
       if (nbJ === 0) return 0;
-      // Toujours tarif unitaire × nbJours (impossible de savoir si c'est un forfait semaine sans commandes_club)
-      const row = tarif.rows[0];
-      if (!row) return 0;
-      const pu = nbEnfants === 1 ? row.e1 : nbEnfants === 2 ? row.e2 : nbEnfants === 3 ? row.e3 : row.e3 + (nbEnfants-3)*row.sup;
-      return pu * nbJ;
+      // Lire les montants depuis les labels [MONTANT:X]
+      const montants = resasSess.map(r => {
+        const m2 = (r.label_jour||"").match(/\[MONTANT:(\d+)\]/);
+        return r.montant ? Number(r.montant) : m2 ? Number(m2[1]) : 0;
+      });
+      const allSame = montants.every(m => m === montants[0]) && montants[0] > 0;
+      if (allSame) {
+        // Forfait réparti par jour → total = montants[0] est la part journalière
+        // Chercher le vrai total dans commandes_club via les dates
+        return montants[0] * nbJ; // sera corrigé par commandes_club lors de la validation
+      }
+      return montants.reduce((s,m) => s+m, 0);
     };
 
     const resasMatin  = resas.filter(r => r.session === "matin");
@@ -9641,8 +9648,8 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                   totalMontantClub = cmdMatching.reduce((s, c) => s + Number(c.montant_total||0), 0);
                 } else {
                   const montants = g.resas.map(r => { const m2=(r.label_jour||"").match(/\[MONTANT:(\d+)\]/); return r.montant?Number(r.montant):(m2?Number(m2[1]):0); });
-                  const allSame = montants.every(m => m === montants[0]);
-                  totalMontantClub = allSame && g.resas.length > 1 ? montants[0] : montants.reduce((s,m)=>s+m,0);
+                  // Sommer tous les montants journaliers (chaque [MONTANT:X] est la part de ce jour)
+                  totalMontantClub = montants.reduce((s,m)=>s+m,0);
                 }
                 await Promise.all(g.resas.map(r => sb.from(table).update({ statut:"confirmed", validated_at:new Date().toISOString(), mode_paiement:mode }).eq("id", r.id)));
               }
