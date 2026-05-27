@@ -171,6 +171,8 @@ const getPrixNatGlobal = (n, dateRef = new Date()) => {
   const prixSup = d >= DATE_NOUVEAUX_TARIFS ? 19 : 17;
   return n <= 10 ? (P[n] || n*23) : maxPrix + (n-10)*prixSup;
 };
+
+const FORMULES_NAT = [
   { id: "f1", label: "1 leçon",   qty: 1,  price: 23,  emoji: "🐠", color: C.sea,   badge: "Découverte" },
   { id: "f2", label: "5 leçons",  qty: 5,  price: 105, emoji: "🐬", color: C.ocean, badge: "Populaire ⭐", saving: "10€ offerts" },
   { id: "f3", label: "6 leçons",  qty: 6,  price: 120, emoji: "🦈", color: C.coral, badge: "Été complet 🌞", saving: "18€ offerts" },
