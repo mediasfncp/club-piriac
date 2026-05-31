@@ -4986,7 +4986,39 @@ function PaiementsTab({ onValidate }) {
   const toggleStatut = async (groupe) => {
     const table     = groupe.type === "natation" ? "reservations_natation" : "reservations_club";
     const newStatut = groupe.statut === "pending" ? "confirmed" : "pending";
-    await Promise.all(groupe.resas.map(r => sb.from(table).update({ statut: newStatut }).eq("id", r.id)));
+    await Promise.all(groupe.resas.map(r => sb.from(table).update({ statut: newStatut, mode_paiement: newStatut === "pending" ? null : r.mode_paiement }).eq("id", r.id)));
+
+    // Si on repasse en pending → supprimer le paiement correspondant dans paiements
+    if (newStatut === "pending") {
+      const membreId = groupe.resas[0]?.membre_id;
+      const type     = groupe.type === "natation" ? "natation" : "club";
+      if (membreId) {
+        // Chercher le paiement créé le même jour que la validation
+        const validatedAt = groupe.resas.find(r => r.validated_at)?.validated_at;
+        if (validatedAt) {
+          const dateStr = validatedAt.slice(0, 10);
+          const { data: pais } = await sb.from("paiements")
+            .select("id, created_at")
+            .eq("membre_id", membreId)
+            .eq("type", type)
+            .eq("statut", "completed");
+          const matching = (pais || []).filter(p => (p.created_at||"").slice(0, 10) === dateStr);
+          if (matching.length > 0) {
+            await sb.from("paiements").delete().eq("id", matching[0].id);
+          } else {
+            // Fallback : supprimer le plus récent du même type
+            const { data: recent } = await sb.from("paiements")
+              .select("id")
+              .eq("membre_id", membreId)
+              .eq("type", type)
+              .eq("statut", "completed")
+              .order("created_at", { ascending: false })
+              .limit(1);
+            if (recent?.length > 0) await sb.from("paiements").delete().eq("id", recent[0].id);
+          }
+        }
+      }
+    }
 
     // Si c'est un achat Carte Liberté → créditer ou décréditer le solde
     if (groupe.type === "club" && groupe.resas.some(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6)) {
