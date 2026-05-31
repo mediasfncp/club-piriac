@@ -5139,7 +5139,7 @@ function PaiementsTab({ onValidate }) {
       // Nb enfants = max enfants dans une résa du groupe
       const nbEnfants = Math.max(1, ...g.resas.map(r => (r.enfants||[]).length));
       const PRIX_NAT = PRIX_NAT_V2;
-      const prixForfait = n <= 10 ? (PRIX_NAT[n] || n*20) : 190 + (n-10)*19;
+      const prixForfait = getPrixNatGlobal(n, g.resas[0]?.created_at || new Date());
       return `${prixForfait * nbEnfants} €`;
     }
     return getClubMontant(g);
@@ -7993,8 +7993,7 @@ function ComptabiliteTab({ dbMembres, dbResas, dbResasClub, dbCommandesClub = []
     }).catch(() => setLoading(false));
   }, []);
 
-  const PRIX_NAT = PRIX_NAT_V2;
-  const LP = { 6:96,12:180,18:252,24:288,30:330 };
+  const LP = { 6:108,12:204,18:288,24:360,30:420 };
 
   const getMontantMembre = (m) => {
     const resasNat  = dbResas.filter(r => r.membre_id === m.id && r.statut === "confirmed" && !exclusions[r.id]);
@@ -8007,10 +8006,16 @@ function ComptabiliteTab({ dbMembres, dbResas, dbResasClub, dbCommandesClub = []
     });
     const totalNat = Object.values(natGroups).reduce((s, g) => {
       const n = g.length;
-      return s + (n <= 10 ? (PRIX_NAT[n] || n*20) : 190+(n-10)*19);
+      const dateRef = g[0]?.created_at || new Date().toISOString();
+      return s + getPrixNatGlobal(n, dateRef);
     }, 0);
-    const resasLiberte  = resasClub.filter(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6);
-    const totalLiberte  = resasLiberte.reduce((s, r) => s + (LP[Number(r.enfants?.[0])] || 0), 0);
+    const resasLiberte = resasClub.filter(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6);
+    const totalLiberte = resasLiberte.reduce((s, r) => {
+      const nb = Number(r.enfants[0]);
+      const tarifsLib = getTarifsVersion(r.created_at || new Date()).liberte;
+      const entry = [6,12,18,24,30].indexOf(nb);
+      return s + (entry >= 0 ? (tarifsLib[entry]?.price || 0) : 0);
+    }, 0);
     const resasNormales = resasClub.filter(r => isNaN(Number(r.enfants?.[0])) || Number(r.enfants?.[0]) < 6);
     const datesResasNormales = new Set(resasNormales.map(r => r.date_reservation?.slice(0,10)).filter(Boolean));
     const commandesMembre = (dbCommandesClub || []).filter(c => c.membre_id === m.id && Array.isArray(c.dates) && c.dates.some(d => datesResasNormales.has(d)));
@@ -8175,16 +8180,17 @@ function ComptesTab({ dbMembres, dbResas, dbResasClub, dbCommandesClub = [], onR
   }, []);
 
   const PRIX_NAT = PRIX_NAT_V2;
-  const getPrixNat = n => n <= 10 ? (PRIX_NAT[n] || n*20) : 190+(n-10)*19;
+  const getPrixNat = (n, dateRef) => getPrixNatGlobal(n, dateRef || new Date());
 
   // Membres avec compte fin de saison
   const membresCompte = (dbMembres || []).filter(m => m.compte_fin_saison && !m.compte_solde);
 
   const getMontantResa = (r, type) => {
-    if (type === "natation") return Number(r.montant || 20);
+    if (type === "natation") return Number(r.montant || getPrixNatGlobal(1, r.created_at));
     const nb = Number(r.enfants?.[0]);
-    const LP = {6:96,12:180,18:252,24:288,30:330};
-    if (nb >= 6 && LP[nb]) return LP[nb];
+    const tarifsLib = getTarifsVersion(r.created_at || new Date()).liberte;
+    const libEntry = tarifsLib.find((_,i) => [6,12,18,24,30][i] === nb);
+    if (nb >= 6 && libEntry) return libEntry.price;
     const match = (r.label_jour||"").match(/\[MONTANT:(\d+)\]/);
     return match ? Number(match[1]) : 0;
   };
@@ -8193,7 +8199,7 @@ function ComptesTab({ dbMembres, dbResas, dbResasClub, dbCommandesClub = [], onR
     const resasNat  = dbResas.filter(r => r.membre_id === membre.id && r.statut === "confirmed" && !exclusions[r.id]);
     const resasClub = dbResasClub.filter(r => r.membre_id === membre.id && r.statut === "confirmed" && !exclusions[r.id]);
 
-    // Natation : forfait par groupe enfant+minute
+    // Natation : forfait par groupe enfant+minute, barème selon date de création
     const natGroups = {};
     resasNat.forEach(r => {
       const enfantsKey = Array.isArray(r.enfants) ? [...r.enfants].sort().join(",") : "";
@@ -8202,16 +8208,17 @@ function ComptesTab({ dbMembres, dbResas, dbResasClub, dbCommandesClub = [], onR
       if (!natGroups[k]) natGroups[k] = [];
       natGroups[k].push(r);
     });
-    const PRIX_NAT = PRIX_NAT_V2;
     const totalNat = Object.values(natGroups).reduce((s, g) => {
       const n = g.length;
-      return s + (n <= 10 ? (PRIX_NAT[n] || n*20) : 190+(n-10)*19);
+      const dateRef = g[0]?.created_at || new Date().toISOString();
+      return s + getPrixNatGlobal(n, dateRef);
     }, 0);
 
-    // Club : utiliser commandes_club pour le montant exact (même logique que PaiementsTab)
-    const LP = {6:96,12:180,18:252,24:288,30:330};
-    const TARIFS_MATIN_rows  = TARIFS_V2.matin.rows;
-    const TARIFS_APMIDI_rows = TARIFS_V2.apmidi.rows;
+    // Club
+    const tarifsLibV = getTarifsVersion(resasClub[0]?.created_at || new Date()).liberte;
+    const LP = { 6: tarifsLibV[0]?.price||108, 12: tarifsLibV[1]?.price||204, 18: tarifsLibV[2]?.price||288, 24: tarifsLibV[3]?.price||360, 30: tarifsLibV[4]?.price||420 };
+    const TARIFS_MATIN_rows  = getTarifsVersion(resasClub[0]?.created_at || new Date()).matin.rows;
+    const TARIFS_APMIDI_rows = getTarifsVersion(resasClub[0]?.created_at || new Date()).apmidi.rows;
 
     // Liberté
     const resasLiberte = resasClub.filter(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6);
@@ -8606,8 +8613,8 @@ function FacturesTab({ dbMembres, dbResas, dbResasClub }) {
   const [sendingMail, setSendingMail]   = useState(null);
   const [enfantsSelectionnes, setEnfantsSelectionnes] = useState({}); // { membreId: Set(prenom) }
 
-  const PRIX_NAT = PRIX_NAT_V2;
-  const getPrixNat = n => n<=10?(PRIX_NAT[n]||n*20):190+(n-10)*19;
+  const PRIX_NAT = PRIX_NAT_V2; // Pour nouvelles réservations
+  const getPrixNat = (n, dateRef) => getPrixNatGlobal(n, dateRef || new Date());
 
   useEffect(() => {
     const load = async () => {
@@ -8654,7 +8661,6 @@ function FacturesTab({ dbMembres, dbResas, dbResasClub }) {
   const grouperNatation = (resasNat, enfantsFilter = null) => {
     if (resasNat.length === 0) return [];
 
-    // Grouper par enfant pour calculer le bon forfait par enfant
     const parEnfant = {};
     resasNat.forEach(r => {
       const enfs = Array.isArray(r.enfants) && r.enfants.length > 0 ? r.enfants : ["—"];
@@ -8664,12 +8670,15 @@ function FacturesTab({ dbMembres, dbResas, dbResasClub }) {
       });
     });
 
-    // Si plusieurs enfants, forfait par enfant
+    // Utiliser la date de création de la première résa pour choisir le barème
+    const getDateRef = (resas) => resas[0]?.created_at || resas[0]?.validated_at || new Date().toISOString();
+
     const enfantsList = Object.keys(parEnfant);
     if (enfantsList.length > 1) {
       return enfantsList.map(prenom => {
-        const n = parEnfant[prenom].length;
-        const prix = getPrixNat(n);
+        const resas = parEnfant[prenom];
+        const n = resas.length;
+        const prix = getPrixNat(n, getDateRef(resas));
         return {
           label: `🏊 École de Natation — Forfait ${n} leçon${n>1?"s":""} (${prenom})`,
           montant: prix,
@@ -8678,9 +8687,8 @@ function FacturesTab({ dbMembres, dbResas, dbResasClub }) {
       });
     }
 
-    // Un seul enfant ou résas sans distinction
     const total = resasNat.length;
-    const prix = getPrixNat(total);
+    const prix = getPrixNat(total, getDateRef(resasNat));
     const nomsEnfants = enfantsList[0] !== "—" ? enfantsList[0] : "";
     return [{ label: `🏊 École de Natation — Forfait ${total} leçon${total>1?"s":""}`, montant: prix, detail: `${total} séance${total>1?"s":""}${nomsEnfants?" · "+nomsEnfants:""}` }];
   };
@@ -9649,11 +9657,11 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
           montantTotal={(() => {
             const g = pendingModalConfirm;
             if (!g) return 0;
-            const LIBERTE_PRIX_V = {6:96,12:180,18:252,24:288,30:330};
-            const PRIX_NAT_V = PRIX_NAT_V2;
+            const LIBERTE_PRIX_V = getTarifsVersion(g.resas[0]?.created_at || new Date()).liberte;
+            const liberteMap = {6:LIBERTE_PRIX_V[0]?.price||108, 12:LIBERTE_PRIX_V[1]?.price||204, 18:LIBERTE_PRIX_V[2]?.price||288, 24:LIBERTE_PRIX_V[3]?.price||360, 30:LIBERTE_PRIX_V[4]?.price||420};
             if (g.type === "natation") {
               const n = g.resas.length;
-              return n <= 10 ? (PRIX_NAT_V[n]||n*20) : 190+(n-10)*19;
+              return getPrixNatGlobal(n, g.resas[0]?.created_at || new Date());
             }
             const r0 = g.resas[0];
             const isLib = !isNaN(Number(r0?.enfants?.[0])) && Number(r0?.enfants?.[0]) >= 6;
@@ -9727,8 +9735,7 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                 await sb.from("paiements").insert([{ membre_id:membreIdClub, montant:totalMontantClub, type:"club", label:`Club · ${g.resas.length} réservation${g.resas.length>1?"s":""}`, statut:"completed", date_paiement:new Date().toISOString() }]);
               }
             } else {
-              // Natation : calculer montant forfait × nombre d'enfants
-              const PRIX_NAT_V = PRIX_NAT_V2;
+              // Natation : calculer montant forfait selon date de création
               const membreId = g.resas[0]?.membre_id;
               const r0 = g.resas[0];
               const nbEnfants = Math.max(1, Array.isArray(r0?.enfants) ? r0.enfants.length : 1);
@@ -9740,7 +9747,8 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
                 return k2 === enfKey && (r.created_at||"").slice(0,16) === minute;
               });
               const n = sameGroup.length;
-              const prixParEnfant = n <= 10 ? (PRIX_NAT_V[n]||n*20) : 190+(n-10)*19;
+              const dateRef = r0?.created_at || new Date().toISOString();
+              const prixParEnfant = getPrixNatGlobal(n, dateRef);
               const montantNat = prixParEnfant * nbEnfants;
               await Promise.all(g.resas.map(r => sb.from(table).update({ statut:"confirmed", validated_at:new Date().toISOString(), mode_paiement:mode }).eq("id", r.id)));
               // ── Insert paiement natation ──
