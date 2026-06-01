@@ -779,7 +779,7 @@ function FormulesChoixScreen({ onNav }) {
             <div style={{ color: "#fff", fontWeight: 900, fontSize: 16, marginBottom: 2 }}>Formules Natation</div>
             <div style={{ color: "rgba(255,255,255,0.8)", fontSize: 12 }}>1, 5, 6 ou 10 leçons</div>
             <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
-              {["20 €", "95 €", "113 €", "170 €"].map(p => (
+              {["23 €", "105 €", "120 €", "190 €"].map(p => (
                 <div key={p} style={{ background: "rgba(255,255,255,0.2)", borderRadius: 50, padding: "3px 10px", color: "#fff", fontSize: 11, fontWeight: 800 }}>{p}</div>
               ))}
             </div>
@@ -1207,14 +1207,14 @@ function FormulesNatationScreen({ onNav, user, allSeasonSessions, setAllSeasonSe
   const getTodayISO = () => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}-${String(t.getDate()).padStart(2,"0")}`; };
   const getSpots = (dayISO, time) => {
     if (dayISO === getTodayISO()) return 0;
-    // Vérifier si le créneau existe encore (non supprimé par admin)
+    const sessions = (allSeasonSessions && allSeasonSessions.length > 0) ? allSeasonSessions : ALL_SEASON_SLOTS_INIT;
     const dayObj = ALL_SEASON_DAYS.find(d => {
       const dd = d.date;
       if (!dd) return false;
       const iso = `${dd.getFullYear()}-${String(dd.getMonth()+1).padStart(2,"0")}-${String(dd.getDate()).padStart(2,"0")}`;
       return iso === dayISO;
     });
-    if (dayObj && allSeasonSessions && !allSeasonSessions.some(s => s.day === dayObj.id && s.time === time)) {
+    if (dayObj && !sessions.some(s => s.day === dayObj.id && s.time === time)) {
       return 0; // Supprimé par l'admin
     }
     const taken = dbResasNat.filter(r => r.date_seance?.slice(0,10) === dayISO && r.heure === time)
