@@ -2485,7 +2485,7 @@ function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSession
 
   // Prix unitaire × nb enfants sélectionnés × forfait
   const nbEnf = Math.max(1, selectedEnfants.length);
-  const prixSeance = 20 * nbEnf;
+  const prixSeance = getPrixNatGlobal(1, new Date()) * nbEnf;
 
   const handleConfirm = async () => {
     if (!selectedEnfants.length) { alert("Veuillez sélectionner au moins un enfant."); return; }
@@ -2635,7 +2635,7 @@ function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSession
 
         {/* Prix */}
         <div style={{ background:`${C.ocean}08`, borderRadius:14, padding:"12px 16px", display:"flex", justifyContent:"space-between", alignItems:"center", border:`1.5px solid ${C.ocean}20` }}>
-          <span style={{ fontSize:13, color:C.ocean, fontWeight:800 }}>💰 20 € × {nbEnf} enfant{nbEnf>1?"s":""} = <strong>{prixSeance} €</strong></span>
+          <span style={{ fontSize:13, color:C.ocean, fontWeight:800 }}>💰 {getPrixNatGlobal(1, new Date())} € × {nbEnf} enfant{nbEnf>1?"s":""} = <strong>{prixSeance} €</strong></span>
           <span style={{ fontSize:11, color:"#aaa" }}>Forfait appliqué dans le panier</span>
         </div>
 
