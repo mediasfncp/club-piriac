@@ -5053,12 +5053,14 @@ function PaiementsTab({ onValidate }) {
   const grouper = (liste) => {
     const groups = {};
 
-    // Construire un index dates→commande pour le club
+    // Construire un index dates→commande pour le club (inclure enfants dans la clé)
     const dateToCommande = {};
     commandesClub.forEach(c => {
       if (Array.isArray(c.dates)) {
+        const enfKey = Array.isArray(c.enfants) ? [...c.enfants].map(e => e.trim().toLowerCase()).sort().join(",") : "";
         c.dates.forEach(d => {
-          if (!dateToCommande[`${c.membre_id}-${d}`]) dateToCommande[`${c.membre_id}-${d}`] = c.id;
+          const k = `${c.membre_id}-${d}-${enfKey}`;
+          if (!dateToCommande[k]) dateToCommande[k] = c.id;
         });
       }
     });
@@ -5069,7 +5071,8 @@ function PaiementsTab({ onValidate }) {
       if (r._type === "club") {
         // Utiliser l'id de commande_club si disponible, sinon minute
         const dateR = r.date_reservation?.slice(0,10);
-        const commandeId = dateR ? dateToCommande[`${r.membre_id}-${dateR}`] : null;
+        const resaEnfKey = Array.isArray(r.enfants) ? [...r.enfants].map(e => e.trim().toLowerCase()).sort().join(",") : "";
+        const commandeId = dateR ? dateToCommande[`${r.membre_id}-${dateR}-${resaEnfKey}`] : null;
         key = commandeId
           ? `${r.membre_id}-club-cmd-${commandeId}`
           : `${r.membre_id}-club-${minuteCreation}`;
