@@ -5052,15 +5052,31 @@ function PaiementsTab({ onValidate }) {
   // Grouper par membre + type + bloc temporel (créés le même jour)
   const grouper = (liste) => {
     const groups = {};
+
+    // Construire un index dates→commande pour le club
+    const dateToCommande = {};
+    commandesClub.forEach(c => {
+      if (Array.isArray(c.dates)) {
+        c.dates.forEach(d => {
+          if (!dateToCommande[`${c.membre_id}-${d}`]) dateToCommande[`${c.membre_id}-${d}`] = c.id;
+        });
+      }
+    });
+
     liste.forEach(r => {
-      // Grouper à la minute : résas d'une même commande créées quasi-simultanément
       const minuteCreation = (r.created_at||"").slice(0,16);
-      // Club: grouper par session + enfants (trié) + minute → chaque combinaison enfant/session = 1 groupe
-      const enfantsKey = Array.isArray(r.enfants) ? [...r.enfants].sort().join(",") : "";
-      const keyClub = r._type === "club"
-        ? `${r.membre_id}-club-${enfantsKey}-${minuteCreation}` // matin+apmidi même groupe si même minute+enfants
-        : null;
-      const key = keyClub || `${r.membre_id}-${r._type}-${enfantsKey}-${minuteCreation}`;
+      let key;
+      if (r._type === "club") {
+        // Utiliser l'id de commande_club si disponible, sinon minute
+        const dateR = r.date_reservation?.slice(0,10);
+        const commandeId = dateR ? dateToCommande[`${r.membre_id}-${dateR}`] : null;
+        key = commandeId
+          ? `${r.membre_id}-club-cmd-${commandeId}`
+          : `${r.membre_id}-club-${minuteCreation}`;
+      } else {
+        const enfantsKey = Array.isArray(r.enfants) ? [...r.enfants].sort().join(",") : "";
+        key = `${r.membre_id}-${r._type}-${enfantsKey}-${minuteCreation}`;
+      }
       if (!groups[key]) groups[key] = {
         key, membre: r.membres, type: r._type, statut: r.statut,
         created_at: r.created_at, resas: [],
@@ -5068,7 +5084,6 @@ function PaiementsTab({ onValidate }) {
       groups[key].resas.push(r);
     });
     return Object.values(groups).sort((a, b) => {
-      // Trier par date de la première séance (chronologique)
       const dateA = a.resas.map(r => `${r.date_seance||r.date_reservation||r.created_at||""} ${r.heure||""}`).sort()[0] || a.created_at || "";
       const dateB = b.resas.map(r => `${r.date_seance||r.date_reservation||r.created_at||""} ${r.heure||""}`).sort()[0] || b.created_at || "";
       return dateA.localeCompare(dateB);
