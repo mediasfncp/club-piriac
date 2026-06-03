@@ -5032,22 +5032,6 @@ function PaiementsTab({ onValidate }) {
       }
     }
 
-    // Si c'est un achat Carte Liberté → créditer ou décréditer le solde
-    if (groupe.type === "club" && groupe.resas.some(r => !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6)) {
-      const r = groupe.resas[0];
-      const credit = Number(r.enfants?.[0]) || 0;
-      if (credit > 0 && r.membre_id) {
-        const { data: m } = await sb.from("membres").select("liberte_balance, liberte_total").eq("id", r.membre_id).maybeSingle();
-        if (m) {
-          const delta = newStatut === "confirmed" ? credit : -credit;
-          await sb.from("membres").update({
-            liberte_balance: Math.max(0, (m.liberte_balance||0) + delta),
-            liberte_total:   Math.max(0, (m.liberte_total||0) + (newStatut === "confirmed" ? credit : 0)),
-          }).eq("id", r.membre_id);
-        }
-      }
-    }
-
     // Si c'est une utilisation carte liberté → décrémenter ou récréditer
     if (groupe.type === "club" && groupe.resas.some(r => (r.label_jour||"").startsWith("[LIBERTE]"))) {
       const membreId = groupe.resas[0]?.membre_id;
@@ -5055,7 +5039,7 @@ function PaiementsTab({ onValidate }) {
       if (membreId && nbUtil > 0) {
         const { data: m } = await sb.from("membres").select("liberte_balance").eq("id", membreId).maybeSingle();
         if (m) {
-          const delta = newStatut === "confirmed" ? -nbUtil : nbUtil; // confirmer = décrémenter
+          const delta = newStatut === "confirmed" ? -nbUtil : nbUtil;
           await sb.from("membres").update({ liberte_balance: Math.max(0, (m.liberte_balance||0) + delta) }).eq("id", membreId);
         }
       }
