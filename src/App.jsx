@@ -9699,11 +9699,13 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
             // Si compte fin de saison → confirmer mais activer compte_fin_saison sur le membre
             if (mode === "compte_fin_saison") {
               if (g.type === "club") {
-                const LIBERTE_PRIX_V = {6:96,12:180,18:252,24:288,30:330};
+                const dateRefCfs = g.resas[0]?.created_at || new Date().toISOString();
+                const liberteArrCfs = getTarifsVersion(dateRefCfs).liberte;
+                const LIBERTE_PRIX_CFS = {6:liberteArrCfs[0]?.price||108, 12:liberteArrCfs[1]?.price||204, 18:liberteArrCfs[2]?.price||288, 24:liberteArrCfs[3]?.price||360, 30:liberteArrCfs[4]?.price||420};
                 for (const r of g.resas) {
                   let montant = 0;
                   const isLib = !isNaN(Number(r.enfants?.[0])) && Number(r.enfants?.[0]) >= 6;
-                  if (isLib) { montant = LIBERTE_PRIX_V[Number(r.enfants[0])]||0; }
+                  if (isLib) { montant = LIBERTE_PRIX_CFS[Number(r.enfants[0])]||0; }
                   else { const m2=(r.label_jour||"").match(/\[MONTANT:(\d+)\]/); montant=m2?Number(m2[1]):0; }
                   await sb.from(table).update({ statut:"confirmed", validated_at:new Date().toISOString(), montant, mode_paiement:mode }).eq("id", r.id);
                 }
@@ -9722,7 +9724,9 @@ function AdminScreen({ onNav, sessions, setSessions, reservations, allSeasonSess
             }
 
             if (g.type === "club") {
-              const LIBERTE_PRIX_V = {6:96,12:180,18:252,24:288,30:330};
+              const dateRefClub = g.resas[0]?.created_at || new Date().toISOString();
+              const liberteArrClub = getTarifsVersion(dateRefClub).liberte;
+              const LIBERTE_PRIX_V = {6:liberteArrClub[0]?.price||108, 12:liberteArrClub[1]?.price||204, 18:liberteArrClub[2]?.price||288, 24:liberteArrClub[3]?.price||360, 30:liberteArrClub[4]?.price||420};
               const membreIdClub = g.resas[0]?.membre_id;
               const r0club = g.resas[0];
               const isLiberte = !isNaN(Number(r0club?.enfants?.[0])) && Number(r0club?.enfants?.[0]) >= 6;
