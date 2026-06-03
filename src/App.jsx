@@ -2626,7 +2626,7 @@ function ReservationScreen({ onNav, user, allSeasonSessions, setAllSeasonSession
             {/* Prix dynamique */}
             <div style={{ marginTop:12, display:"flex", justifyContent:"space-between", alignItems:"center", background:`${C.ocean}08`, borderRadius:10, padding:"8px 12px" }}>
               <span style={{ fontSize:13, color:"#888", fontWeight:700 }}>
-                20 € × {nbEnf} enfant{nbEnf>1?"s":""}
+                {getPrixNatGlobal(1, new Date())} € × {nbEnf} enfant{nbEnf>1?"s":""}
               </span>
               <span style={{ fontSize:18, fontWeight:900, color:C.coral }}>{prixSeance} €</span>
             </div>
@@ -5127,16 +5127,18 @@ function PaiementsTab({ onValidate }) {
   };
 
   const getClubMontant = (g) => {
+    const dateRef = g.resas[0]?.created_at || g.resas[0]?.validated_at || new Date().toISOString();
+    const tarifsVer = getTarifsVersion(dateRef);
+    const liberteArr = tarifsVer.liberte;
+    const LIBERTE_PRIX = { 6: liberteArr[0]?.price||108, 12: liberteArr[1]?.price||204, 18: liberteArr[2]?.price||288, 24: liberteArr[3]?.price||360, 30: liberteArr[4]?.price||420 };
+
     if (isLiberte(g)) {
       const nb = Number(g.resas[0]?.enfants?.[0]) || 0;
       return LIBERTE_PRIX[nb] ? `${LIBERTE_PRIX[nb]} €` : "—";
     }
 
     const membreId = g.resas[0]?.membre_id;
-    // Dates de toutes les résas du groupe
     const datesGroupe = new Set(g.resas.map(r => r.date_reservation?.slice(0,10)).filter(Boolean));
-
-    // Trouver toutes les commandes_club dont AU MOINS UNE date est dans le groupe
     const commandesTrouvees = commandesClub.filter(c =>
       c.membre_id === membreId &&
       Array.isArray(c.dates) &&
@@ -5147,32 +5149,24 @@ function PaiementsTab({ onValidate }) {
       return `${total} €`;
     }
 
-    // Fallback pour anciennes résas sans commandes_club : calculer par session séparément
     const resas = g.resas.filter(r => !(Array.isArray(r.enfants) && Number(r.enfants[0]) >= 6));
     if (resas.length === 0) return "—";
     const nbEnfants = (resas[0]?.enfants||[]).length || 1;
 
-    const calcSession = (resasSess, tarif) => {
+    const calcSession = (resasSess) => {
       const nbJ = resasSess.length;
       if (nbJ === 0) return 0;
-      // Lire les montants depuis les labels [MONTANT:X]
       const montants = resasSess.map(r => {
         const m2 = (r.label_jour||"").match(/\[MONTANT:(\d+)\]/);
         return r.montant ? Number(r.montant) : m2 ? Number(m2[1]) : 0;
       });
-      const allSame = montants.every(m => m === montants[0]) && montants[0] > 0;
-      if (allSame) {
-        // Forfait réparti par jour → total = montants[0] est la part journalière
-        // Chercher le vrai total dans commandes_club via les dates
-        return montants[0] * nbJ; // sera corrigé par commandes_club lors de la validation
-      }
       return montants.reduce((s,m) => s+m, 0);
     };
 
     const resasMatin  = resas.filter(r => r.session === "matin");
     const resasApmidi = resas.filter(r => r.session === "apmidi");
-    const totalMatin  = calcSession(resasMatin,  TARIFS_MATIN);
-    const totalApmidi = calcSession(resasApmidi, TARIFS_APMIDI);
+    const totalMatin  = calcSession(resasMatin);
+    const totalApmidi = calcSession(resasApmidi);
     const total = totalMatin + totalApmidi;
     return total > 0 ? `${total} €` : "—";
   };
@@ -7126,7 +7120,7 @@ function NouvelleResaModal({ onClose, onSaved, dbMembres, allSeasonSessions, set
               <div>
                 <label style={{ fontSize:11, fontWeight:900, color:C.ocean, display:"block", marginBottom:6, textTransform:"uppercase" }}>Formule</label>
                 <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-                  {[["unite","1 · 20€"],["forfait5","5 · 95€"],["forfait6","6 · 113€"],["forfait10","10 · 170€"],["libre","🔢 Libre"]].map(([k,l]) => (
+                  {[["unite","1 · 23€"],["forfait5","5 · 105€"],["forfait6","6 · 120€"],["forfait10","10 · 190€"],["libre","🔢 Libre"]].map(([k,l]) => (
                     <button key={k} onClick={() => { setForfaitNat(k); setSelectedCreneaux([]); }} style={{ flex:1, background: forfaitNat===k ? C.ocean : "#f0f0f0", color: forfaitNat===k ? "#fff" : "#888", border:"none", borderRadius:12, padding:"8px 4px", cursor:"pointer", fontWeight:800, fontSize:10, fontFamily:"inherit" }}>{l}</button>
                   ))}
                 </div>
