@@ -5141,11 +5141,15 @@ function PaiementsTab({ onValidate }) {
 
     const membreId = g.resas[0]?.membre_id;
     const datesGroupe = new Set(g.resas.map(r => r.date_reservation?.slice(0,10)).filter(Boolean));
-    const commandesTrouvees = commandesClub.filter(c =>
-      c.membre_id === membreId &&
-      Array.isArray(c.dates) &&
-      c.dates.some(d => datesGroupe.has(d))
-    );
+    const enfantsGroupe = new Set(g.resas.flatMap(r => Array.isArray(r.enfants) ? r.enfants.map(e => e.trim().toLowerCase()) : []));
+
+    const commandesTrouvees = commandesClub.filter(c => {
+      if (c.membre_id !== membreId || !Array.isArray(c.dates)) return false;
+      // Les enfants de la commande doivent correspondre aux enfants du groupe
+      const cmdEnfants = Array.isArray(c.enfants) ? c.enfants.map(e => e.trim().toLowerCase()) : [];
+      if (cmdEnfants.length > 0 && !cmdEnfants.every(e => enfantsGroupe.has(e))) return false;
+      return c.dates.some(d => datesGroupe.has(d));
+    });
     if (commandesTrouvees.length > 0) {
       const total = commandesTrouvees.reduce((s, c) => s + Number(c.montant_total || 0), 0);
       return `${total} €`;
